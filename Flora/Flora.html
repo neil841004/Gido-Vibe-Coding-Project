@@ -91,11 +91,29 @@
             },
 
             // 戰鬥相關 (Combat)
+            // 戰鬥相關 (Combat)
             combat: {
-                cooldown: 0.3,           // 攻擊冷卻時間 (秒)
-                attackLockDuration: 0, // 攻擊時無法移動的時間 (秒)
-                bulletSpeed: 30,         // 子彈飛行速度
-                bulletLife: 3.0,         // 子彈存在時間 (秒) - 暫時用
+                preFireDelay: 0.2,       // 攻擊前搖時間 (秒)
+                duoWindow: 0.2,          // 雙人合體技判定窗口 (秒) - 建議與前搖時間一致
+                cooldown: 0.7,           // 攻擊冷卻時間 (秒) - 發射後開始計算
+                // attackLockDuration: 0, // [已移除] 攻擊不鎖定移動
+            },
+
+            // 子彈參數 (Bullets)
+            bullet: {
+                single: {
+                    speedMin: 20,        // [單人] 飛行速度最小值
+                    speedMax: 28,        // [單人] 飛行速度最大值
+                    lifeMin: 0.8,        // [單人] 存在時間最小值 (秒)
+                    lifeMax: 1.4,        // [單人] 存在時間最大值 (秒)
+                    spread: 0.4,        // [單人] 散射角度 (弧度)
+                    gravity: 25,         // [單人] 重力下墜值
+                },
+                duo: {
+                    speed: 50,           // [雙人] 飛行速度 (固定)
+                    life: 4.0,           // [雙人] 存在時間 (固定)
+                    gravity: 0,          // [雙人] 重力 (無)
+                }
             },
 
             // 合體技相關 (Combo / Charge)
@@ -163,12 +181,14 @@
         // --- Classes ---
 
         class Bullet {
-            constructor(owner, position, direction, speed) {
+            constructor(owner, position, direction, speed, life, gravity) {
                 this.owner = owner; // 'p1', 'p2', or 'merged'
                 this.type = owner === 'merged' ? 'large' : 'small';
                 this.direction = direction.clone();
-                this.speed = speed;
-                this.createdAt = performance.now();
+                this.velocity = this.direction.clone().multiplyScalar(speed);
+                this.gravity = gravity;
+                this.maxLife = life;
+                this.lifeTimer = 0;
                 this.markedForDeletion = false;
 
                 const size = this.type === 'large' ? 0.8 : 0.3;
@@ -183,10 +203,21 @@
             }
 
             update(dt) {
-                this.mesh.position.add(this.direction.clone().multiplyScalar(this.speed * dt));
+                // Apply Gravity
+                if (this.gravity !== 0) {
+                    this.velocity.y -= this.gravity * dt;
+                }
 
-                // Temp: auto-delete after 3 seconds
-                if (performance.now() - this.createdAt > CONFIG.combat.bulletLife * 1000) {
+                this.mesh.position.add(this.velocity.clone().multiplyScalar(dt));
+
+                // Life check
+                this.lifeTimer += dt;
+                if (this.lifeTimer >= this.maxLife) {
+                    this.markedForDeletion = true;
+                }
+
+                // Floor check (Simple)
+                if (this.mesh.position.y < 0) {
                     this.markedForDeletion = true;
                 }
             }
@@ -204,8 +235,19 @@
                 this.velocity = new THREE.Vector3();
 
                 // Combat State
+                // Combat State
                 this.cooldowns = { p1: 0, p2: 0 };
-                this.attackDurations = { p1: 0, p2: 0 }; // If > 0, player is in "Attack Phase"
+
+                // New Combat State Machine
+                // Windup state: > 0 means preparing to fire
+                this.windupTimer = { p1: 0, p2: 0 };
+                this.isWindup = { p1: false, p2: false };
+
+                // Input tracking for "Fresh Press"
+                this.lastAttackInput = { p1: false, p2: false };
+
+                // Duo Synergy State
+                this.pendingDuo = false; // True if a Duo Shot is queued to fire at end of windup
 
                 // Combo State
                 this.isFiringBeam = false;
@@ -213,6 +255,12 @@
 
                 this.buildModel();
                 this.buildIndicators();
+
+                // Save original materials for color restoration
+                this.baseColorP1 = new THREE.Color(CONFIG.visuals.colors.p1);
+                this.baseColorP2 = new THREE.Color(CONFIG.visuals.colors.p2);
+                this.darkColorP1 = this.baseColorP1.clone().multiplyScalar(0.4); // Darker version
+                this.darkColorP2 = this.baseColorP2.clone().multiplyScalar(0.4);
 
                 scene.add(this.mesh);
             }
@@ -308,7 +356,29 @@
                 this.mouth.getWorldPosition(spawnPos);
                 spawnPos.add(this.getForwardVector().multiplyScalar(0.5));
 
-                const bullet = new Bullet(owner, spawnPos, this.getForwardVector(), CONFIG.combat.bulletSpeed);
+                let speed, life, gravity, direction;
+
+                if (owner === 'merged') {
+                    // DUO SHOT: Straight, Fixed, No Gravity
+                    speed = CONFIG.bullet.duo.speed;
+                    life = CONFIG.bullet.duo.life;
+                    gravity = CONFIG.bullet.duo.gravity;
+                    direction = this.getForwardVector();
+                } else {
+                    // SINGLE SHOT: Spread, Random, Gravity
+                    const cfg = CONFIG.bullet.single;
+                    speed = THREE.MathUtils.randFloat(cfg.speedMin, cfg.speedMax);
+                    life = THREE.MathUtils.randFloat(cfg.lifeMin, cfg.lifeMax);
+                    gravity = cfg.gravity;
+
+                    // Spread
+                    const spreadAngle = (Math.random() - 0.5) * cfg.spread;
+                    const baseDir = this.getForwardVector();
+                    const axis = new THREE.Vector3(0, 1, 0); // Rotate around Y
+                    direction = baseDir.applyAxisAngle(axis, spreadAngle);
+                }
+
+                const bullet = new Bullet(owner, spawnPos, direction, speed, life, gravity);
                 state.bullets.push(bullet);
             }
 
@@ -375,23 +445,114 @@
 
 
                 // --- Combat Inputs ---
+                // --- Combat Logic Updates ---
+
+                // 1. Cooldown Management
                 if (this.cooldowns.p1 > 0) this.cooldowns.p1 -= dt;
                 if (this.cooldowns.p2 > 0) this.cooldowns.p2 -= dt;
-                if (this.attackDurations.p1 > 0) this.attackDurations.p1 -= dt;
-                if (this.attackDurations.p2 > 0) this.attackDurations.p2 -= dt;
 
-                // Fire P1
-                if (state.input.p1.attack && this.cooldowns.p1 <= 0 && !p1Charging) {
-                    this.shoot('p1');
-                    this.cooldowns.p1 = CONFIG.combat.cooldown;
-                    this.attackDurations.p1 = CONFIG.combat.attackLockDuration;
+                // 2. Input Detection (Fresh Press)
+                const p1Press = state.input.p1.attack && !this.lastAttackInput.p1;
+                const p2Press = state.input.p2.attack && !this.lastAttackInput.p2;
+                this.lastAttackInput.p1 = state.input.p1.attack;
+                this.lastAttackInput.p2 = state.input.p2.attack;
+
+                // 3. Initiate Windup
+                // If press, and not cooldown, and not charging, start windup
+                if (p1Press && this.cooldowns.p1 <= 0 && !p1Charging && !this.isWindup.p1) {
+                    this.isWindup.p1 = true;
+                    this.windupTimer.p1 = CONFIG.combat.preFireDelay;
                 }
-                // Fire P2
-                if (state.input.p2.attack && this.cooldowns.p2 <= 0 && !p2Charging) {
-                    this.shoot('p2');
+                if (p2Press && this.cooldowns.p2 <= 0 && !p2Charging && !this.isWindup.p2) {
+                    this.isWindup.p2 = true;
+                    this.windupTimer.p2 = CONFIG.combat.preFireDelay;
+                }
+
+                // 4. Duo Synergy Check
+                // If one is in windup, and other presses, it's a Duo Trigger!
+                // Actually, if BOTH inputs happen within the window (which is the same as windup duration)
+                // Logic: 
+                //    If P1 is winding up, and P2 presses -> P1 marks "Pending Duo", P2 joins windup (or just burns cooldown?)
+                //    Requirement: "Two players input gap < 0.3s"
+                //    "Duo bullet fire time = First player start time + preFireDelay"
+
+                if (this.isWindup.p1 && p2Press && !p2Charging) {
+                    // P1 was waiting, P2 joined.
+                    // The shot will fire when P1's timer ends.
+                    // We need to mark that it will be a DUO shot.
+                    this.pendingDuo = true;
+                    // Reset P2 cooldown so they "spent" their shot
                     this.cooldowns.p2 = CONFIG.combat.cooldown;
-                    this.attackDurations.p2 = CONFIG.combat.attackLockDuration;
+                    // P2 Visuals? They should probably also flash white technically? 
+                    // Or just sync attack. Let's start P2 windup too but sync it to P1?
+                    // Simplest interpretation: Just mark PendingDuo. P2 participation is recorded.
                 }
+                else if (this.isWindup.p2 && p1Press && !p1Charging) {
+                    // P2 was waiting, P1 joined.
+                    this.pendingDuo = true;
+                    this.cooldowns.p1 = CONFIG.combat.cooldown;
+                }
+
+                // 5. Process Windup Timers & Firing
+                ['p1', 'p2'].forEach(p => {
+                    if (this.isWindup[p]) {
+                        this.windupTimer[p] -= dt;
+
+                        // Visual Color Lerp (Red -> White)
+                        const part = p === 'p1' ? this.p1Part : this.p2Part;
+                        const base = p === 'p1' ? this.baseColorP1 : this.baseColorP2;
+
+                        // Normalized time 0 to 1 (0=start, 1=ready)
+                        const t = 1.0 - (this.windupTimer[p] / CONFIG.combat.preFireDelay);
+                        part.material.color.lerpColors(base, new THREE.Color(0xffffff), t);
+
+                        if (this.windupTimer[p] <= 0) {
+                            // FIRE!
+                            this.isWindup[p] = false;
+
+                            if (this.pendingDuo) {
+                                // Only the "leader" (the one whose timer expired) fires the Duo shot?
+                                // Optimization: If both are winding up independently and collide, 
+                                // we need to avoid double firing.
+                                // But PendingDuo is global for the pair.
+
+                                // Check if we already fired this frame (due to other player loop)?
+                                // Let's simplify: Only fire if THIS player initiated the Duo?
+                                // Or fire Duo, clear PendingDuo.
+                                if (this.pendingDuo) {
+                                    this.shoot('merged');
+                                    this.pendingDuo = false; // Consumed
+
+                                    // CRITICAL FIX: Stop BOTH windups immediately
+                                    this.isWindup.p1 = false;
+                                    this.isWindup.p2 = false;
+
+                                    // Set both to cooldown
+                                    this.cooldowns.p1 = CONFIG.combat.cooldown;
+                                    this.cooldowns.p2 = CONFIG.combat.cooldown;
+                                }
+                            } else {
+                                // Fire Single
+                                this.shoot(p);
+                                this.cooldowns[p] = CONFIG.combat.cooldown;
+                            }
+                        }
+                    } else {
+                        // Not Windup. Check Cooldown state for Dark Color
+                        const coold = this.cooldowns[p];
+                        const part = p === 'p1' ? this.p1Part : this.p2Part;
+                        const base = p === 'p1' ? this.baseColorP1 : this.baseColorP2; // Normal
+                        const dark = p === 'p1' ? this.darkColorP1 : this.darkColorP2; // Dark
+
+                        if (coold > 0) {
+                            // "Instant Dark until cooldown ends"
+                            part.material.color.copy(dark);
+                        } else {
+                            // Normal
+                            part.material.color.copy(base);
+                        }
+                    }
+                });
 
                 // --- Movement Physics ---
                 const p1Input = state.input.p1.move;
@@ -421,8 +582,9 @@
                 }
 
                 // Dual Force Logic
-                const p1CanMove = this.attackDurations.p1 <= 0 && v1.lengthSq() > 0.01 && !p1Charging;
-                const p2CanMove = this.attackDurations.p2 <= 0 && v2.lengthSq() > 0.01 && !p2Charging;
+                // Removed attackLockDuration blockage
+                const p1CanMove = v1.lengthSq() > 0.01 && !p1Charging;
+                const p2CanMove = v2.lengthSq() > 0.01 && !p2Charging;
 
                 // Calculate Target Velocity based on Input
                 const dir1 = p1CanMove ? v1 : new THREE.Vector3();
@@ -561,31 +723,7 @@
                     state.bullets.splice(i, 1);
                 }
             }
-
-            // Merging Logic
-            const now = performance.now();
-            const candidates = state.bullets.filter(b => b.type === 'small' && (now - b.createdAt) < CONFIG.combo.mergeWindow);
-
-            for (let i = 0; i < candidates.length; i++) {
-                for (let j = i + 1; j < candidates.length; j++) {
-                    const b1 = candidates[i];
-                    const b2 = candidates[j];
-
-                    if (b1.owner !== b2.owner && !b1.markedForDeletion && !b2.markedForDeletion) {
-                        const dist = b1.mesh.position.distanceTo(b2.mesh.position);
-                        if (dist < CONFIG.combo.mergeDistance) { // Threshold
-                            b1.markedForDeletion = true;
-                            b2.markedForDeletion = true;
-
-                            const midPos = b1.mesh.position.clone().add(b2.mesh.position).multiplyScalar(0.5);
-                            const avgDir = b1.direction.clone().add(b2.direction).normalize();
-
-                            const bigBullet = new Bullet('merged', midPos, avgDir.lengthSq() > 0 ? avgDir : new THREE.Vector3(0, 0, 1), 25);
-                            state.bullets.push(bigBullet);
-                        }
-                    }
-                }
-            }
+            // Merging Logic REMOVED (Replaced by Input-based Duo Shot)
         }
 
         // --- Main Loop ---
