@@ -197,7 +197,15 @@
                 chargeRateIndividual: 40, // 單人蓄力時脈衝增加速度 (每秒)
                 chargeRateDuo: 110,        // 雙人蓄力時脈衝增加速度 (每秒) - 鼓勵合作
                 decayRate: 30,            // 沒人蓄力時脈衝消退速度 (每秒)
-                beamDuration: 3.0,        // 組合技射線持續時間 (秒)
+
+                // New Vine Sweep Config
+                preCastDelay: 3.0,        // 前搖時間 (秒)
+                activeDuration: 5.0,      // 傷害持續時間 (秒)
+                radius: 12.0,             // 攻擊半徑
+                vineCount: 8,             // 藤蔓數量
+                vineSpeed: 5.0,           // 揮舞速度
+                moveSpeedFactor: 0.2,     // 施法時移動速度倍率
+
                 mergeDistance: 1.0,       // 子彈合併判定距離
                 mergeWindow: 500,         // 子彈合併判定時間窗口 (毫秒)
             },
@@ -410,6 +418,90 @@
             }
         }
 
+        class Vine {
+            constructor(parent, index, total) {
+                this.mesh = new THREE.Group();
+                parent.add(this.mesh);
+
+                this.segments = [];
+                const segmentCount = 6;
+                const length = CONFIG.combo.radius;
+                const segLen = length / segmentCount;
+
+                // Create segments
+                let parentObj = this.mesh;
+
+                for (let i = 0; i < segmentCount; i++) {
+                    const pivot = new THREE.Group();
+                    pivot.position.z = i === 0 ? 0 : segLen;
+
+                    const geo = new THREE.BoxGeometry(0.8, 0.8, segLen);
+                    // Green gradient
+                    const color = new THREE.Color().lerpColors(
+                        new THREE.Color(0x228822),
+                        new THREE.Color(0x88dd88),
+                        i / (segmentCount - 1)
+                    );
+                    const mat = new THREE.MeshLambertMaterial({ color: color });
+                    const mesh = new THREE.Mesh(geo, mat);
+                    mesh.position.z = segLen / 2; // Forward from pivot
+                    mesh.castShadow = true;
+
+                    pivot.add(mesh);
+                    parentObj.add(pivot);
+
+                    this.segments.push({ pivot: pivot, mesh: mesh });
+
+                    // Next segment attaches to this pivot
+                    parentObj = pivot;
+                }
+
+                // Initial Rotation
+                this.baseAngle = (index / total) * Math.PI * 2;
+                this.mesh.rotation.y = this.baseAngle;
+
+                this.isActive = false;
+                this.timer = 0;
+            }
+
+            setVisible(v) {
+                this.mesh.visible = v;
+            }
+
+            update(dt, isSweeping) {
+                this.timer += dt;
+
+                if (isSweeping) {
+                    // Wild Thrashing
+                    // Sine waves propagating down the chain
+                    const freq = 5.0;
+                    const speed = CONFIG.combo.vineSpeed;
+
+                    this.segments.forEach((seg, i) => {
+                        const offset = i * 0.5;
+                        const t = this.timer * speed - offset;
+
+                        // Side to side (Y rotation)
+                        seg.pivot.rotation.y = Math.sin(t) * 0.5 * (i > 0 ? 1 : 0.2);
+                        // Up and down (X rotation) - keep mostly near ground but rise up
+                        seg.pivot.rotation.x = Math.sin(t * 1.3) * 0.3;
+                    });
+
+                    // Rotate entire vine slowly?
+                    this.mesh.rotation.y = this.baseAngle + Math.sin(this.timer) * 0.5;
+
+                } else {
+                    // Rumble (Pre-cast)
+                    this.segments.forEach((seg, i) => {
+                        seg.pivot.rotation.x = (Math.random() - 0.5) * 0.1;
+                        seg.pivot.rotation.y = (Math.random() - 0.5) * 0.1;
+                        // Reset generally flat
+                        if (i > 0) seg.pivot.rotation.x *= 0.5;
+                    });
+                }
+            }
+        }
+
         class Flora {
             constructor() {
                 this.mesh = new THREE.Group();
@@ -494,32 +586,7 @@
                 this.p2Part.castShadow = true;
                 this.mesh.add(this.p2Part);
 
-                // 5. Beam Visual (Hidden initially)
-                // Cylinder
-                const beamGeo = new THREE.CylinderGeometry(0.5, 2, 20, 16); // TopRadius is small, BotRadius is big (cone-ish), length 20
-                beamGeo.rotateX(-Math.PI / 2); // Point Z
-                beamGeo.translate(0, 10, 0); // Active pivot is start, move mesh forward half length? No, Geometry translate
-                // Cylinder default is Y axis. Rotated X-90 -> Z axis. Center at 0.
-                // We want base at 0, pointing +Z. 
-                // Restore geometry logic:
-                // Cylinder centered at (0,0,0) height 20.
-                // rotateX(-90) -> points +Z.
-                // translate(0, 0, 10) -> moves center to +10Z, so base is at 0.
 
-                // Let's redo cleanly
-                const beamG = new THREE.CylinderGeometry(0.2, 4.0, 30, 12, 1, true);
-                beamG.rotateX(-Math.PI / 2);
-                beamG.translate(0, 0, 15); // Move center forward so one end is at 0
-
-                const beamMat = new THREE.MeshBasicMaterial({
-                    color: CONFIG.visuals.colors.beam,
-                    transparent: true,
-                    opacity: 0.8,
-                    blending: THREE.AdditiveBlending
-                });
-                this.beamMesh = new THREE.Mesh(beamG, beamMat);
-                this.beamMesh.visible = false;
-                this.mouth.add(this.beamMesh); // Child of mouth
 
                 // 6. Head Indicators (P1/P2)
                 // P1 Head Part (Red) - Left Side
@@ -535,6 +602,32 @@
                 this.p2HeadPart = new THREE.Mesh(p2HeadGeo, p2HeadMat);
                 this.p2HeadPart.position.set(0.6, 0.5, 0); // Right, Top
                 this.head.add(this.p2HeadPart);
+
+                // --- 5. Combo Visuals (New) ---
+                this.comboGroup = new THREE.Group();
+                this.mesh.add(this.comboGroup);
+
+                // A. Radius Indicator (Ring)
+                const r = CONFIG.combo.radius;
+                const ringGeo = new THREE.RingGeometry(r - 0.2, r, 64);
+                ringGeo.rotateX(-Math.PI / 2);
+                const ringMat = new THREE.MeshBasicMaterial({
+                    color: 0xff0000,
+                    side: THREE.DoubleSide,
+                    transparent: true,
+                    opacity: 0.0
+                });
+                this.comboRing = new THREE.Mesh(ringGeo, ringMat);
+                this.comboRing.position.y = 0.1;
+                this.comboGroup.add(this.comboRing);
+
+                // B. Vines
+                this.vines = [];
+                for (let i = 0; i < CONFIG.combo.vineCount; i++) {
+                    const vine = new Vine(this.comboGroup, i, CONFIG.combo.vineCount);
+                    vine.setVisible(false);
+                    this.vines.push(vine);
+                }
             }
 
             buildIndicators() {
@@ -591,39 +684,73 @@
 
             activateCombo() {
                 state.comboActive = true;
-                this.isFiringBeam = true;
-                this.beamTimer = CONFIG.combo.beamDuration; // 3 seconds duration
-                this.beamMesh.visible = true;
 
-                // Scale animation in update
-                this.beamMesh.scale.set(0.1, 0.1, 0.1);
+                // Initialize Combo State Machine
+                this.comboState = 'precast';
+                this.comboTimer = CONFIG.combo.preCastDelay;
+
+                // Visuals Setup
+                this.comboRing.material.opacity = 0.5;
+                this.comboRing.scale.set(0, 0, 0);
+
+                // Vines hidden during pre-cast
+                this.vines.forEach(v => {
+                    v.setVisible(false);
+                    v.timer = 0;
+                });
             }
 
             update(dt) {
                 // --- Combo Skill State ---
-                if (this.isFiringBeam) {
-                    this.beamTimer -= dt;
+                if (state.comboActive) {
+                    this.comboTimer -= dt;
 
-                    // Visual pulse
-                    const scale = 1.0 + Math.sin(performance.now() * 0.02) * 0.2;
-                    // Grow in Z initially
-                    const growth = Math.min(1, (CONFIG.combo.beamDuration - this.beamTimer) * 5); // Fast grow
-                    this.beamMesh.scale.set(scale, scale, growth);
+                    // 1. Pre-Cast Phase
+                    if (this.comboState === 'precast') {
+                        // Expand Ring Warning
+                        const progress = 1.0 - (this.comboTimer / CONFIG.combo.preCastDelay);
+                        this.comboRing.scale.set(progress, progress, progress);
 
-                    if (this.beamTimer <= 0) {
-                        this.isFiringBeam = false;
-                        state.comboActive = false;
-                        this.beamMesh.visible = false;
-                        state.pulseValue = 0; // Reset
+                        // Flash Ring
+                        this.comboRing.material.opacity = 0.5 + Math.sin(progress * 20) * 0.3;
+
+                        // Rumble Vines
+                        // this.vines.forEach(v => v.update(dt, false)); // REMOVED: Vines hidden in pre-cast
+
+                        if (this.comboTimer <= 0) {
+                            // Transition to Active
+                            this.comboState = 'active';
+                            this.comboTimer = CONFIG.combo.activeDuration;
+
+                            // Visual Pop
+                            this.comboRing.material.opacity = 0.8;
+                            this.comboRing.scale.set(1, 1, 1);
+
+                            // Show Vines
+                            this.vines.forEach(v => v.setVisible(true));
+                        }
+
+                        // Freeze Movement during PRE-CAST
+                        return;
                     }
+                    // 2. Active Phase (Damage/Sweep)
+                    else if (this.comboState === 'active') {
+                        this.vines.forEach(v => v.update(dt, true));
 
-                    // Stop movement while firing beam? Yes usually.
-                    // But assume "Combo Skill" locks movement.
-                    // Return early to freeze movement physics?
-                    // Let's freeze position updates but maybe allow slight aiming?
-                    // User said: "Combo: Flora releases combo skill". 
-                    // Let's freeze completely for impact.
-                    return;
+                        // Fade ring slowly
+                        const remain = this.comboTimer / CONFIG.combo.activeDuration;
+                        this.comboRing.material.opacity = remain * 0.8;
+
+                        if (this.comboTimer <= 0) {
+                            // End Combo
+                            state.comboActive = false;
+                            this.comboRing.material.opacity = 0;
+                            this.vines.forEach(v => v.setVisible(false));
+                            state.pulseValue = 0;
+                        }
+
+                        // Allow Movement logic to run, but will be slowed down below
+                    }
                 }
 
 
@@ -857,6 +984,12 @@
                 if (inputDir.lengthSq() > 0.001) {
                     // Normalize and scale by maxSpeed
                     inputDir.normalize().multiplyScalar(CONFIG.movement.maxSpeed);
+
+                    // Apply Slow during Combo Active
+                    if (state.comboActive && this.comboState === 'active') {
+                        inputDir.multiplyScalar(CONFIG.combo.moveSpeedFactor);
+                    }
+
                     targetVel.copy(inputDir);
                 }
 
