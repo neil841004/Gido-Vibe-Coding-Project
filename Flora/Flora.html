@@ -167,7 +167,7 @@
             // 戰鬥相關 (Combat)
             combat: {
                 preFireDelay: 0.5,       // 攻擊前搖時間 (秒)
-                duoWindow: 0.5,          // 雙人子彈合體判定窗口 (秒) - 建議與前搖時間一致
+                duoWindow: 0.2,          // 雙人子彈合體判定窗口 (秒) - 建議與前搖時間一致
                 cooldown: 0.5,           // 攻擊冷卻時間 (秒) - 發射後開始計算
                 // attackLockDuration: 0, // [已移除] 攻擊不鎖定移動
                 bufferWindow: 0.15        // 輸入預緩衝窗口 (秒)
@@ -199,12 +199,12 @@
                 decayRate: 30,            // 沒人蓄力時脈衝消退速度 (每秒)
 
                 // New Vine Sweep Config
-                preCastDelay: 3.0,        // 前搖時間 (秒)
+                preCastDelay: 2.3,        // 前搖時間 (秒)
                 activeDuration: 5.0,      // 傷害持續時間 (秒)
                 radius: 12.0,             // 攻擊半徑
-                vineCount: 8,             // 藤蔓數量
-                vineSpeed: 5.0,           // 揮舞速度
-                moveSpeedFactor: 0.2,     // 施法時移動速度倍率
+                vineCount: 2,             // 藤蔓數量
+                vineSpeed: 2.0,           // 揮舞速度
+                moveSpeedFactor: 0.4,     // 施法時移動速度倍率
 
                 mergeDistance: 1.0,       // 子彈合併判定距離
                 mergeWindow: 500,         // 子彈合併判定時間窗口 (毫秒)
@@ -217,8 +217,8 @@
                     p1: 0xff4444,     // 1P 顏色 (紅)
                     p2: 0x4444ff,     // 2P 顏色 (藍)
                     body: 0x44aa44,   // 身體顏色 (綠)
-                    head: 0xaa44aa,   // 頭部顏色 (紫)
-                    mouth: 0xffff00,  // 嘴巴顏色 (黃)
+                    head: 0x44aa44,   // 頭部顏色 (紫)
+                    mouth: 0x44aa44,  // 嘴巴顏色 (黃)
                     beam: 0xff00ff    // 射線顏色
                 }
             }
@@ -520,6 +520,11 @@
 
                 this.isActive = false;
                 this.timer = 0;
+
+                // Randomization Props
+                this.rndSpeed = 0.5 + Math.random() * 1.5; // range 0.5 - 2.0
+                this.rndPhase = Math.random() * 100;
+                this.rndAmp = 0.8 + Math.random() * 0.4;   // range 0.8 - 1.2
             }
 
             setVisible(v) {
@@ -530,31 +535,35 @@
                 this.timer += dt;
 
                 if (isSweeping) {
-                    // Wild Thrashing
-                    // Sine waves propagating down the chain
-                    const freq = 5.0;
-                    const speed = CONFIG.combo.vineSpeed;
+                    // Chaotic Thrashing (Horizontal Mainly)
+                    const baseSpeed = CONFIG.combo.vineSpeed * this.rndSpeed;
 
+                    // 1. Root Rotation (Overall Sweep)
+                    // Large amplitude sweep from base to cover wide area
+                    // Use noise-like sum of sines
+                    const t = this.timer * baseSpeed + this.rndPhase;
+
+                    const sweep = Math.sin(t) * 1.5 + Math.sin(t * 0.3) * 0.5; // Wide angles
+                    this.mesh.rotation.y = this.baseAngle + sweep * this.rndAmp;
+
+                    // 2. Segment Wiggle (Whip effect)
                     this.segments.forEach((seg, i) => {
-                        const offset = i * 0.5;
-                        const t = this.timer * speed - offset;
+                        const segT = t - (i * 0.3); // Delay for wave
 
-                        // Side to side (Y rotation)
-                        seg.pivot.rotation.y = Math.sin(t) * 0.5 * (i > 0 ? 1 : 0.2);
-                        // Up and down (X rotation) - keep mostly near ground but rise up
-                        seg.pivot.rotation.x = Math.sin(t * 1.3) * 0.3;
+                        // Horizontal Wiggle (Strong)
+                        seg.pivot.rotation.y = Math.sin(segT * 3.0) * (Math.PI / 4) * (1 + i * 0.2);
+
+                        // Vertical (Keeping it FLAT as requested)
+                        // Just a tiny breathing idle motion, near zero
+                        seg.pivot.rotation.x = Math.sin(t * 2.0 + i) * 0.05;
                     });
-
-                    // Rotate entire vine slowly?
-                    this.mesh.rotation.y = this.baseAngle + Math.sin(this.timer) * 0.5;
 
                 } else {
                     // Rumble (Pre-cast)
                     this.segments.forEach((seg, i) => {
                         seg.pivot.rotation.x = (Math.random() - 0.5) * 0.1;
-                        seg.pivot.rotation.y = (Math.random() - 0.5) * 0.1;
-                        // Reset generally flat
-                        if (i > 0) seg.pivot.rotation.x *= 0.5;
+                        // const jitter = (Math.random() - 0.5) * 0.1;
+                        // seg.pivot.rotation.y = jitter; // Keep Y mostly stable in pre-cast?
                     });
                 }
             }
@@ -579,6 +588,9 @@
 
                 // Input Buffer
                 this.bufferedInput = { p1: false, p2: false }; // True if input queued during cooldown
+
+                // Rhythm Validation State
+                this.rhythmBonus = { p1: false, p2: false };
 
                 // Track active indicators for merging
                 this.activeIndicators = { p1: null, p2: null };
@@ -663,7 +675,7 @@
 
                 // --- 5. Combo Visuals (New) ---
                 this.comboGroup = new THREE.Group();
-                this.mesh.add(this.comboGroup);
+                scene.add(this.comboGroup); // Attached to Scene (World Space)
 
                 // A. Radius Indicator (Ring)
                 const r = CONFIG.combo.radius;
@@ -907,6 +919,14 @@
                 if (checkTrigger('p1', p1Press) && !p1Charging && !this.isWindup.p1) {
                     this.isWindup.p1 = true;
                     this.windupTimer.p1 = CONFIG.combat.preFireDelay;
+
+                    // Rhythm Check
+                    // Distance from 0.5 (Center)
+                    const timeDiff = Math.abs(state.rhythmTime - 0.5) * cycleTime;
+                    this.rhythmBonus.p1 = timeDiff <= (CONFIG.combat.duoWindow / 2);
+
+                    console.log(`P1 Rhythm: ${this.rhythmBonus.p1} (Diff: ${timeDiff.toFixed(3)}s)`);
+
                     // Spawn Dot
                     if (this.activeIndicators.p1) this.activeIndicators.p1.remove();
                     this.activeIndicators.p1 = state.showInputFeedback('p1');
@@ -916,13 +936,22 @@
                 if (checkTrigger('p2', p2Press) && !p2Charging && !this.isWindup.p2) {
                     this.isWindup.p2 = true;
                     this.windupTimer.p2 = CONFIG.combat.preFireDelay;
+
+                    // Rhythm Check
+                    const timeDiff = Math.abs(state.rhythmTime - 0.5) * cycleTime;
+                    this.rhythmBonus.p2 = timeDiff <= (CONFIG.combat.duoWindow / 2);
+
+                    console.log(`P2 Rhythm: ${this.rhythmBonus.p2} (Diff: ${timeDiff.toFixed(3)}s)`);
+
                     // Spawn Dot
                     if (this.activeIndicators.p2) this.activeIndicators.p2.remove();
                     this.activeIndicators.p2 = state.showInputFeedback('p2');
                 }
 
                 // 4. Duo Synergy Check
-                if (this.isWindup.p1 && this.isWindup.p2 && !this.pendingDuo) {
+                // Requirement: Both valid windups AND both hit the rhythm window
+                if (this.isWindup.p1 && this.isWindup.p2 && !this.pendingDuo &&
+                    this.rhythmBonus.p1 && this.rhythmBonus.p2) {
                     // Both are winding up! (Could be simultaneous buffer or join)
                     this.pendingDuo = true;
                     this.cooldowns.p1 = CONFIG.combat.cooldown;
@@ -939,9 +968,22 @@
 
                     state.showInputFeedback('duo');
                 }
-                // 5. Process Windup Timers & Firing
+                // 5. Process Visuals (Charge > Windup > Cooldown > Normal)
                 ['p1', 'p2'].forEach(p => {
-                    if (this.isWindup[p]) {
+                    const isCharging = state.input[p].charge;
+                    const part = p === 'p1' ? this.p1Part : this.p2Part;
+                    const headPart = p === 'p1' ? this.p1HeadPart : this.p2HeadPart;
+
+                    if (isCharging) {
+                        // Psychedelic Rainbow
+                        const time = Date.now() * 0.005; // Speed
+                        const hue = time % 1.0;
+                        const rainbow = new THREE.Color().setHSL(hue, 1.0, 0.5);
+
+                        part.material.color.copy(rainbow);
+                        headPart.material.color.copy(rainbow);
+                    }
+                    else if (this.isWindup[p]) {
                         this.windupTimer[p] -= dt;
 
                         // Visual Color Lerp (Red -> White)
@@ -951,7 +993,11 @@
 
                         // Normalized time 0 to 1 (0=start, 1=ready)
                         const t = 1.0 - (this.windupTimer[p] / CONFIG.combat.preFireDelay);
-                        const c = new THREE.Color().lerpColors(base, new THREE.Color(0xffffff), t);
+
+                        // Target Color: Yellow if Rhythm Valid, White if not
+                        const targetHex = this.rhythmBonus[p] ? 0xffff00 : 0xffffff;
+                        const c = new THREE.Color().lerpColors(base, new THREE.Color(targetHex), t);
+
                         part.material.color.copy(c);
                         headPart.material.color.copy(c);
 
@@ -1106,6 +1152,11 @@
                 camera.position.x = this.mesh.position.x;
                 camera.position.z = this.mesh.position.z + 10;
                 camera.lookAt(this.mesh.position);
+
+                // Sync Combo Group Position (Manual)
+                if (this.comboGroup) {
+                    this.comboGroup.position.copy(this.mesh.position);
+                }
             }
         }
 
