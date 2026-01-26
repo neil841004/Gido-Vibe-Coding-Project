@@ -177,10 +177,10 @@
             bullet: {
                 single: {
                     size: 0.4,           // [單人] 子彈大小
-                    speedMin: 17,        // [單人] 飛行速度最小值
-                    speedMax: 23,        // [單人] 飛行速度最大值
-                    lifeMin: 0.8,        // [單人] 存在時間最小值 (秒)
-                    lifeMax: 1.4,        // [單人] 存在時間最大值 (秒)
+                    speedMin: 18,        // [單人] 飛行速度最小值
+                    speedMax: 21,        // [單人] 飛行速度最大值
+                    lifeMin: 0.9,        // [單人] 存在時間最小值 (秒)
+                    lifeMax: 1.3,        // [單人] 存在時間最大值 (秒)
                     spread: 0.4,        // [單人] 散射角度 (弧度)
                     gravity: 25,         // [單人] 重力下墜值
                 },
@@ -223,6 +223,7 @@
                 p2: { move: new THREE.Vector2(), attack: false, charge: false }
             },
             bullets: [],
+            particles: [], // Array for simple particles
             pulseValue: 0, // 0 to 100
             comboActive: false,
             // Rhythm State
@@ -371,6 +372,44 @@
             }
         }
 
+        class Particle {
+            constructor(position, color) {
+                this.life = 0.5; // Seconds
+                this.maxLife = 0.5;
+                this.velocity = new THREE.Vector3(
+                    (Math.random() - 0.5) * 10,
+                    (Math.random() - 0.5) * 10,
+                    (Math.random() - 0.5) * 10
+                );
+
+                const geo = new THREE.BoxGeometry(0.2, 0.2, 0.2);
+                const mat = new THREE.MeshBasicMaterial({ color: color });
+                this.mesh = new THREE.Mesh(geo, mat);
+                this.mesh.position.copy(position);
+
+                scene.add(this.mesh);
+            }
+
+            update(dt) {
+                this.life -= dt;
+                this.mesh.position.add(this.velocity.clone().multiplyScalar(dt));
+                this.mesh.rotation.x += dt * 5;
+                this.mesh.rotation.y += dt * 5;
+
+                // Scale down
+                const s = this.life / this.maxLife;
+                this.mesh.scale.set(s, s, s);
+
+                if (this.life <= 0) {
+                    scene.remove(this.mesh);
+                    this.mesh.geometry.dispose();
+                    this.mesh.material.dispose();
+                    return false; // Dead
+                }
+                return true; // Alive
+            }
+        }
+
         class Flora {
             constructor() {
                 this.mesh = new THREE.Group();
@@ -481,6 +520,21 @@
                 this.beamMesh = new THREE.Mesh(beamG, beamMat);
                 this.beamMesh.visible = false;
                 this.mouth.add(this.beamMesh); // Child of mouth
+
+                // 6. Head Indicators (P1/P2)
+                // P1 Head Part (Red) - Left Side
+                const p1HeadGeo = new THREE.BoxGeometry(0.3, 0.3, 0.3);
+                const p1HeadMat = new THREE.MeshLambertMaterial({ color: CONFIG.visuals.colors.p1 });
+                this.p1HeadPart = new THREE.Mesh(p1HeadGeo, p1HeadMat);
+                this.p1HeadPart.position.set(-0.6, 0.5, 0); // Left, Top
+                this.head.add(this.p1HeadPart);
+
+                // P2 Head Part (Blue) - Right Side
+                const p2HeadGeo = new THREE.BoxGeometry(0.3, 0.3, 0.3);
+                const p2HeadMat = new THREE.MeshLambertMaterial({ color: CONFIG.visuals.colors.p2 });
+                this.p2HeadPart = new THREE.Mesh(p2HeadGeo, p2HeadMat);
+                this.p2HeadPart.position.set(0.6, 0.5, 0); // Right, Top
+                this.head.add(this.p2HeadPart);
             }
 
             buildIndicators() {
@@ -512,6 +566,11 @@
                     life = CONFIG.bullet.duo.life;
                     gravity = CONFIG.bullet.duo.gravity;
                     direction = this.getForwardVector();
+
+                    // Spawn Particles
+                    for (let i = 0; i < 8; i++) {
+                        state.particles.push(new Particle(spawnPos, 0xffff00)); // Yellow burst
+                    }
                 } else {
                     // SINGLE SHOT: Spread, Random, Gravity
                     const cfg = CONFIG.bullet.single;
@@ -691,11 +750,14 @@
 
                         // Visual Color Lerp (Red -> White)
                         const part = p === 'p1' ? this.p1Part : this.p2Part;
+                        const headPart = p === 'p1' ? this.p1HeadPart : this.p2HeadPart;
                         const base = p === 'p1' ? this.baseColorP1 : this.baseColorP2;
 
                         // Normalized time 0 to 1 (0=start, 1=ready)
                         const t = 1.0 - (this.windupTimer[p] / CONFIG.combat.preFireDelay);
-                        part.material.color.lerpColors(base, new THREE.Color(0xffffff), t);
+                        const c = new THREE.Color().lerpColors(base, new THREE.Color(0xffffff), t);
+                        part.material.color.copy(c);
+                        headPart.material.color.copy(c);
 
                         if (this.windupTimer[p] <= 0) {
                             // FIRE!
@@ -736,15 +798,18 @@
                         // Not Windup. Check Cooldown state for Dark Color
                         const coold = this.cooldowns[p];
                         const part = p === 'p1' ? this.p1Part : this.p2Part;
+                        const headPart = p === 'p1' ? this.p1HeadPart : this.p2HeadPart;
                         const base = p === 'p1' ? this.baseColorP1 : this.baseColorP2; // Normal
                         const dark = p === 'p1' ? this.darkColorP1 : this.darkColorP2; // Dark
 
                         if (coold > 0) {
                             // "Instant Dark until cooldown ends"
                             part.material.color.copy(dark);
+                            headPart.material.color.copy(dark);
                         } else {
                             // Normal
                             part.material.color.copy(base);
+                            headPart.material.color.copy(base);
                         }
                     }
                 });
@@ -932,12 +997,21 @@
             const dt = Math.min((time - state.lastTime) / 1000, 0.1);
             state.lastTime = time;
 
+            flora.update(dt); // Flora update moved to before input polling
             state.pollInputs();
-            flora.update(dt);
+            // Update Bullets
             updateBullets(dt);
 
-            // UI Updates
-            const bar = document.getElementById('pulse-bar');
+            // Update Particles
+            for (let i = state.particles.length - 1; i >= 0; i--) {
+                const p = state.particles[i];
+                if (!p.update(dt)) {
+                    state.particles.splice(i, 1);
+                }
+            }
+
+            // Update Pulse Bar
+            const bar = document.getElementById('pulse-bar'); // Renamed to 'bar' to match original
             bar.style.width = state.pulseValue + '%';
 
             // Debug Info
