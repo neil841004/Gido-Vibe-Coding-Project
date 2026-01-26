@@ -157,7 +157,7 @@
         const CONFIG = {
             // 移動相關 (Movement)
             movement: {
-                maxSpeed: 11,      // 最大合力速度 (World units per second)
+                maxSpeed: 9,      // 最大合力速度 (World units per second)
                 acceleration: 60,  // 起步加速度
                 friction: 80,      // 停止時的摩擦力 (慣性減速)
                 rotationSpeed: 18,  // 轉身速度
@@ -166,19 +166,19 @@
             // 戰鬥相關 (Combat)
             // 戰鬥相關 (Combat)
             combat: {
-                preFireDelay: 0.3,       // 攻擊前搖時間 (秒)
-                duoWindow: 0.3,          // 雙人合體技判定窗口 (秒) - 建議與前搖時間一致
-                cooldown: 0.6,           // 攻擊冷卻時間 (秒) - 發射後開始計算
+                preFireDelay: 0.5,       // 攻擊前搖時間 (秒)
+                duoWindow: 0.5,          // 雙人子彈合體判定窗口 (秒) - 建議與前搖時間一致
+                cooldown: 0.5,           // 攻擊冷卻時間 (秒) - 發射後開始計算
                 // attackLockDuration: 0, // [已移除] 攻擊不鎖定移動
-                bufferWindow: 0.1        // 輸入預緩衝窗口 (秒)
+                bufferWindow: 0.15        // 輸入預緩衝窗口 (秒)
             },
 
             // 子彈參數 (Bullets)
             bullet: {
                 single: {
                     size: 0.4,           // [單人] 子彈大小
-                    speedMin: 18,        // [單人] 飛行速度最小值
-                    speedMax: 21,        // [單人] 飛行速度最大值
+                    speedMin: 20,        // [單人] 飛行速度最小值
+                    speedMax: 24,        // [單人] 飛行速度最大值
                     lifeMin: 0.9,        // [單人] 存在時間最小值 (秒)
                     lifeMax: 1.3,        // [單人] 存在時間最大值 (秒)
                     spread: 0.4,        // [單人] 散射角度 (弧度)
@@ -283,6 +283,64 @@
             },
 
             lastTime: 0
+        };
+
+        // --- Sound System (Synthesizer) ---
+        const SoundSystem = {
+            ctx: null,
+            init: function () {
+                if (!this.ctx) {
+                    this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+                } else if (this.ctx.state === 'suspended') {
+                    this.ctx.resume();
+                }
+            },
+            playKick: function () {
+                if (!this.ctx) return;
+                const t = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+
+                osc.frequency.setValueAtTime(150, t);
+                osc.frequency.exponentialRampToValueAtTime(0.01, t + 0.5);
+
+                gain.gain.setValueAtTime(1, t);
+                gain.gain.exponentialRampToValueAtTime(0.01, t + 0.5);
+
+                osc.start(t);
+                osc.stop(t + 0.5);
+            },
+            playHiHat: function () {
+                if (!this.ctx) return;
+                // White noise buffer
+                const bufferSize = this.ctx.sampleRate * 0.1; // 0.1s
+                const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+                const data = buffer.getChannelData(0);
+                for (let i = 0; i < bufferSize; i++) {
+                    data[i] = Math.random() * 2 - 1;
+                }
+
+                const noise = this.ctx.createBufferSource();
+                noise.buffer = buffer;
+
+                // Filter Highpass
+                const filter = this.ctx.createBiquadFilter();
+                filter.type = 'highpass';
+                filter.frequency.value = 5000;
+
+                const gain = this.ctx.createGain();
+                gain.gain.setValueAtTime(0.5, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.05);
+
+                noise.connect(filter);
+                filter.connect(gain);
+                gain.connect(this.ctx.destination);
+
+                noise.start();
+            }
         };
 
         // --- Scene Setup ---
@@ -782,7 +840,18 @@
                 // Rhythm UI Update
                 // Dynamic Cycle Time = PreFire + Cooldown
                 const cycleTime = CONFIG.combat.preFireDelay + CONFIG.combat.cooldown;
+                const prevRhythm = state.rhythmTime;
                 state.rhythmTime = (state.rhythmTime + (dt / cycleTime)) % 1.0;
+
+                // Sound Triggers
+                // 1. Kick at 0.5 (Center)
+                if (prevRhythm < 0.5 && state.rhythmTime >= 0.5) {
+                    SoundSystem.playKick();
+                }
+                // 2. Hi-Hat at 0.0 (Wrap around)
+                if (state.rhythmTime < prevRhythm) {
+                    SoundSystem.playHiHat();
+                }
 
                 const cursor = document.getElementById('rhythm-cursor');
                 const target = document.getElementById('rhythm-target');
@@ -1045,11 +1114,16 @@
         function setupInputs() {
             // P1: Keyboard
             const keys = {};
-            window.addEventListener('keydown', (e) => keys[e.code] = true);
+            const initAudio = () => { SoundSystem.init(); window.removeEventListener('keydown', initAudio); window.removeEventListener('mousedown', initAudio); };
+
+            window.addEventListener('keydown', (e) => {
+                keys[e.code] = true;
+                SoundSystem.init();
+            });
             window.addEventListener('keyup', (e) => keys[e.code] = false);
 
-            // Mouse for P1 Attack/Charge
             window.addEventListener('mousedown', (e) => {
+                SoundSystem.init();
                 if (e.button === 0) state.input.p1.attack = true;
                 if (e.button === 2) state.input.p1.charge = true;
             });
