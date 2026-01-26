@@ -56,6 +56,72 @@
             background: linear-gradient(90deg, #ff00ff, #00ffff);
             transition: width 0.1s linear;
         }
+
+        /* Rhythm Assist UI */
+        #rhythm-helper {
+            position: absolute;
+            bottom: 50px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 400px;
+            height: 60px;
+            pointer-events: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .beat-line {
+            position: absolute;
+            width: 100%;
+            height: 2px;
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .center-target {
+            position: absolute;
+            width: 30px;
+            height: 30px;
+            border: 2px solid white;
+            border-radius: 50%;
+            transform: scale(1);
+            transition: transform 0.1s;
+        }
+
+        .beat-cursor {
+            position: absolute;
+            top: 10px;
+            bottom: 10px;
+            width: 4px;
+            background-color: white;
+            left: 0%;
+            box-shadow: 0 0 10px white;
+        }
+
+        .input-indicator {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            transform: scale(0);
+            opacity: 0;
+            transition: transform 0.2s ease-out, opacity 0.3s ease-out;
+        }
+
+        .indicator-p1 {
+            background-color: #ff4444;
+        }
+
+        .indicator-p2 {
+            background-color: #4444ff;
+        }
+
+        .indicator-duo {
+            background-color: #ffff00;
+            width: 40px;
+            height: 40px;
+            z-index: 10;
+        }
     </style>
 </head>
 
@@ -69,6 +135,13 @@
         <div id="pulse-bar-container">
             <div id="pulse-bar"></div>
         </div>
+    </div>
+
+    <div id="rhythm-helper">
+        <div class="beat-line"></div>
+        <div class="center-target" id="rhythm-target"></div>
+        <div class="beat-cursor" id="rhythm-cursor"></div>
+        <!-- Indicators will be injected here or just keep fixed ones if we recycle DOM -->
     </div>
     <script type="importmap">
         {
@@ -84,7 +157,7 @@
         const CONFIG = {
             // 移動相關 (Movement)
             movement: {
-                maxSpeed: 19,      // 最大合力速度 (World units per second)
+                maxSpeed: 11,      // 最大合力速度 (World units per second)
                 acceleration: 60,  // 起步加速度
                 friction: 80,      // 停止時的摩擦力 (慣性減速)
                 rotationSpeed: 18,  // 轉身速度
@@ -93,24 +166,27 @@
             // 戰鬥相關 (Combat)
             // 戰鬥相關 (Combat)
             combat: {
-                preFireDelay: 0.2,       // 攻擊前搖時間 (秒)
-                duoWindow: 0.2,          // 雙人合體技判定窗口 (秒) - 建議與前搖時間一致
-                cooldown: 0.7,           // 攻擊冷卻時間 (秒) - 發射後開始計算
+                preFireDelay: 0.3,       // 攻擊前搖時間 (秒)
+                duoWindow: 0.3,          // 雙人合體技判定窗口 (秒) - 建議與前搖時間一致
+                cooldown: 0.6,           // 攻擊冷卻時間 (秒) - 發射後開始計算
                 // attackLockDuration: 0, // [已移除] 攻擊不鎖定移動
+                bufferWindow: 0.1        // 輸入預緩衝窗口 (秒)
             },
 
             // 子彈參數 (Bullets)
             bullet: {
                 single: {
-                    speedMin: 20,        // [單人] 飛行速度最小值
-                    speedMax: 28,        // [單人] 飛行速度最大值
+                    size: 0.4,           // [單人] 子彈大小
+                    speedMin: 17,        // [單人] 飛行速度最小值
+                    speedMax: 23,        // [單人] 飛行速度最大值
                     lifeMin: 0.8,        // [單人] 存在時間最小值 (秒)
                     lifeMax: 1.4,        // [單人] 存在時間最大值 (秒)
                     spread: 0.4,        // [單人] 散射角度 (弧度)
                     gravity: 25,         // [單人] 重力下墜值
                 },
                 duo: {
-                    speed: 50,           // [雙人] 飛行速度 (固定)
+                    size: 0.8,           // [雙人] 子彈大小
+                    speed: 33,           // [雙人] 飛行速度 (固定)
                     life: 4.0,           // [雙人] 存在時間 (固定)
                     gravity: 0,          // [雙人] 重力 (無)
                 }
@@ -149,6 +225,54 @@
             bullets: [],
             pulseValue: 0, // 0 to 100
             comboActive: false,
+            // Rhythm State
+            rhythmTime: 0, // 0 to 1
+
+            // Input Feedback
+            showInputFeedback: (type) => { // 'p1', 'p2', 'duo'
+                const container = document.getElementById('rhythm-helper');
+                const el = document.createElement('div');
+                el.className = `input-indicator indicator-${type}`;
+
+                // Start Center
+                el.style.left = '50%';
+                el.style.top = '50%';
+                el.style.marginTop = '-10px';
+                el.style.marginLeft = '-10px';
+
+                if (type === 'duo') {
+                    el.style.width = '40px';
+                    el.style.height = '40px';
+                    el.style.marginTop = '-20px';
+                    el.style.marginLeft = '-20px';
+                }
+
+                container.appendChild(el);
+
+                // Calculate animation duration based on rhythm speed
+                const cycleTime = CONFIG.combat.preFireDelay + CONFIG.combat.cooldown;
+                // It travels 50% of the screen (50% -> 100%).
+                const travelDuration = cycleTime / 2;
+
+                // Animate
+                requestAnimationFrame(() => {
+                    // Move Right
+                    el.style.transition = `left ${travelDuration}s linear`;
+                    el.style.left = '100%';
+                    el.style.opacity = '1';
+                    el.style.transform = 'scale(1)';
+
+                    // Fade out near end (at 80% of travel time)
+                    setTimeout(() => {
+                        el.style.transition = `left ${travelDuration}s linear, opacity 0.2s ease-out`;
+                        el.style.opacity = '0';
+                        setTimeout(() => el.remove(), 200);
+                    }, travelDuration * 1000 * 0.8);
+                });
+
+                return el;
+            },
+
             lastTime: 0
         };
 
@@ -191,7 +315,7 @@
                 this.lifeTimer = 0;
                 this.markedForDeletion = false;
 
-                const size = this.type === 'large' ? 0.8 : 0.3;
+                const size = this.type === 'large' ? CONFIG.bullet.duo.size : CONFIG.bullet.single.size;
                 const color = owner === 'p1' ? CONFIG.visuals.colors.p1 : (owner === 'p2' ? CONFIG.visuals.colors.p2 : 0xffff00);
 
                 const geo = new THREE.SphereGeometry(size);
@@ -200,6 +324,14 @@
                 this.mesh.position.copy(position);
 
                 scene.add(this.mesh);
+
+                // Shadow
+                const shadowGeo = new THREE.CircleGeometry(size, 8);
+                const shadowMat = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.5 });
+                this.shadowMesh = new THREE.Mesh(shadowGeo, shadowMat);
+                this.shadowMesh.rotation.x = -Math.PI / 2;
+                this.shadowMesh.position.set(position.x, 0.02, position.z); // Slightly above ground
+                scene.add(this.shadowMesh);
             }
 
             update(dt) {
@@ -209,6 +341,12 @@
                 }
 
                 this.mesh.position.add(this.velocity.clone().multiplyScalar(dt));
+
+                // Update Shadow Position
+                this.shadowMesh.position.x = this.mesh.position.x;
+                this.shadowMesh.position.z = this.mesh.position.z;
+                // Optional: Scale shadow based on height to give depth cue? 
+                // Simple drop shadow is usually enough.
 
                 // Life check
                 this.lifeTimer += dt;
@@ -226,6 +364,10 @@
                 scene.remove(this.mesh);
                 this.mesh.geometry.dispose();
                 this.mesh.material.dispose();
+
+                scene.remove(this.shadowMesh);
+                this.shadowMesh.geometry.dispose();
+                this.shadowMesh.material.dispose();
             }
         }
 
@@ -245,6 +387,12 @@
 
                 // Input tracking for "Fresh Press"
                 this.lastAttackInput = { p1: false, p2: false };
+
+                // Input Buffer
+                this.bufferedInput = { p1: false, p2: false }; // True if input queued during cooldown
+
+                // Track active indicators for merging
+                this.activeIndicators = { p1: null, p2: null };
 
                 // Duo Synergy State
                 this.pendingDuo = false; // True if a Duo Shot is queued to fire at end of windup
@@ -445,6 +593,27 @@
 
 
                 // --- Combat Inputs ---
+                // Rhythm UI Update
+                // Dynamic Cycle Time = PreFire + Cooldown
+                const cycleTime = CONFIG.combat.preFireDelay + CONFIG.combat.cooldown;
+                state.rhythmTime = (state.rhythmTime + (dt / cycleTime)) % 1.0;
+
+                const cursor = document.getElementById('rhythm-cursor');
+                const target = document.getElementById('rhythm-target');
+
+                // Map time 0..1 to left 0%..100%
+                cursor.style.left = (state.rhythmTime * 100) + '%';
+
+                // Pulse target at 50% (0.5)
+                const distToCenter = Math.abs(state.rhythmTime - 0.5);
+                if (distToCenter < 0.05) {
+                    target.style.transform = 'scale(1.3)';
+                    cursor.style.backgroundColor = '#ffff00'; // Flash cursor
+                } else {
+                    target.style.transform = 'scale(1)';
+                    cursor.style.backgroundColor = 'white';
+                }
+
                 // --- Combat Logic Updates ---
 
                 // 1. Cooldown Management
@@ -457,42 +626,64 @@
                 this.lastAttackInput.p1 = state.input.p1.attack;
                 this.lastAttackInput.p2 = state.input.p2.attack;
 
-                // 3. Initiate Windup
-                // If press, and not cooldown, and not charging, start windup
-                if (p1Press && this.cooldowns.p1 <= 0 && !p1Charging && !this.isWindup.p1) {
+                // 3. Initiate Windup (and Visual Feedback)
+                // Helper to check for trigger
+                const checkTrigger = (p, press) => {
+                    // Check Buffer First
+                    if (this.bufferedInput[p] && this.cooldowns[p] <= 0) {
+                        this.bufferedInput[p] = false; // Consume buffer
+                        return true;
+                    }
+                    // Check Fresh Press
+                    if (press) {
+                        if (this.cooldowns[p] <= 0) {
+                            return true;
+                        } else if (this.cooldowns[p] <= CONFIG.combat.bufferWindow) {
+                            // Buffer it!
+                            this.bufferedInput[p] = true;
+                            // Maybe show some small visual feedback that input is buffered?
+                            return false;
+                        }
+                    }
+                    return false;
+                };
+
+                // P1 Trigger
+                if (checkTrigger('p1', p1Press) && !p1Charging && !this.isWindup.p1) {
                     this.isWindup.p1 = true;
                     this.windupTimer.p1 = CONFIG.combat.preFireDelay;
+                    // Spawn Dot
+                    if (this.activeIndicators.p1) this.activeIndicators.p1.remove();
+                    this.activeIndicators.p1 = state.showInputFeedback('p1');
                 }
-                if (p2Press && this.cooldowns.p2 <= 0 && !p2Charging && !this.isWindup.p2) {
+
+                // P2 Trigger
+                if (checkTrigger('p2', p2Press) && !p2Charging && !this.isWindup.p2) {
                     this.isWindup.p2 = true;
                     this.windupTimer.p2 = CONFIG.combat.preFireDelay;
+                    // Spawn Dot
+                    if (this.activeIndicators.p2) this.activeIndicators.p2.remove();
+                    this.activeIndicators.p2 = state.showInputFeedback('p2');
                 }
 
                 // 4. Duo Synergy Check
-                // If one is in windup, and other presses, it's a Duo Trigger!
-                // Actually, if BOTH inputs happen within the window (which is the same as windup duration)
-                // Logic: 
-                //    If P1 is winding up, and P2 presses -> P1 marks "Pending Duo", P2 joins windup (or just burns cooldown?)
-                //    Requirement: "Two players input gap < 0.3s"
-                //    "Duo bullet fire time = First player start time + preFireDelay"
-
-                if (this.isWindup.p1 && p2Press && !p2Charging) {
-                    // P1 was waiting, P2 joined.
-                    // The shot will fire when P1's timer ends.
-                    // We need to mark that it will be a DUO shot.
-                    this.pendingDuo = true;
-                    // Reset P2 cooldown so they "spent" their shot
-                    this.cooldowns.p2 = CONFIG.combat.cooldown;
-                    // P2 Visuals? They should probably also flash white technically? 
-                    // Or just sync attack. Let's start P2 windup too but sync it to P1?
-                    // Simplest interpretation: Just mark PendingDuo. P2 participation is recorded.
-                }
-                else if (this.isWindup.p2 && p1Press && !p1Charging) {
-                    // P2 was waiting, P1 joined.
+                if (this.isWindup.p1 && this.isWindup.p2 && !this.pendingDuo) {
+                    // Both are winding up! (Could be simultaneous buffer or join)
                     this.pendingDuo = true;
                     this.cooldowns.p1 = CONFIG.combat.cooldown;
-                }
+                    this.cooldowns.p2 = CONFIG.combat.cooldown;
 
+                    // Sync Timers: Use the one closest to firing (smallest timer value)
+                    const minTimer = Math.min(this.windupTimer.p1, this.windupTimer.p2);
+                    this.windupTimer.p1 = minTimer;
+                    this.windupTimer.p2 = minTimer;
+
+                    // Merge Visuals - Remove BOTH single dots
+                    if (this.activeIndicators.p1) { this.activeIndicators.p1.remove(); this.activeIndicators.p1 = null; }
+                    if (this.activeIndicators.p2) { this.activeIndicators.p2.remove(); this.activeIndicators.p2 = null; }
+
+                    state.showInputFeedback('duo');
+                }
                 // 5. Process Windup Timers & Firing
                 ['p1', 'p2'].forEach(p => {
                     if (this.isWindup[p]) {
@@ -530,11 +721,15 @@
                                     // Set both to cooldown
                                     this.cooldowns.p1 = CONFIG.combat.cooldown;
                                     this.cooldowns.p2 = CONFIG.combat.cooldown;
+
+                                    // Feedback already shown on Press Merge
                                 }
                             } else {
                                 // Fire Single
                                 this.shoot(p);
                                 this.cooldowns[p] = CONFIG.combat.cooldown;
+
+                                // Feedback already shown on Press
                             }
                         }
                     } else {
