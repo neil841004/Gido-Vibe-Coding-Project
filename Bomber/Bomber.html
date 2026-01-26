@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GIDO Bomber Prototype - "Boomberry" Mechanics</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #121212;
+            font-family: 'Inter', sans-serif;
+            user-select: none;
+        }
+
+        canvas {
+            display: block;
+            cursor: crosshair;
+        }
+
+        #ui-overlay {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            pointer-events: none;
+            color: white;
+            width: 380px;
+        }
+
+        .instruction-box {
+            background: rgba(0, 0, 0, 0.85);
+            padding: 18px;
+            border-radius: 12px;
+            border: 1px solid #444;
+            pointer-events: auto;
+            backdrop-filter: blur(8px);
+        }
+
+        #game-over {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.95);
+            color: white;
+            padding: 40px;
+            border-radius: 24px;
+            text-align: center;
+            display: none;
+            border: 2px solid #ef4444;
+            pointer-events: auto;
+            z-index: 100;
+        }
+
+        .lux-text {
+            text-shadow: 0 0 10px rgba(251, 146, 60, 0.5);
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="ui-overlay">
+        <div class="instruction-box">
+            <h1 class="text-xl font-bold mb-1 text-white">GIDO <span class="text-red-500">Bomber</span> Prototype</h1>
+            <p class="text-gray-400 text-[10px] mb-3 border-b border-white/10 pb-2">炸彈魔機制驗證 (修正 v58 - 舉彈衝刺後拋)</p>
+
+            <div class="space-y-4 text-[11px]">
+                <div class="p-2 bg-white/5 rounded border border-white/5">
+                    <p class="font-bold lux-text text-orange-400 mb-1">【戰鬥修正：炸膛與拋彈】</p>
+                    <ul class="space-y-1 opacity-90 text-gray-300">
+                        <li><span class="text-yellow-400">舉彈威脅：</span> 舉著炸彈時若被 Melee 擊中會<span
+                                class="text-white bg-red-900 px-1">直接原位引爆</span>。</li>
+                        <li><span class="text-yellow-400">Dash抛彈：</span> 舉彈衝刺時會將炸彈<span
+                                class="text-white bg-blue-900 px-1">向後拋出</span>並延遲爆炸。</li>
+                        <li><span class="text-yellow-400">最新保護：</span> 前 5 顆隱形彈維持 1x 速，其餘 2x 速。</li>
+                        <li><span class="text-yellow-400">直擊瞬爆：</span> 飛行中的炸彈直擊敵人則跳過預警直接爆炸。</li>
+                    </ul>
+                </div>
+
+                <div class="grid grid-cols-2 gap-2 text-[9px]">
+                    <div class="text-white border-l-2 border-orange-500 pl-2">
+                        <p class="font-bold mb-1">P1 (WASD)</p>
+                        <p>Space:衝刺 / LMB:近戰 / RMB:技能</p>
+                    </div>
+                    <div class="text-cyan-400 border-l-2 border-cyan-500 pl-2">
+                        <p class="font-bold mb-1">P2 (手把)</p>
+                        <p>Stick 移動 / RT 技能 / West 攻擊</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="game-over">
+        <h2 id="winner-text" class="text-4xl font-bold mb-4">P1 VICTORY</h2>
+        <button onclick="location.reload()"
+            class="bg-white text-black font-bold py-2 px-8 rounded-full hover:bg-orange-500 hover:text-white transition-all">重新開始</button>
+    </div>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <script>
+        /**
+         * ============================================================
+         * 1. 數值配置 (CONFIG) 
+         * [LOCKED] 代表使用者已調校完畢，AI 編輯時請勿修改數值
+         * ============================================================
+         */
+        const CONFIG = {
+            // --- 玩家屬性 ---
+            playerMaxHp: 115,           // [LOCKED] 不要修改這個數值，這是我剛調好的體感 (玩家最大血量)
+            playerMaxStamina: 100,      // [LOCKED] 不要修改這個數值，這是我剛調好的體感 (玩家最大精力)
+            baseSpeed: 4.5,             // [LOCKED] 不要修改這個數值，這是我剛調好的體感 (基礎移速)
+            liftingSpeedMult: 0.5,      // [LOCKED] 不要修改這個數值，這是我剛調好的體感 (舉彈時的緩速倍率)
+            staminaRegen: 0.2,          // [LOCKED] 不要修改這個數值，這是我剛調好的體感 (精力恢復速度)
+            staminaLiftCost: 50,        // [LOCKED] 不要修改這個數值，這是我剛調好的體感 (舉起炸彈消耗體力)
+
+            // --- 衝刺參數 (Dash) ---
+            dashSpeed: 14,              // [LOCKED] 不要修改這個數值，這是我剛調好的體感 (衝刺速度)
+            dashDuration: 270,          // [LOCKED] 不要修改這個數值，這是我剛調好的體感 (衝刺持續毫秒)
+            dashCooldown: 1800,         // [LOCKED] 不要修改這個數值，這是我剛調好的體感 (衝刺冷卻毫秒)
+            dashGhostInterval: 40,      // [LOCKED] 不要修改這個數值，這是我剛調好的體感 (殘影產生間隔)
+            dashThrowSpeed: 2,        // [NEW] Dash 後拋炸彈初速 (影響位移距離)
+            dashThrowOffset: 3,        // [NEW] Dash 後拋炸彈起始距離
+
+            // --- 近戰屬性 (Melee) ---
+            meleeDamage: 15,            // [LOCKED] 不要修改這個數值，這是我剛調好的體感 (近戰對建築傷害)
+            meleeCD: 400,               // [LOCKED] 不要修改這個數值，這是我剛調好的體感 (近戰冷卻)
+            meleeRange: 95,             // [LOCKED] 不要修改這個數值，這是我剛調好的體感 (近戰判定距離)
+            meleeAngle: 1.7,            // [LOCKED] 不要修改這個數值，這是我剛調好的體感 (近戰扇形弧度)
+            meleeMoveDuration: 200,     // [LOCKED] 不要修改這個數值，這是我剛調好的體感 (近戰時的小段位移時間)
+            edgeSampleSteps: 10,        // [LOCKED] 不要修改這個數值，這是我剛調好的體感 (建築邊緣採樣精度)
+
+            // --- 擊飛物理 ---
+            flySpeed: 6.7,              // [LOCKED] 不要修改這個數值，這是我剛調好的體感 (炸彈飛行初速)
+            flyDecay: 0.98,             // [LOCKED] 不要修改這個數值，這是我剛調好的體感 (飛行速度衰減)
+            flyStopThresh: 0.5,         // [LOCKED] 不要修改這個數值，這是我剛調好的體感 (停止飛行的速度門檻)
+
+            // --- 動作時間控制 ---
+            liftDuration: 600,          // [LOCKED] 不要修改這個數值，這是我剛調好的體感 (舉彈蓄力時間)
+            placeRecoveryDuration: 200, // [LOCKED] 不要修改這個數值，這是我剛調好的體感 (放下後的僵直/緩速時間)
+            placeFadeDuration: 300,     // [LOCKED] 不要修改這個數值，這是我剛調好的體感 (緩速恢復至原速的漸變時間)
+
+            // --- 炸彈屬性與老化 ---
+            bombLifetime: 60000,         // [LOCKED] 不要修改這個數值，這是我剛調好的體感 (地面炸彈基礎壽命)
+            bombBuildingLifetime: 120000, // [LOCKED] 不要修改這個數值，這是我剛調好的體感 (建築炸彈基礎壽命)
+            bombStealthDelay: 3500,      // [LOCKED] 不要修改這個數值，這是我剛調好的體感 (落地到隱形的時間)
+            bombStealthFadeDuration: 500, // [LOCKED] 不要修改這個數值，這是我剛調好的體感 (隱形漸變時間)
+            bombRevealDuration: 500,    // [LOCKED] 不要修改這個數值，這是我剛調好的體感 (觸發後現形到爆炸的總預警時間)
+            bombExplosionRadius: 130,   // [LOCKED] 不要修改這個數值，這是我剛調好的體感 (地面炸彈爆炸半徑)
+            bombBuildingRadius: 200,    // [LOCKED] 不要修改這個數值，這是我剛調好的體感 (建築炸彈爆炸半徑)
+            bombDamage: 42,             // [LOCKED] 不要修改這個數值，這是我剛調好的體感 (炸彈爆炸傷害)
+            bombPlaceDistance: 85,      // [LOCKED] 不要修改這個數值，這是我剛調好的體感 (放彈時的偏移距離)
+            bombStackRadius: 50,        // [LOCKED] 不要修改這個數值，這是我剛調好的體感 (炸彈間距避讓半徑)
+            bombDecayThreshold: 5,       // [LOCKED] 不要修改這個數值，這是我剛調好的體感 (超過幾顆隱形彈開始老化)
+            bombDecayMultiplier: 2.0,    // [LOCKED] 不要修改這個數值，這是我剛調好的體感 (老化的時間流逝倍率)
+
+            // --- 道具與安裝 ---
+            dropHeartChance: 0.3,       // [LOCKED] 不要修改這個數值，這是我剛調好的體感 (掉落愛心機率)
+            dropCoffeeChance: 0.2,      // [LOCKED] 不要修改這個數值，這是我剛調好的體感 (掉落咖啡機率)
+            coffeeDuration: 10000,      // [LOCKED] 不要修改這個數值，這是我剛調好的體感 (咖啡效果持續毫秒)
+            installTriggerPadding: 10,  // [LOCKED] 不要修改這個數值，這是我剛調好的體感 (建築安裝判定範圍補強)
+            installPushThreshold: 0.3,  // [LOCKED] 不要修改這個數值，這是我剛調好的體感 (觸發安裝的推擠力道門檻)
+            installTime: 4000,          // [LOCKED] 不要修改這個數值，這是我剛調好的體感 (安裝炸彈所需時間)
+            installCancelDuration: 500, // [LOCKED] 不要修改這個數值，這是我剛調好的體感 (安裝時反向推擠多久取消)
+
+            // --- 場景生成 ---
+            buildingDensity: 0.000007,  // [LOCKED] 不要修改這個數值，這是我剛調好的體感 (建築物生成密度)
+            buildingMaxHp: 100          // [LOCKED] 不要修改這個數值，這是我剛調好的體感 (建築物耐久值)
+        };
+
+        /**
+         * ============================================================
+         * 2. 核心類別
+         * ============================================================
+         */
+
+        class Item {
+            constructor(x, y, type) {
+                this.x = x; this.y = y;
+                this.type = type; this.radius = 12; this.isCollected = false;
+            }
+            draw() {
+                const bounce = Math.sin(Date.now() * 0.005) * 5;
+                ctx.save(); ctx.translate(this.x, this.y + bounce);
+                if (this.type === 'heart') {
+                    ctx.fillStyle = '#ef4444';
+                    ctx.beginPath(); ctx.arc(-5, -5, 7, 0, Math.PI * 2); ctx.arc(5, -5, 7, 0, Math.PI * 2); ctx.fill();
+                    ctx.beginPath(); ctx.moveTo(-12, -3); ctx.lineTo(0, 10); ctx.lineTo(12, -3); ctx.fill();
+                } else {
+                    ctx.fillStyle = '#92400e'; ctx.beginPath(); ctx.arc(0, 0, 10, 0, Math.PI * 2); ctx.fill();
+                    ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
+                    ctx.beginPath(); ctx.arc(10, 0, 5, -Math.PI / 2, Math.PI / 2); ctx.stroke();
+                }
+                ctx.globalAlpha = 0.3; ctx.fillStyle = '#fff';
+                ctx.beginPath(); ctx.ellipse(0, 15 - bounce, 12, 4, 0, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+            }
+        }
+
+        class Bomb {
+            constructor(x, y, owner, type = 'ground', building = null) {
+                this.x = x; this.y = y; this.owner = owner; this.type = type; this.building = building;
+                this.initialLife = (type === 'building') ? CONFIG.bombBuildingLifetime : CONFIG.bombLifetime;
+                this.remainingLife = this.initialLife;
+                this.stealthRefTime = Date.now(); this.state = 'visible'; this.radius = type === 'building' ? 18 : 12;
+                this.isDestroyed = false; this.velocity = { x: 0, y: 0 }; this.warningUntil = 0; this.wasHit = false;
+                if (type === 'building') this.state = 'stealth';
+            }
+            update(dt, specificMultiplier) {
+                const now = Date.now();
+                if (!this.isDestroyed) {
+                    this.remainingLife -= dt * specificMultiplier;
+                    if (this.remainingLife <= 0) {
+                        this.isDestroyed = true;
+                        if (this.type === 'building' && this.building) { this.building.hasBomb = false; this.building.bombOwnerId = null; }
+                        createEffect(this.x, this.y, '#666', 8, 12); return;
+                    }
+                }
+                if (this.state === 'flying' || this.state === 'tossing') {
+                    this.x += this.velocity.x; this.y += this.velocity.y;
+                    this.velocity.x *= CONFIG.flyDecay; this.velocity.y *= CONFIG.flyDecay;
+                    state.players.forEach(p => {
+                        if (p.id !== this.owner.id && Math.hypot(p.x - this.x, p.y - this.y) < this.radius + p.radius) {
+                            this.explode();
+                        }
+                    });
+                    if (checkWallCollision(this.x, this.y, this.radius)) this.explode();
+                    if (Math.hypot(this.velocity.x, this.velocity.y) < CONFIG.flyStopThresh) {
+                        if (this.state === 'tossing') { this.state = 'visible'; this.stealthRefTime = Date.now(); }
+                        else this.trigger();
+                    }
+                }
+                if (this.state === 'visible' && now - this.stealthRefTime > CONFIG.bombStealthDelay) this.state = 'stealth';
+                if (this.state === 'warning' && now > this.warningUntil) this.explode();
+                if (this.state === 'stealth' || (this.state === 'visible' && this.type === 'ground')) {
+                    state.players.forEach(p => {
+                        if (p.id !== this.owner.id) {
+                            const nx = this.type === 'building' && this.building ? Math.max(this.building.x, Math.min(p.x, this.building.x + this.building.w)) : this.x;
+                            const ny = this.type === 'building' && this.building ? Math.max(this.building.y, Math.min(p.y, this.building.y + this.building.h)) : this.y;
+                            if (Math.hypot(nx - p.x, ny - p.y) < (this.type === 'building' ? p.radius + 2 : this.radius + p.radius)) this.trigger();
+                        }
+                    });
+                }
+            }
+            trigger() { if (this.state === 'warning' || this.state === 'exploding' || this.isDestroyed) return; this.state = 'warning'; this.warningUntil = Date.now() + CONFIG.bombRevealDuration; }
+            explode() {
+                if (this.isDestroyed) return;
+                this.isDestroyed = true; this.state = 'exploding';
+                const radius = this.type === 'building' ? CONFIG.bombBuildingRadius : CONFIG.bombExplosionRadius;
+                if (this.type === 'building' && this.building) { this.building.hasBomb = false; this.building.bombOwnerId = null; }
+                const bombColor = this.owner.id === 'P1' ? '#ef4444' : '#3b82f6';
+                state.particles.push({ x: this.x, y: this.y, type: 'shockwave', radius: 0, maxRadius: radius, alpha: 0.8, color: bombColor });
+                createEffect(this.x, this.y, bombColor, 25, radius / 2);
+                state.players.forEach(p => {
+                    if (p.id !== this.owner.id && Math.hypot(p.x - this.x, p.y - this.y) < radius + p.radius) {
+                        p.takeDamage(CONFIG.bombDamage); p.recoil.x = Math.cos(Math.atan2(p.y - this.y, p.x - this.x)) * 15; p.recoil.y = Math.sin(Math.atan2(p.y - this.y, p.x - this.x)) * 15;
+                        if (p.hp <= 0) endGame(this.owner.id);
+                    }
+                });
+                state.buildings.forEach(b => { if (!b.isDestroyed && Math.hypot(b.x + b.w / 2 - this.x, b.y + b.h / 2 - this.y) < radius + Math.max(b.w, b.h) / 1.5) b.takeDamage(CONFIG.bombDamage, "EXPLOSION"); });
+                state.bombs.forEach(other => { if (other !== this && !other.isDestroyed && Math.hypot(other.x - this.x, other.y - this.y) < radius * 0.8) other.trigger(); });
+            }
+            draw() {
+                if (this.isDestroyed) return;
+                const now = Date.now();
+                let alpha = 1.0;
+                if (this.state === 'warning') {
+                    const timeLeft = this.warningUntil - now;
+                    alpha = timeLeft > 400 ? 1.0 : (Math.floor(now / 40) % 2 === 0 ? 1.0 : 0.1);
+                } else {
+                    const stealthStartTime = this.stealthRefTime + CONFIG.bombStealthDelay;
+                    if (this.state === 'stealth' || now > stealthStartTime) {
+                        alpha = 1.0 - (Math.min(1, (now - stealthStartTime) / CONFIG.bombStealthFadeDuration) * 0.7);
+                        if (this.owner.id !== 'P1' && now > stealthStartTime + CONFIG.bombStealthFadeDuration) return;
+                    }
+                }
+                ctx.save(); ctx.translate(this.x, this.y); ctx.globalAlpha = alpha;
+                ctx.fillStyle = this.owner.id === 'P1' ? (this.type === 'building' ? '#f59e0b' : '#ef4444') : '#3b82f6';
+                ctx.beginPath(); ctx.arc(0, 0, this.radius, 0, Math.PI * 2); ctx.fill();
+                ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
+                if (this.state === 'stealth' || this.state === 'warning') {
+                    const lifeRatio = Math.max(0, this.remainingLife / this.initialLife);
+                    ctx.beginPath(); ctx.arc(0, 0, this.radius + 6, -Math.PI / 2, -Math.PI / 2 + (Math.PI * 2 * lifeRatio));
+                    ctx.lineWidth = 3; ctx.strokeStyle = (lifeRatio < 0.25 && Math.floor(now / 100) % 2 === 0) ? '#ef4444' : 'rgba(255,255,255,0.6)'; ctx.stroke();
+                }
+                ctx.restore();
+            }
+        }
+
+        class Building {
+            constructor(x, y, w, h) {
+                this.x = x; this.y = y; this.w = w; this.h = h; this.hp = CONFIG.buildingMaxHp; this.maxHp = CONFIG.buildingMaxHp;
+                this.isDestroyed = false; this.hasBomb = false; this.bombOwnerId = null;
+            }
+            takeDamage(amount, attackerId) {
+                if (this.isDestroyed) return false;
+                this.hp -= amount; if (this.hasBomb && attackerId !== "EXPLOSION") { const b = state.bombs.find(bomb => bomb.building === this && !bomb.isDestroyed); if (b) b.trigger(); }
+                if (this.hp <= 0) { this.hp = 0; this.isDestroyed = true; this.dropItem(); if (this.hasBomb) { const b = state.bombs.find(bomb => bomb.building === this && !bomb.isDestroyed); if (b) b.explode(); } return true; }
+                return false;
+            }
+            dropItem() {
+                const rand = Math.random(); const centerX = this.x + this.w / 2; const centerY = this.y + this.h / 2;
+                if (rand < CONFIG.dropHeartChance) state.items.push(new Item(centerX, centerY, 'heart'));
+                else if (rand < CONFIG.dropHeartChance + CONFIG.dropCoffeeChance) state.items.push(new Item(centerX, centerY, 'coffee'));
+            }
+            draw() {
+                if (this.isDestroyed) return;
+                ctx.fillStyle = this.hasBomb ? '#3a2a2a' : '#2a2a2a';
+                let borderCol = this.hasBomb ? (this.bombOwnerId === 'P1' ? '#f59e0b' : '#3b82f6') : '#555';
+                ctx.strokeStyle = borderCol; ctx.lineWidth = this.hasBomb ? 3 : 1.5; ctx.fillRect(this.x, this.y, this.w, this.h); ctx.strokeRect(this.x, this.y, this.w, this.h);
+                if (this.hp < this.maxHp) {
+                    const bw = this.w * 0.8; const bx = this.x + (this.w - bw) / 2; const by = this.y - 12;
+                    ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(bx, by, bw, 5); ctx.fillStyle = this.hasBomb ? borderCol : '#fbbf24'; ctx.fillRect(bx, by, bw * (this.hp / this.maxHp), 5);
+                }
+            }
+        }
+
+        class Player {
+            constructor(id, x, y, color) {
+                this.id = id; this.x = x; this.y = y; this.color = color; this.radius = 22; this.angle = id === "P1" ? 0 : Math.PI;
+                this.hp = CONFIG.playerMaxHp; this.stamina = CONFIG.playerMaxStamina;
+                this.skillState = 'IDLE'; this.skillReady = true; this.timer = 0;
+                this.isInstalling = false; this.installProgress = 0; this.installTarget = null;
+                this.cancelInstallTimerAccumulator = 0;
+                this.coffeeActiveUntil = 0; this.meleeStartTime = 0; this.lastDashTime = 0; this.dashActiveUntil = 0;
+                this.lastMeleeTime = 0; this.meleeActiveUntil = 0; this.recoil = { x: 0, y: 0 };
+                this.dashReadyNotified = true; this.lastGhostSpawnTime = 0; this.readyPulseAlpha = 0;
+            }
+
+            /**
+             * 受傷邏輯
+             */
+            takeDamage(amount) {
+                this.hp -= amount;
+                // 若在蓄力時被打斷
+                if (this.skillState === 'LIFTING') {
+                    this.skillState = 'IDLE'; this.isInstalling = false; createEffect(this.x, this.y - 20, '#fff', 12, 15);
+                }
+                // 若在舉彈完成後被打到 (這部分在 performMelee 中會被更具體的 Melee 規則覆蓋引爆)
+                else if (this.skillState === 'HELD') {
+                    this.explodeHeldBomb();
+                }
+            }
+
+            /**
+             * 核心新增：舉著炸彈時被擊中的瞬爆處理
+             */
+            explodeHeldBomb() {
+                if (this.skillState !== 'HELD') return;
+                this.skillState = 'IDLE';
+                this.isInstalling = false;
+                // 在玩家原位產生炸彈並瞬間引爆
+                const b = new Bomb(this.x, this.y, this, 'ground');
+                state.bombs.push(b);
+                b.explode(); // 這會造成範圍傷害，包括對舉彈者本人
+            }
+
+            update(dt, inputDx, inputDy, isDashPressed, isMeleePressed, isSkillPressed, target) {
+                const now = Date.now();
+                const isDashing = now < this.dashActiveUntil;
+                const isMeleeing = now < this.meleeActiveUntil;
+                const hasCoffee = now < this.coffeeActiveUntil;
+                if (hasCoffee) this.stamina = CONFIG.playerMaxStamina;
+
+                if ((this.skillState === 'IDLE' || this.skillState === 'DROP_RECOVERY') && this.isInstalling) {
+                    this.isInstalling = false; this.installTarget = null; this.installProgress = 0; this.cancelInstallTimerAccumulator = 0;
+                }
+                if (this.skillState === 'IDLE' && !this.isInstalling && !hasCoffee) this.stamina = Math.min(CONFIG.playerMaxStamina, this.stamina + CONFIG.staminaRegen * (dt / 16.6));
+                if (!isSkillPressed) this.skillReady = true;
+
+                // --- 技能與蓄力 ---
+                if (isSkillPressed && this.skillReady && this.skillState === 'IDLE' && this.stamina >= CONFIG.staminaLiftCost) {
+                    if (!hasCoffee) this.stamina -= CONFIG.staminaLiftCost;
+                    this.skillState = 'LIFTING'; this.skillReady = false; this.timer = now;
+                }
+
+                if (this.skillState === 'LIFTING') {
+                    if (now - this.timer >= CONFIG.liftDuration) {
+                        if (!isSkillPressed) { this.spawnActualBomb(); this.skillState = 'DROP_RECOVERY'; this.timer = now; }
+                        else { this.skillState = 'HELD'; createEffect(this.x, this.y - this.radius - 20, '#fff', 5, 10); }
+                    }
+                }
+
+                let moveX = 0, moveY = 0;
+
+                if (this.skillState === 'HELD' && !isDashing) {
+                    if (this.isInstalling) {
+                        if (!isSkillPressed) {
+                            this.isInstalling = false; this.skillState = 'DROP_RECOVERY'; this.timer = now; this.spawnBounceBomb();
+                        } else {
+                            const b = this.installTarget;
+                            const nx = Math.max(b.x, Math.min(this.x, b.x + b.w)), ny = Math.max(b.y, Math.min(this.y, b.y + b.h));
+                            const dx = nx - this.x, dy = ny - this.y;
+                            const dist = Math.max(1, Math.hypot(dx, dy));
+                            if (inputDx !== 0 || inputDy !== 0) {
+                                if ((inputDx * (dx / dist)) + (inputDy * (dy / dist)) < 0.1) {
+                                    this.cancelInstallTimerAccumulator += dt;
+                                    if (this.cancelInstallTimerAccumulator >= CONFIG.installCancelDuration) { this.isInstalling = false; this.cancelInstallTimerAccumulator = 0; createEffect(this.x, this.y, '#fff', 8, 10); }
+                                } else { this.cancelInstallTimerAccumulator = 0; }
+                            } else { this.cancelInstallTimerAccumulator = 0; }
+                            this.installProgress += dt;
+                            if (this.installProgress >= CONFIG.installTime) { this.completeInstall(); this.skillState = 'IDLE'; }
+                            moveX = 0; moveY = 0;
+                        }
+                    } else {
+                        // 舉彈中主動擊飛
+                        if (isMeleePressed && now - this.lastMeleeTime > CONFIG.meleeCD) {
+                            this.hitHeldBombForward();
+                            this.skillState = 'DROP_RECOVERY';
+                            this.timer = now; this.lastMeleeTime = now; return;
+                        }
+                        let triggeredThisFrame = false;
+                        state.buildings.forEach(b => {
+                            if (!b.isDestroyed && !b.hasBomb && !triggeredThisFrame) {
+                                const nx = Math.max(b.x, Math.min(this.x, b.x + b.w)), ny = Math.max(b.y, Math.min(this.y, b.y + b.h));
+                                const dx = nx - this.x, dy = ny - this.y;
+                                const dist = Math.hypot(dx, dy);
+                                if (dist <= this.radius + CONFIG.installTriggerPadding && (inputDx !== 0 || inputDy !== 0)) {
+                                    if ((inputDx * (dx / Math.max(1, dist))) + (inputDy * (dy / Math.max(1, dist))) > CONFIG.installPushThreshold) {
+                                        this.isInstalling = true; this.installTarget = b; this.installProgress = 0; this.cancelInstallTimerAccumulator = 0; triggeredThisFrame = true;
+                                    }
+                                }
+                            }
+                        });
+                        if (!triggeredThisFrame && !isSkillPressed) { this.spawnActualBomb(); this.skillState = 'DROP_RECOVERY'; this.timer = now; }
+                    }
+                }
+
+                if (this.skillState === 'DROP_RECOVERY' && now - this.timer >= (CONFIG.placeRecoveryDuration + CONFIG.placeFadeDuration)) this.skillState = 'IDLE';
+
+                const isDashReady = (now - this.lastDashTime > CONFIG.dashCooldown);
+                if (isDashReady && !this.dashReadyNotified) { this.dashReadyNotified = true; this.readyPulseAlpha = 0.8; }
+                if (isDashPressed && isDashReady) {
+                    let dashAngle = this.angle;
+                    if (inputDx !== 0 || inputDy !== 0) dashAngle = Math.atan2(inputDy, inputDx);
+
+                    if (this.skillState === 'LIFTING' || this.skillState === 'HELD') {
+                        this.throwHeldBombBackward(dashAngle);
+                        this.skillState = 'IDLE';
+                        this.isInstalling = false;
+                    }
+                    this.lastDashTime = now; this.dashActiveUntil = now + CONFIG.dashDuration; this.dashReadyNotified = false;
+                    createEffect(this.x, this.y, '#fff', 10, 15);
+                }
+
+                if (!this.isInstalling) {
+                    if (!isMeleeing) {
+                        if (inputDx !== 0 || inputDy !== 0) {
+                            this.angle = Math.atan2(inputDy, inputDx);
+                            let speed = isDashing ? CONFIG.dashSpeed : CONFIG.baseSpeed;
+                            let mult = 1.0;
+                            if (this.skillState === 'LIFTING' || this.skillState === 'HELD') mult = CONFIG.liftingSpeedMult;
+                            else if (this.skillState === 'DROP_RECOVERY') {
+                                const el = now - this.timer;
+                                mult = el < CONFIG.placeRecoveryDuration ? CONFIG.liftingSpeedMult : CONFIG.liftingSpeedMult + (1.0 - CONFIG.liftingSpeedMult) * Math.min(1, (el - CONFIG.placeRecoveryDuration) / CONFIG.placeFadeDuration);
+                            }
+                            if (!isDashing) speed *= mult;
+                            const frameRatio = dt / 16.6;
+                            moveX = (inputDx / Math.sqrt(inputDx * inputDx + inputDy * inputDy)) * speed * frameRatio;
+                            moveY = (inputDy / Math.sqrt(inputDx * inputDx + inputDy * inputDy)) * speed * frameRatio;
+                        }
+                    } else {
+                        const el = now - this.meleeStartTime;
+                        if (el < CONFIG.meleeMoveDuration) {
+                            const spd = CONFIG.baseSpeed * 1.2 * (1 - el / CONFIG.meleeMoveDuration);
+                            moveX = Math.cos(this.angle) * spd * (dt / 16.6); moveY = Math.sin(this.angle) * spd * (dt / 16.6);
+                        }
+                    }
+                }
+
+                this.resolveMovement(moveX + this.recoil.x * (dt / 16.6), moveY + this.recoil.y * (dt / 16.6));
+                this.recoil.x *= 0.85; this.recoil.y *= 0.85;
+
+                if (isDashing && now - this.lastGhostSpawnTime > CONFIG.dashGhostInterval) {
+                    this.lastGhostSpawnTime = now;
+                    state.particles.push({ x: this.x, y: this.y, angle: this.angle, type: 'ghost', alpha: 0.5, color: this.color, radius: this.radius });
+                }
+                if (this.readyPulseAlpha > 0) this.readyPulseAlpha -= 0.02 * (dt / 16.6);
+
+                state.items.forEach(it => { if (!it.isCollected && Math.hypot(it.x - this.x, it.y - this.y) < this.radius + it.radius) { it.isCollected = true; if (it.type === 'heart') this.hp = Math.min(CONFIG.playerMaxHp, this.hp + CONFIG.playerMaxHp * 0.5); else this.coffeeActiveUntil = now + CONFIG.coffeeDuration; } });
+                // 近戰觸發
+                if (!this.isInstalling && (this.skillState === 'IDLE' || this.skillState === 'DROP_RECOVERY') && isMeleePressed && now - this.lastMeleeTime > CONFIG.meleeCD) {
+                    this.lastMeleeTime = now; this.meleeActiveUntil = now + 150; this.meleeStartTime = now; this.performMelee(target);
+                }
+            }
+
+            resolveMovement(mx, my) {
+                let nx = this.x + mx; if (!checkWallCollision(nx, this.y, this.radius)) this.x = nx;
+                let ny = this.y + my; if (!checkWallCollision(this.x, ny, this.radius)) this.y = ny;
+                this.x = Math.max(this.radius, Math.min(canvas.width - this.radius, this.x));
+                this.y = Math.max(this.radius, Math.min(canvas.height - this.radius, this.y));
+            }
+
+            throwHeldBombBackward(movementAngle) {
+                const angle = movementAngle + Math.PI;
+                const bx = this.x + Math.cos(angle) * CONFIG.dashThrowOffset;
+                const by = this.y + Math.sin(angle) * CONFIG.dashThrowOffset;
+                const b = new Bomb(bx, by, this, 'ground');
+                b.state = 'flying'; b.wasHit = true;
+                b.velocity = { x: Math.cos(angle) * CONFIG.dashThrowSpeed, y: Math.sin(angle) * CONFIG.dashThrowSpeed };
+                state.bombs.push(b);
+                createEffect(bx, by, this.id === 'P1' ? '#ef4444' : '#3b82f6', 15, 20);
+            }
+
+            hitHeldBombForward() {
+                const bx = this.x + Math.cos(this.angle) * 35;
+                const by = this.y + Math.sin(this.angle) * 35;
+                const b = new Bomb(bx, by, this, 'ground');
+                b.state = 'flying'; b.wasHit = true;
+                b.velocity = { x: Math.cos(this.angle) * CONFIG.flySpeed, y: Math.sin(this.angle) * CONFIG.flySpeed };
+                state.bombs.push(b);
+                createEffect(bx, by, this.id === 'P1' ? '#ef4444' : '#3b82f6', 15, 20);
+            }
+
+            spawnActualBomb() {
+                let bx = this.x + Math.cos(this.angle) * CONFIG.bombPlaceDistance, by = this.y + Math.sin(this.angle) * CONFIG.bombPlaceDistance;
+                let att = 0; while (checkWallCollision(bx, by, 15) && att < 10) { bx -= Math.cos(this.angle) * 15; by -= Math.sin(this.angle) * 15; att++; }
+                att = 0; while (att < 12) { if (state.players.some(p => Math.hypot(p.x - bx, p.y - by) < p.radius + 15) || state.bombs.some(ob => !ob.isDestroyed && Math.hypot(ob.x - bx, ob.y - by) < 30)) { const ja = Math.random() * Math.PI * 2; bx += Math.cos(ja) * 20; by += Math.sin(ja) * 20; att++; } else break; }
+                state.bombs.push(new Bomb(bx, by, this, 'ground')); createEffect(bx, by, this.id === 'P1' ? '#ef4444' : '#3b82f6', 5, 10);
+            }
+            placeBombOnGround() { const b = new Bomb(this.x, this.y, this, 'ground'); b.state = 'visible'; b.createdAt = Date.now(); b.stealthRefTime = Date.now(); state.bombs.push(b); }
+            spawnBounceBomb() { if (!this.installTarget) return; const b = this.installTarget; const an = Math.atan2(this.y - (b.y + b.h / 2), this.x - (b.x + b.w / 2)); const bomb = new Bomb(this.x, this.y, this, 'ground'); bomb.state = 'tossing'; bomb.velocity = { x: ((b.x + b.w / 2) + Math.cos(an) * (Math.max(b.w, b.h) / 2 + 45) - this.x) * 0.12, y: ((b.y + b.h / 2) + Math.sin(an) * (Math.max(b.w, b.h) / 2 + 45) - this.y) * 0.12 }; state.bombs.push(bomb); }
+            completeInstall() { this.isInstalling = false; this.installTarget.hasBomb = true; this.installTarget.bombOwnerId = this.id; state.bombs.push(new Bomb(this.installTarget.x + this.installTarget.w / 2, this.installTarget.y + this.installTarget.h / 2, this, 'building', this.installTarget)); }
+
+            /**
+             * 近戰判定修正：加入舉彈者被命中即引爆邏輯
+             */
+            performMelee(target) {
+                // 判定是否命中敵方玩家
+                if (this.isInMeleeArc(Math.hypot(target.x - this.x, target.y - this.y), Math.atan2(target.y - this.y, target.x - this.x), target.radius)) {
+                    // 核心修正：敵方若正在舉彈 -> 觸發炸膛瞬爆
+                    if (target.skillState === 'HELD') {
+                        target.explodeHeldBomb();
+                    }
+                    target.takeDamage(CONFIG.meleeDamage);
+                    target.recoil = { x: Math.cos(this.angle) * 15, y: Math.sin(this.angle) * 15 };
+                    if (target.hp <= 0) endGame(this.id);
+                }
+
+                // 判定是否命中場上炸彈
+                state.bombs.forEach(b => {
+                    if (!b.isDestroyed && !b.wasHit) {
+                        const dist = Math.hypot(b.x - this.x, b.y - this.y);
+                        const ang = Math.atan2(b.y - this.y, b.x - this.x);
+                        if (this.isInMeleeArc(dist, ang, b.radius)) {
+                            if (b.state === 'stealth' && b.owner.id === this.id) return;
+                            if (b.state === 'stealth') {
+                                b.trigger();
+                                createEffect(b.x, b.y, '#fff', 5, 10);
+                            } else {
+                                b.state = 'flying'; b.wasHit = true;
+                                b.velocity = { x: Math.cos(ang) * CONFIG.flySpeed, y: Math.sin(ang) * CONFIG.flySpeed };
+                            }
+                        }
+                    }
+                });
+
+                // 判定是否命中建築
+                state.buildings.forEach(b => {
+                    if (!b.isDestroyed) {
+                        let hit = false; const steps = CONFIG.edgeSampleSteps; const s = []; for (let i = 0; i <= steps; i++) { s.push({ x: b.x + (b.w / steps) * i, y: b.y }); s.push({ x: b.x + (b.w / steps) * i, y: b.y + b.h }); } for (let i = 1; i < steps; i++) { s.push({ x: b.x, y: b.y + (b.h / steps) * i }); s.push({ x: b.x + b.w, y: b.y + (b.h / steps) * i }); }
+                        for (let p of s) { if (this.isInMeleeArc(Math.hypot(p.x - this.x, p.y - this.y), Math.atan2(p.y - this.y, p.x - this.x), 0)) { hit = true; break; } }
+                        if (hit) { b.takeDamage(CONFIG.meleeDamage, this.id); createEffect(this.x + Math.cos(this.angle) * 40, this.y + Math.sin(this.angle) * 40, '#666', 5, 10); }
+                    }
+                });
+            }
+            isInMeleeArc(d, a, r) { if (d > CONFIG.meleeRange + r) return false; let diff = a - this.angle; while (diff < -Math.PI) diff += Math.PI * 2; while (diff > Math.PI) diff -= Math.PI * 2; return Math.abs(diff) < CONFIG.meleeAngle / 2; }
+
+            draw() {
+                const now = Date.now(); ctx.save(); ctx.translate(this.x, this.y);
+                const bombColor = this.id === 'P1' ? '#ef4444' : '#3b82f6';
+                const hasCoffee = now < this.coffeeActiveUntil;
+                const isDashing = now < this.dashActiveUntil;
+                if (this.readyPulseAlpha > 0) {
+                    ctx.beginPath(); ctx.arc(0, 0, this.radius + (1 - this.readyPulseAlpha) * 40, 0, Math.PI * 2);
+                    ctx.strokeStyle = `rgba(255,255,255,${this.readyPulseAlpha})`; ctx.lineWidth = 2; ctx.stroke();
+                }
+                if (this.skillState === 'LIFTING') {
+                    const p = (now - this.timer) / CONFIG.liftDuration; ctx.beginPath(); ctx.arc(0, -this.radius - 20, 20, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * p); ctx.strokeStyle = '#fff'; ctx.lineWidth = 4; ctx.stroke(); ctx.fillStyle = bombColor; ctx.globalAlpha = p; ctx.beginPath(); ctx.arc(0, -this.radius - 20, 14 * p, 0, Math.PI * 2); ctx.fill(); ctx.globalAlpha = 1;
+                } else if (this.skillState === 'HELD') {
+                    const s = Math.sin(now * 0.1) * 1.5, g = (Math.sin(now * 0.01) + 1) * 0.5; ctx.fillStyle = bombColor; ctx.beginPath(); ctx.arc(s, -this.radius - 20, 15, 0, Math.PI * 2); ctx.fill(); ctx.strokeStyle = `rgba(255,255,255,${0.5 + g * 0.5})`; ctx.lineWidth = 3; ctx.stroke();
+                }
+                if (now < this.meleeActiveUntil) {
+                    const r = (this.meleeActiveUntil - now) / 150; ctx.beginPath(); ctx.arc(0, 0, CONFIG.meleeRange, this.angle - CONFIG.meleeAngle / 2, this.angle + CONFIG.meleeAngle / 2); ctx.strokeStyle = `rgba(255,255,255,${r})`; ctx.lineWidth = 12 * r; ctx.stroke(); ctx.fillStyle = `rgba(239,68,68,${r * 0.2})`; ctx.fill();
+                }
+                ctx.rotate(this.angle); ctx.fillStyle = this.color;
+                if (isDashing) { ctx.beginPath(); ctx.moveTo(this.radius * 1.3, 0); ctx.lineTo(-this.radius * 0.7, -this.radius * 0.8); ctx.lineTo(-this.radius * 0.4, 0); ctx.lineTo(-this.radius * 0.7, this.radius * 0.8); ctx.closePath(); ctx.fill(); }
+                else { ctx.beginPath(); ctx.moveTo(this.radius, 0); ctx.lineTo(-this.radius * 0.7, -this.radius); ctx.lineTo(-this.radius * 0.4, 0); ctx.lineTo(-this.radius * 0.7, this.radius); ctx.closePath(); ctx.fill(); }
+                if (now - this.lastDashTime > CONFIG.dashCooldown) { ctx.shadowBlur = 10; ctx.shadowColor = "#fff"; }
+                ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke(); ctx.restore(); this.drawBars(hasCoffee);
+                if (this.isInstalling) {
+                    const p = this.installProgress / CONFIG.installTime; ctx.fillStyle = 'rgba(0,0,0,0.85)'; ctx.fillRect(this.x - 40, this.y + 35, 80, 10); ctx.fillStyle = this.id === 'P1' ? '#f59e0b' : '#3b82f6'; ctx.fillRect(this.x - 40, this.y + 35, 80 * p, 10);
+                }
+            }
+
+            drawBars(hasCoffee) {
+                const now = Date.now(); const barW = 50; const sx = this.x - barW / 2; const sy = this.y - 45;
+                ctx.fillStyle = '#333'; ctx.fillRect(sx, sy, barW, 6); ctx.fillStyle = '#ef4444'; ctx.fillRect(sx, sy, barW * (Math.max(0, this.hp) / CONFIG.playerMaxHp), 6);
+                ctx.fillStyle = '#333'; ctx.fillRect(sx, sy + 8, barW, 3);
+                if (hasCoffee) { const g = ctx.createLinearGradient(sx, 0, sx + barW, 0); g.addColorStop(0, `hsl(${(now / 10) % 360},100%,50%)`); g.addColorStop(1, `hsl(${(now / 10 + 60) % 360},100%,50%)`); ctx.fillStyle = g; }
+                else { ctx.fillStyle = this.stamina < CONFIG.staminaLiftCost ? '#ef4444' : '#3b82f6'; }
+                ctx.fillRect(sx, sy + 8, barW * (this.stamina / CONFIG.playerMaxStamina), 3);
+                if (now - this.lastDashTime < CONFIG.dashCooldown) {
+                    ctx.fillStyle = 'rgba(255,255,255,0.1)'; ctx.fillRect(sx, sy + 13, barW, 1.5);
+                    const progress = (now - this.lastDashTime) / CONFIG.dashCooldown;
+                    ctx.fillStyle = 'rgba(255,255,255,0.5)'; ctx.fillRect(sx, sy + 13, barW * progress, 1.5);
+                }
+            }
+        }
+
+        /**
+         * ============================================================
+         * 3. 系統核心
+         * ============================================================
+         */
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        let state = { isGameOver: false, startTime: Date.now(), lastFrameTime: performance.now(), players: [], particles: [], buildings: [], bombs: [], items: [], inputs: { p1: {}, p2: {} } };
+
+        function init() {
+            canvas.width = window.innerWidth; canvas.height = window.innerHeight;
+            state.players = [new Player("P1", canvas.width * 0.15, canvas.height / 2, "#f97316"), new Player("P2", canvas.width * 0.85, canvas.height / 2, "#0ea5e9")];
+            generateBuildings(); requestAnimationFrame(gameLoop);
+        }
+
+        function generateBuildings() {
+            state.buildings = []; const targetCount = Math.floor(canvas.width * canvas.height * CONFIG.buildingDensity);
+            const spacing = 40; let attempts = 0;
+            while (state.buildings.length < targetCount && attempts < 2000) {
+                attempts++; const w = 70 + Math.random() * 100, h = 70 + Math.random() * 100, x = 50 + Math.random() * (canvas.width - 150), y = 50 + Math.random() * (canvas.height - 150);
+                if (state.players.some(p => Math.hypot(x + w / 2 - p.x, y + h / 2 - p.y) < 220)) continue;
+                if (state.buildings.some(b => (x < b.x + b.w + spacing && x + w + spacing > b.x && y < b.y + b.h + spacing && y + h + spacing > b.y))) continue;
+                state.buildings.push(new Building(x, y, w, h));
+            }
+        }
+
+        function checkWallCollision(px, py, r) { return state.buildings.some(b => !b.isDestroyed && (px - Math.max(b.x, Math.min(px, b.x + b.w))) ** 2 + (py - Math.max(b.y, Math.min(py, b.y + b.h))) ** 2 < r * r); }
+
+        window.addEventListener('keydown', e => {
+            if (e.code === 'KeyW') state.inputs.p1.up = true; if (e.code === 'KeyS') state.inputs.p1.down = true; if (e.code === 'KeyA') state.inputs.p1.left = true; if (e.code === 'KeyD') state.inputs.p1.right = true; if (e.code === 'Space') state.inputs.p1.dash = true;
+            if (e.code === 'ArrowUp') state.inputs.p2.up = true; if (e.code === 'ArrowDown') state.inputs.p2.down = true; if (e.code === 'ArrowLeft') state.inputs.p2.left = true; if (e.code === 'ArrowRight') state.inputs.p2.right = true;
+            if (e.code === 'KeyK') state.inputs.p2.keyDash = true; if (e.code === 'KeyL') state.inputs.p2.keyMelee = true; if (e.code === 'KeyJ') state.inputs.p2.keySkill = true;
+        });
+        window.addEventListener('keyup', e => {
+            if (e.code === 'KeyW') state.inputs.p1.up = false; if (e.code === 'KeyS') state.inputs.p1.down = false; if (e.code === 'KeyA') state.inputs.p1.left = false; if (e.code === 'KeyD') state.inputs.p1.right = false; if (e.code === 'Space') state.inputs.p1.dash = false;
+            if (e.code === 'ArrowUp') state.inputs.p2.up = false; if (e.code === 'ArrowDown') state.inputs.p2.down = false; if (e.code === 'ArrowLeft') state.inputs.p2.left = false; if (e.code === 'ArrowRight') state.inputs.p2.right = false;
+            if (e.code === 'KeyK') state.inputs.p2.keyDash = false; if (e.code === 'KeyL') state.inputs.p2.keyMelee = false; if (e.code === 'KeyJ') state.inputs.p2.keySkill = false;
+        });
+        window.addEventListener('mousedown', e => { if (e.button === 0) state.inputs.p1.melee = true; if (e.button === 2) state.inputs.p1.skill = true; });
+        window.addEventListener('mouseup', e => { if (e.button === 0) state.inputs.p1.melee = false; if (e.button === 2) state.inputs.p1.skill = false; });
+        window.addEventListener('contextmenu', e => e.preventDefault());
+
+        function handleInputs() {
+            const gp = navigator.getGamepads()[0];
+            let kDx = (state.inputs.p2.left ? -1 : 0) + (state.inputs.p2.right ? 1 : 0);
+            let kDy = (state.inputs.p2.up ? -1 : 0) + (state.inputs.p2.down ? 1 : 0);
+            if (gp) {
+                state.inputs.p2.dx = (Math.abs(gp.axes[0]) > 0.2 ? gp.axes[0] : 0) || kDx;
+                state.inputs.p2.dy = (Math.abs(gp.axes[1]) > 0.2 ? gp.axes[1] : 0) || kDy;
+                state.inputs.p2.dash = gp.buttons[0].pressed || state.inputs.p2.keyDash;
+                state.inputs.p2.melee = gp.buttons[2].pressed || state.inputs.p2.keyMelee;
+                state.inputs.p2.skill = gp.buttons[7].pressed || state.inputs.p2.keySkill;
+            } else {
+                state.inputs.p2.dx = kDx; state.inputs.p2.dy = kDy; state.inputs.p2.dash = state.inputs.p2.keyDash; state.inputs.p2.melee = state.inputs.p2.keyMelee; state.inputs.p2.skill = state.inputs.p2.keySkill;
+            }
+        }
+
+        function createEffect(x, y, color, count, range) { for (let i = 0; i < count; i++) state.particles.push({ x, y, vx: (Math.random() - 0.5) * range / 4, vy: (Math.random() - 0.5) * range / 4, radius: Math.random() * 4 + 2, alpha: 1, color, decay: 0.02 }); }
+
+        function gameLoop(currentTime) {
+            if (state.isGameOver) return;
+            const dt = currentTime - state.lastFrameTime; state.lastFrameTime = currentTime;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            handleInputs();
+
+            const stealthBombs = state.bombs.filter(b => b.state === 'stealth' && !b.isDestroyed).sort((a, b) => b.stealthRefTime - a.stealthRefTime);
+            const totalStealth = stealthBombs.length;
+            const protectionLimit = CONFIG.bombDecayThreshold;
+
+            if (document.getElementById('protected-count-ui')) document.getElementById('protected-count-ui').innerText = Math.min(totalStealth, protectionLimit);
+            if (document.getElementById('decaying-count-ui')) document.getElementById('decaying-count-ui').innerText = Math.max(0, totalStealth - protectionLimit);
+
+            state.players[0].update(dt, (state.inputs.p1.left ? -1 : 0) + (state.inputs.p1.right ? 1 : 0), (state.inputs.p1.up ? -1 : 0) + (state.inputs.p1.down ? 1 : 0), state.inputs.p1.dash, state.inputs.p1.melee, state.inputs.p1.skill, state.players[1]);
+            state.players[1].update(dt, state.inputs.p2.dx, state.inputs.p2.dy, state.inputs.p2.dash, state.inputs.p2.melee, state.inputs.p2.skill, state.players[0]);
+
+            state.buildings.forEach(b => b.draw()); state.items = state.items.filter(it => !it.isCollected); state.items.forEach(it => it.draw());
+
+            state.bombs.forEach(b => {
+                let mult = 1.0;
+                if (b.state === 'stealth' && totalStealth > protectionLimit) {
+                    if (stealthBombs.indexOf(b) >= protectionLimit) mult = CONFIG.bombDecayMultiplier;
+                }
+                b.update(dt, mult); b.draw();
+            });
+            state.bombs = state.bombs.filter(b => !b.isDestroyed || b.state === 'exploding');
+
+            for (let i = state.particles.length - 1; i >= 0; i--) {
+                const p = state.particles[i];
+                if (p.type === 'shockwave') { p.radius += (p.maxRadius - p.radius) * 0.15; p.alpha -= 0.03; if (p.alpha <= 0) state.particles.splice(i, 1); else { ctx.beginPath(); ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2); ctx.strokeStyle = p.color; ctx.lineWidth = 3; ctx.globalAlpha = p.alpha; ctx.stroke(); } }
+                else if (p.type === 'ghost') {
+                    p.alpha -= 0.04 * (dt / 16.6); if (p.alpha <= 0) state.particles.splice(i, 1); else {
+                        ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.angle); ctx.globalAlpha = p.alpha; ctx.fillStyle = p.color;
+                        ctx.beginPath(); ctx.moveTo(p.radius * 1.2, 0); ctx.lineTo(-p.radius * 0.7, -p.radius * 0.8); ctx.lineTo(-p.radius * 0.4, 0); ctx.lineTo(-p.radius * 0.7, p.radius * 0.8); ctx.closePath(); ctx.fill(); ctx.restore();
+                    }
+                } else { p.x += p.vx; p.y += p.vy; p.alpha -= p.decay; if (p.alpha <= 0) state.particles.splice(i, 1); else { ctx.globalAlpha = p.alpha; ctx.fillStyle = p.color; ctx.beginPath(); ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2); ctx.fill(); } }
+            }
+            ctx.globalAlpha = 1; state.players.forEach(p => p.draw()); requestAnimationFrame(gameLoop);
+        }
+
+        function endGame(id) { state.isGameOver = true; const go = document.getElementById('game-over'); const wt = document.getElementById('winner-text'); if (go) go.style.display = 'block'; if (wt) wt.innerText = id + " VICTORY"; }
+        window.addEventListener('resize', () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; });
+        window.onload = () => setTimeout(init, 100);
+    </script>
+</body>
+
+</html>

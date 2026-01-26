@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GIDO Prototype - Stamina Gate Update</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #121212;
+            font-family: 'Inter', sans-serif;
+            user-select: none;
+        }
+
+        canvas {
+            display: block;
+            cursor: crosshair;
+        }
+
+        #ui-overlay {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            pointer-events: none;
+            color: white;
+            width: 350px;
+        }
+
+        .instruction-box {
+            background: rgba(0, 0, 0, 0.8);
+            padding: 15px;
+            border-radius: 12px;
+            border: 1px solid #333;
+            pointer-events: auto;
+            backdrop-filter: blur(4px);
+        }
+
+        #game-over {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.95);
+            color: white;
+            padding: 40px;
+            border-radius: 24px;
+            text-align: center;
+            display: none;
+            border: 2px solid #ef4444;
+            pointer-events: auto;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="ui-overlay">
+        <div class="instruction-box">
+            <h1 class="text-xl font-bold mb-2 text-white">GIDO <span class="text-orange-500">Shooter Polish</span></h1>
+            <p class="text-gray-400 text-[11px] mb-4 border-b border-white/10 pb-2">驗證：精力啟動門檻與低體力暗橘色提示</p>
+
+            <div class="grid grid-cols-2 gap-4 text-[11px] mb-3">
+                <div class="text-white">
+                    <p class="font-bold text-orange-400 mb-1">1P (鍵鼠)</p>
+                    <ul class="space-y-1 opacity-80">
+                        <li>WASD - 移動</li>
+                        <li>Space - 衝刺</li>
+                        <li>RMB - <span class="text-orange-300">蓄力 (需精力 > 15)</span></li>
+                    </ul>
+                </div>
+                <div class="text-cyan-400">
+                    <p class="font-bold text-cyan-400 mb-1">2P (手把)</p>
+                    <ul class="space-y-1 opacity-80">
+                        <li>左搖桿 - 移動 / 轉向</li>
+                        <li>A 鈕 - 衝刺</li>
+                        <li>RT - <span class="text-cyan-300">體力不足顯示暗橘色</span></li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="mt-2 text-[10px] text-gray-400 flex flex-col gap-1 bg-white/5 p-2 rounded">
+                <div class="flex justify-between mb-1">
+                    <span>運行時間: <span id="timer" class="text-white">0.0</span>s</span>
+                    <span class="text-orange-600 font-bold">STAMINA GATE: 15</span>
+                </div>
+                <p class="text-[9px] text-orange-500">⚠️ 精力 < 15 時，UI 會轉為暗橘色</p>
+            </div>
+        </div>
+    </div>
+
+    <div id="game-over">
+        <h2 id="winner-text" class="text-4xl font-bold mb-4">P1 VICTORY</h2>
+        <p class="mb-6 text-gray-400">戰鬥結束</p>
+        <button onclick="location.reload()"
+            class="bg-white text-black font-bold py-2 px-8 rounded-full hover:bg-orange-500 hover:text-white transition-all">重新開始</button>
+    </div>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <script>
+        /**
+         * ============================================================
+         * 1. 全域配置
+         * ============================================================
+         */
+        const CONFIG = {
+            playerMaxHp: 120,
+            playerMaxStamina: 100,
+            baseSpeed: 4.5,
+
+            // 蓄力技能基礎
+            skillStartCost: 20,
+            skillDrainPerFrame: 1.5,
+            skillMaxChargeTime: 350,
+            skillCD: 300,
+            skillExhaustedMult: 0.25,
+
+            // 子彈等級參數
+            bulletLv1: { size: 16, damage: 12, speed: 11, life: 700, recoil: 0, recoilDuration: 0 },
+            bulletLv2: { size: 27, damage: 24, speed: 16, life: 900, recoil: 12, recoilDuration: 380 },
+
+            // 劍氣專屬數值
+            bladeWave: {
+                damage: 45,
+                speed: 20,
+                radius: 70,
+                life: 1200,
+                segments: 6,
+                arc: Math.PI * 0.75,
+                thickness: 18,
+                recoilMag: 28,
+                recoilDuration: 500
+            },
+
+            // 近戰 (Melee) 參數
+            meleeDamage: 15,
+            meleeCD: 350,
+            meleeDuration: 200,
+            meleeRange: 85,
+            meleeAngle: 1.2,
+            meleeLungeStartMult: 1.4,
+
+            // 衝刺 (Dash) 參數
+            dashSpeed: 14,
+            dashDuration: 270,
+            dashCD: 1800,
+            staminaRegen: 0.4,
+
+            // 環境參數
+            buildingDensity: 0.000008,
+            buildingMaxHp: 80,
+            dropRate: 0.4
+        };
+
+        /**
+         * ============================================================
+         * 2. 輔助函式
+         * ============================================================
+         */
+        function getClosestPointOnRect(px, py, rx, ry, rw, rh) {
+            return {
+                x: Math.max(rx, Math.min(px, rx + rw)),
+                y: Math.max(ry, Math.min(py, ry + rh))
+            };
+        }
+
+        /**
+         * ============================================================
+         * 3. 核心類別
+         * ============================================================
+         */
+
+        // --- 分節劍氣類別 ---
+        class BladeWave {
+            constructor(x, y, angle, ownerId, color) {
+                this.x = x; this.y = y; this.angle = angle;
+                this.ownerId = ownerId; this.color = color;
+                const stats = CONFIG.bladeWave;
+                this.speed = stats.speed;
+                this.damage = stats.damage;
+                this.life = stats.life;
+                this.radius = stats.radius;
+                this.startTime = Date.now();
+                this.isDead = false;
+                this.segments = [];
+                for (let i = 0; i < stats.segments; i++) {
+                    this.segments.push({ isAlive: true });
+                }
+                this.hitUnits = new Set();
+                this.hitBuildings = new Set();
+            }
+
+            update(dtFactor) {
+                this.x += Math.cos(this.angle) * this.speed * dtFactor;
+                this.y += Math.sin(this.angle) * this.speed * dtFactor;
+                if (Date.now() - this.startTime > this.life) { this.isDead = true; return; }
+                let anyAlive = false;
+                const stats = CONFIG.bladeWave;
+                const step = stats.arc / stats.segments;
+                const startA = this.angle - stats.arc / 2;
+                this.segments.forEach((seg, i) => {
+                    if (!seg.isAlive) return;
+                    anyAlive = true;
+                    const midA = startA + (i + 0.5) * step;
+                    const sx = this.x + Math.cos(midA) * this.radius;
+                    const sy = this.y + Math.sin(midA) * this.radius;
+                    state.buildings.forEach(b => {
+                        if (b.isDestroyed) return;
+                        const cp = getClosestPointOnRect(sx, sy, b.x, b.y, b.w, b.h);
+                        if (Math.hypot(sx - cp.x, sy - cp.y) < stats.thickness + 2) {
+                            if (!this.hitBuildings.has(b)) { b.takeDamage(this.damage); this.hitBuildings.add(b); }
+                            seg.isAlive = false;
+                            createImpactEffect(cp.x, cp.y, '#fff', 5);
+                        }
+                    });
+                    state.players.forEach(p => {
+                        if (p.id === this.ownerId || this.hitUnits.has(p)) return;
+                        if (Math.hypot(sx - p.x, sy - p.y) < p.radius + stats.thickness) {
+                            p.hp -= this.damage; p.recoil.x = Math.cos(this.angle) * 25; p.recoil.y = Math.sin(this.angle) * 25;
+                            this.hitUnits.add(p); seg.isAlive = false;
+                            createImpactEffect(p.x, p.y, '#ff4400', 10);
+                            if (p.hp <= 0) endGame(this.ownerId);
+                        }
+                    });
+                });
+                if (!anyAlive) this.isDead = true;
+            }
+
+            draw() {
+                const stats = CONFIG.bladeWave;
+                const step = stats.arc / stats.segments;
+                const startA = this.angle - stats.arc / 2;
+                ctx.save(); ctx.translate(this.x, this.y); ctx.lineCap = 'round'; ctx.shadowBlur = 20; ctx.shadowColor = this.color;
+                this.segments.forEach((seg, i) => {
+                    if (!seg.isAlive) return;
+                    const s = startA + i * step; const e = s + step;
+                    ctx.beginPath(); ctx.arc(0, 0, this.radius, s, e); ctx.strokeStyle = '#fff'; ctx.lineWidth = stats.thickness; ctx.stroke();
+                    ctx.beginPath(); ctx.arc(0, 0, this.radius, s, e); ctx.strokeStyle = this.color; ctx.lineWidth = stats.thickness * 0.5; ctx.stroke();
+                });
+                ctx.restore();
+            }
+        }
+
+        // --- 一般子彈類別 ---
+        class Bullet {
+            constructor(x, y, angle, level, ownerId, color) {
+                this.x = x; this.y = y; this.angle = angle;
+                this.ownerId = ownerId; this.color = color;
+                let stats = CONFIG.bulletLv1;
+                if (level === 2) stats = CONFIG.bulletLv2;
+                this.level = level;
+                this.radius = stats.size; this.damage = stats.damage; this.speed = stats.speed; this.life = stats.life; this.recoil = stats.recoil; this.recoilDuration = stats.recoilDuration;
+                this.startTime = Date.now(); this.isDead = false;
+            }
+            update(dtFactor) {
+                this.x += Math.cos(this.angle) * this.speed * dtFactor;
+                this.y += Math.sin(this.angle) * this.speed * dtFactor;
+                if (Date.now() - this.startTime > this.life) this.isDead = true;
+                state.buildings.forEach(b => {
+                    if (b.isDestroyed) return;
+                    const cp = getClosestPointOnRect(this.x, this.y, b.x, b.y, b.w, b.h);
+                    if (Math.hypot(this.x - cp.x, this.y - cp.y) < this.radius + 2) {
+                        b.takeDamage(this.damage); createImpactEffect(this.x, this.y, this.color, 5); this.isDead = true;
+                    }
+                });
+                state.players.forEach(p => {
+                    if (p.id === this.ownerId) return;
+                    const d = Math.hypot(p.x - this.x, p.y - this.y);
+                    if (d < p.radius + this.radius) {
+                        p.hp -= this.damage; p.recoil.x = Math.cos(this.angle) * 15; p.recoil.y = Math.sin(this.angle) * 15;
+                        createImpactEffect(this.x, this.y, '#ff4400', 10); if (p.hp <= 0) endGame(this.ownerId); this.isDead = true;
+                    }
+                });
+            }
+            draw() {
+                ctx.save(); ctx.translate(this.x, this.y); ctx.shadowBlur = 15; ctx.shadowColor = this.color; ctx.fillStyle = '#fff';
+                ctx.beginPath(); ctx.arc(0, 0, this.radius, 0, Math.PI * 2); ctx.fill();
+                if (this.level === 2) {
+                    ctx.lineWidth = 4; ctx.strokeStyle = "#fbbf24"; ctx.shadowBlur = 24; ctx.shadowColor = "#fbbf24";
+                    ctx.beginPath(); ctx.arc(0, 0, this.radius + 4, 0, Math.PI * 2); ctx.stroke();
+                    ctx.shadowBlur = 0; ctx.globalAlpha = 0.7; ctx.fillStyle = "#fbbf24";
+                    ctx.beginPath(); ctx.arc(0, 0, this.radius * 0.5, 0, Math.PI * 2); ctx.fill();
+                    ctx.globalAlpha = 1;
+                }
+                ctx.shadowBlur = 0; ctx.fillStyle = this.color;
+                ctx.beginPath(); ctx.arc(0, 0, this.radius * 0.7, 0, Math.PI * 2); ctx.fill();
+                ctx.restore();
+            }
+        }
+
+        // --- 建築物與道具 ---
+        class Building {
+            constructor(x, y, w, h) {
+                this.x = x; this.y = y; this.w = w; this.h = h;
+                this.hp = CONFIG.buildingMaxHp; this.maxHp = CONFIG.buildingMaxHp;
+                this.isDestroyed = false;
+            }
+            takeDamage(amount) {
+                if (this.isDestroyed) return false;
+                this.hp -= amount;
+                if (this.hp <= 0) { this.hp = 0; this.isDestroyed = true; this.spawnDrop(); return true; }
+                return false;
+            }
+            spawnDrop() {
+                if (Math.random() > CONFIG.dropRate) return;
+                const centerX = this.x + this.w / 2; const centerY = this.y + this.h / 2;
+                const type = Math.random() > 0.6 ? 'COFFEE' : 'HEART';
+                state.drops.push(new Drop(centerX, centerY, type));
+            }
+            draw() {
+                if (this.isDestroyed) return;
+                ctx.fillStyle = '#2a2a2a'; ctx.strokeStyle = '#555'; ctx.lineWidth = 2;
+                ctx.fillRect(this.x, this.y, this.w, this.h); ctx.strokeRect(this.x, this.y, this.w, this.h);
+                if (this.hp < this.maxHp) {
+                    const bw = this.w * 0.8; const bx = this.x + (this.w - bw) / 2; const by = this.y - 10;
+                    ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(bx, by, bw, 4);
+                    ctx.fillStyle = '#fbbf24'; ctx.fillRect(bx, by, bw * (this.hp / this.maxHp), 4);
+                }
+            }
+        }
+
+        class Drop {
+            constructor(x, y, type) { this.x = x; this.y = y; this.type = type; this.radius = 16; this.spawnTime = Date.now(); }
+            draw() {
+                const float = Math.sin(Date.now() / 300) * 5; ctx.save(); ctx.translate(this.x, this.y + float);
+                if (this.type === 'HEART') {
+                    ctx.fillStyle = '#f472b6'; ctx.shadowBlur = 15; ctx.shadowColor = '#f472b6';
+                    ctx.beginPath(); ctx.arc(-6, -6, 8, 0, Math.PI * 2); ctx.arc(6, -6, 8, 0, Math.PI * 2); ctx.fill();
+                    ctx.beginPath(); ctx.moveTo(-14, -4); ctx.lineTo(0, 12); ctx.lineTo(14, -4); ctx.fill();
+                } else {
+                    ctx.fillStyle = '#78350f'; ctx.shadowBlur = 15; ctx.shadowColor = '#fbbf24';
+                    ctx.beginPath(); ctx.arc(0, 0, 14, 0, Math.PI * 2); ctx.fill();
+                    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.moveTo(-4, -6); ctx.lineTo(4, -2); ctx.lineTo(-2, 2); ctx.lineTo(4, 8);
+                    ctx.stroke(); ctx.lineWidth = 2; ctx.strokeStyle = '#fff'; ctx.stroke();
+                }
+                ctx.restore();
+            }
+        }
+
+        // --- 玩家類別 ---
+        class Player {
+            constructor(id, x, y, color) {
+                this.id = id; this.x = x; this.y = y; this.color = color;
+                this.radius = 22; this.angle = 0;
+                this.hp = CONFIG.playerMaxHp; this.stamina = CONFIG.playerMaxStamina;
+                this.lastDashTime = 0; this.dashActiveUntil = 0;
+                this.lastMeleeTime = 0; this.meleeActiveUntil = 0;
+                this.lastSkillTime = 0;
+                this.recoil = { x: 0, y: 0 }; this.recoilStartTime = 0; this.recoilDuration = 0;
+                this.coffeeUntil = 0;
+                this.isCharging = false; this.chargeValue = 0;
+                this.scaleX = 1; this.scaleY = 1;
+                this.isSlowCharging = false;
+            }
+
+            update(inputDx, inputDy, isDashPressed, isMeleePressed, isSkillPressed, target, dtFactor) {
+                const now = Date.now();
+                const isDashing = now < this.dashActiveUntil;
+                const isMeleeing = now < this.meleeActiveUntil;
+                const hasCoffee = now < this.coffeeUntil;
+                const recoilElapsed = now - this.recoilStartTime;
+                const isStunnedByRecoil = recoilElapsed < (this.recoilDuration / 2);
+
+                // 1. 精力回覆
+                if (hasCoffee) { this.stamina = CONFIG.playerMaxStamina; }
+                else if (!this.isCharging && this.stamina < CONFIG.playerMaxStamina) {
+                    this.stamina = Math.min(CONFIG.playerMaxStamina, this.stamina + CONFIG.staminaRegen * dtFactor);
+                }
+
+                // 2. 蓄力技能邏輯
+                if (isSkillPressed) {
+                    // --- 核心修正：精力需 > 20 才可開始蓄力 ---
+                    if (!this.isCharging && (this.stamina > CONFIG.skillStartCost || hasCoffee) && now - this.lastSkillTime > CONFIG.skillCD) {
+                        this.isCharging = true;
+                        if (!hasCoffee) this.stamina = Math.max(0, this.stamina - CONFIG.skillStartCost);
+                        this.chargeValue = 0;
+                    }
+
+                    if (this.isCharging) {
+                        if (!isDashing) { inputDx = 0; inputDy = 0; }
+
+                        // 瞄準更新
+                        if (this.id === 'P1') this.angle = Math.atan2(state.mouse.y - this.y, state.mouse.x - this.x);
+                        else {
+                            const gp = navigator.getGamepads()[0];
+                            if (gp) {
+                                const deadzone = 0.2;
+                                const sx = Math.abs(gp.axes[0]) > deadzone ? gp.axes[0] : 0;
+                                const sy = Math.abs(gp.axes[1]) > deadzone ? gp.axes[1] : 0;
+                                if (sx !== 0 || sy !== 0) this.angle = Math.atan2(sy, sx);
+                            }
+                        }
+
+                        // 蓄力速度計算
+                        if (this.chargeValue < 1.0) {
+                            let currentChargeSpeed = (16.66 / CONFIG.skillMaxChargeTime);
+                            if (this.stamina <= 0 && !hasCoffee) {
+                                currentChargeSpeed *= CONFIG.skillExhaustedMult;
+                                this.isSlowCharging = true;
+                            } else {
+                                this.isSlowCharging = false;
+                            }
+                            this.chargeValue += currentChargeSpeed * dtFactor;
+                            if (!hasCoffee) this.stamina = Math.max(0, this.stamina - CONFIG.skillDrainPerFrame * dtFactor);
+                            if (this.chargeValue > 1.0) this.chargeValue = 1.0;
+                        }
+                    }
+                } else if (this.isCharging) {
+                    // 發射
+                    let rMag = 0, rDur = 0;
+                    if (this.chargeValue > 0.9) {
+                        state.projectiles.push(new BladeWave(this.x, this.y, this.angle, this.id, this.color));
+                        rMag = CONFIG.bladeWave.recoilMag; rDur = CONFIG.bladeWave.recoilDuration;
+                    } else {
+                        state.projectiles.push(new Bullet(this.x, this.y, this.angle, 1, this.id, this.color));
+                        rMag = CONFIG.bulletLv1.recoil; rDur = CONFIG.bulletLv1.recoilDuration;
+                    }
+                    this.recoil.x = -Math.cos(this.angle) * rMag; this.recoil.y = -Math.sin(this.angle) * rMag;
+                    this.recoilStartTime = now; this.recoilDuration = rDur;
+                    this.lastSkillTime = now; this.isCharging = false; this.chargeValue = 0; this.isSlowCharging = false;
+                }
+
+                // 3. 其他行為與移動
+                if (isMeleePressed && !this.isCharging && now - this.lastMeleeTime > CONFIG.meleeCD) {
+                    this.lastMeleeTime = now; this.meleeActiveUntil = now + CONFIG.meleeDuration; this.performMelee(target);
+                }
+                if (isDashPressed && now - this.lastDashTime > CONFIG.dashCD && !isStunnedByRecoil) {
+                    this.lastDashTime = now; this.dashActiveUntil = now + CONFIG.dashDuration;
+                }
+                if ((this.isCharging && !isDashing) || isStunnedByRecoil) { inputDx = 0; inputDy = 0; }
+
+                let moveX = 0, moveY = 0;
+                if (isMeleeing) {
+                    const elapsed = now - this.lastMeleeTime; const progress = Math.min(elapsed / CONFIG.meleeDuration, 1);
+                    moveX = Math.cos(this.angle) * CONFIG.baseSpeed * CONFIG.meleeLungeStartMult * (1 - progress) * dtFactor;
+                    moveY = Math.sin(this.angle) * CONFIG.baseSpeed * CONFIG.meleeLungeStartMult * (1 - progress) * dtFactor;
+                } else if (inputDx !== 0 || inputDy !== 0) {
+                    if (!this.isCharging) this.angle = Math.atan2(inputDy, inputDx);
+                    const speed = isDashing ? CONFIG.dashSpeed : CONFIG.baseSpeed;
+                    const len = Math.sqrt(inputDx * inputDx + inputDy * inputDy);
+                    moveX = (inputDx / len) * speed * dtFactor; moveY = (inputDy / len) * speed * dtFactor;
+                }
+                moveX += this.recoil.x * dtFactor; moveY += this.recoil.y * dtFactor;
+                this.resolveMovement(moveX, moveY);
+                this.recoil.x *= Math.pow(0.85, dtFactor); this.recoil.y *= Math.pow(0.85, dtFactor);
+
+                // 道具拾取
+                for (let i = state.drops.length - 1; i >= 0; i--) {
+                    const drop = state.drops[i];
+                    if (Math.hypot(this.x - drop.x, this.y - drop.y) < this.radius + drop.radius) {
+                        if (drop.type === 'HEART') this.hp = Math.min(CONFIG.playerMaxHp, this.hp + CONFIG.playerMaxHp * 0.5);
+                        else if (drop.type === 'COFFEE') this.coffeeUntil = now + 10000;
+                        state.drops.splice(i, 1); createImpactEffect(this.x, this.y, drop.type === 'HEART' ? '#f472b6' : '#fbbf24', 8);
+                    }
+                }
+            }
+
+            resolveMovement(mx, my) {
+                let nX = this.x + mx; if (!checkWallCollision(nX, this.y, this.radius)) this.x = nX; else this.recoil.x = 0;
+                let nY = this.y + my; if (!checkWallCollision(this.x, nY, this.radius)) this.y = nY; else this.recoil.y = 0;
+                this.x = Math.max(this.radius, Math.min(canvas.width - this.radius, this.x));
+                this.y = Math.max(this.radius, Math.min(canvas.height - this.radius, this.y));
+            }
+
+            performMelee(target) {
+                const distP = Math.hypot(target.x - this.x, target.y - this.y); const aToP = Math.atan2(target.y - this.y, target.x - this.x);
+                if (this.isInMeleeArc(distP, aToP, target.radius)) {
+                    target.hp -= CONFIG.meleeDamage; target.recoil.x = Math.cos(this.angle) * 15; target.recoil.y = Math.sin(this.angle) * 15;
+                    createImpactEffect(target.x, target.y, '#ff4400', 10); if (target.hp <= 0) endGame(this.id);
+                }
+                state.buildings.forEach(b => {
+                    if (b.isDestroyed) return;
+                    const cp = getClosestPointOnRect(this.x, this.y, b.x, b.y, b.w, b.h);
+                    if (this.isInMeleeArc(Math.hypot(this.x - cp.x, this.y - cp.y), Math.atan2(cp.y - this.y, cp.x - this.x), 10)) {
+                        b.takeDamage(CONFIG.meleeDamage); createImpactEffect(cp.x, cp.y, '#fff', 5);
+                    }
+                });
+            }
+
+            isInMeleeArc(dist, aTo, tR) {
+                if (dist > CONFIG.meleeRange + tR) return false;
+                let diff = aTo - this.angle; while (diff < -Math.PI) diff += Math.PI * 2; while (diff > Math.PI) diff -= Math.PI * 2;
+                return Math.abs(diff) < CONFIG.meleeAngle / 2;
+            }
+
+            draw() {
+                ctx.save(); ctx.translate(this.x, this.y); const now = Date.now();
+                if (now < this.meleeActiveUntil) {
+                    const ratio = (this.meleeActiveUntil - now) / CONFIG.meleeDuration;
+                    ctx.beginPath(); ctx.arc(0, 0, CONFIG.meleeRange, this.angle - CONFIG.meleeAngle / 2, this.angle + CONFIG.meleeAngle / 2);
+                    ctx.strokeStyle = `rgba(255, 255, 255, ${ratio})`; ctx.lineWidth = 15 * ratio; ctx.stroke();
+                }
+
+                // --- 核心修正：UI 顏色邏輯 ---
+                const isLowStamina = this.stamina < 15 && !now < this.coffeeUntil;
+                const uiColor = isLowStamina ? "#c2410c" : null; // 暗橘色
+
+                // 蓄力環
+                if (this.isCharging) {
+                    const total = this.chargeValue;
+                    const r = this.radius + 17;
+                    const isFlicker = this.isSlowCharging && (Math.floor(Date.now() / 100) % 2 === 0);
+                    const baseColor = isFlicker ? "#ef4444" : (this.isSlowCharging ? "#666" : uiColor);
+
+                    const segs = [
+                        { from: 0, to: Math.min(total, 0.9), color: baseColor || "#f97316" },
+                        { from: 0.9, to: Math.min(total, 1.0), color: baseColor || "#fff" }
+                    ];
+
+                    segs.forEach(seg => {
+                        if (seg.to > seg.from) {
+                            ctx.beginPath();
+                            ctx.arc(0, 0, r, Math.PI * 2 * seg.from, Math.PI * 2 * seg.to, false);
+                            ctx.strokeStyle = seg.color; ctx.lineWidth = 5;
+                            if (seg.color === "#fff") { ctx.shadowBlur = 16; ctx.shadowColor = "#fff"; }
+                            ctx.stroke(); ctx.shadowBlur = 0;
+                        }
+                    });
+
+                    if (this.isSlowCharging) {
+                        ctx.fillStyle = "#ef4444"; ctx.font = "bold 10px Inter"; ctx.textAlign = "center";
+                        ctx.fillText("LOW ENERGY (0.25x)", 0, -55);
+                    }
+                }
+
+                // 瞄準箭頭 (當按住技能但體力不足無法啟動時也顯示暗橘色箭頭)
+                const isTryingToCharge = state.inputs[this.id.toLowerCase()].skill;
+                if (this.isCharging || (isTryingToCharge && isLowStamina)) {
+                    let arrowLen = this.chargeValue > 0.9 ? 120 : 60;
+                    let arrowColor = uiColor || (this.chargeValue > 0.9 ? "#fff" : "#f97316");
+
+                    ctx.save(); ctx.rotate(this.angle);
+                    ctx.beginPath(); ctx.moveTo(this.radius + 8, 0); ctx.lineTo(this.radius + arrowLen, 0);
+                    ctx.strokeStyle = arrowColor; ctx.lineWidth = 6; ctx.stroke();
+                    ctx.beginPath(); ctx.moveTo(this.radius + arrowLen, 0); ctx.lineTo(this.radius + arrowLen - 18, -10); ctx.lineTo(this.radius + arrowLen - 18, 10); ctx.closePath();
+                    ctx.fillStyle = arrowColor; ctx.fill(); ctx.restore();
+                }
+
+                ctx.rotate(this.angle); ctx.scale(this.scaleX, this.scaleY); ctx.fillStyle = this.color;
+                ctx.beginPath(); ctx.moveTo(this.radius, 0); ctx.lineTo(-this.radius * 0.7, -this.radius); ctx.lineTo(-this.radius * 0.4, 0); ctx.lineTo(-this.radius * 0.7, this.radius); ctx.closePath();
+                ctx.fill(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke(); ctx.restore(); this.drawBars();
+            }
+
+            drawBars() {
+                const barW = 50, sx = this.x - barW / 2, sy = this.y - 45;
+                ctx.fillStyle = '#333'; ctx.fillRect(sx, sy, barW, 5);
+                ctx.fillStyle = '#ef4444'; ctx.fillRect(sx, sy, barW * (Math.max(0, this.hp) / CONFIG.playerMaxHp), 5);
+                ctx.fillStyle = '#333'; ctx.fillRect(sx, sy + 7, barW, 3);
+                if (Date.now() < this.coffeeUntil) {
+                    const hue = (Date.now() / 5) % 360; ctx.fillStyle = `hsl(${hue}, 80%, 60%)`;
+                } else {
+                    ctx.fillStyle = (this.stamina < 15) ? "#c2410c" : "#3b82f6";
+                }
+                ctx.fillRect(sx, sy + 7, barW * (this.stamina / CONFIG.playerMaxStamina), 3);
+            }
+        }
+
+        /**
+         * ============================================================
+         * 4. 系統初始化與循環
+         * ============================================================
+         */
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        let state = {
+            isGameOver: false, startTime: Date.now(), lastFrameTime: performance.now(),
+            players: [], projectiles: [], particles: [], buildings: [], drops: [],
+            mouse: { x: 0, y: 0 },
+            inputs: { p1: { up: false, down: false, left: false, right: false, dash: false, skill: false, melee: false }, p2: { dx: 0, dy: 0, dash: false, skill: false, melee: false } },
+            gamepad: { prevA: false, prevX: false }
+        };
+
+        function init() {
+            state.players = [new Player("P1", canvas.width * 0.1, canvas.height / 2, "#f97316"), new Player("P2", canvas.width * 0.9, canvas.height / 2, "#0ea5e9")];
+            generateBuildings(); requestAnimationFrame(gameLoop);
+        }
+
+        function generateBuildings() {
+            state.buildings = [];
+            const area = canvas.width * canvas.height;
+            const targetCount = Math.floor(area * CONFIG.buildingDensity);
+            let attempts = 0;
+            while (state.buildings.length < targetCount && attempts < 1000) {
+                attempts++;
+                const w = 60 + Math.random() * 110; const h = 60 + Math.random() * 110;
+                const x = 100 + Math.random() * (canvas.width - 200 - w); const y = 80 + Math.random() * (canvas.height - 160 - h);
+                let overlap = false;
+                for (let b of state.buildings) {
+                    const padding = 30; if (x < b.x + b.w + padding && x + w + padding > b.x && y < b.y + b.h + padding && y + h + padding > b.y) { overlap = true; break; }
+                }
+                state.players.forEach(p => { if (Math.hypot(x + w / 2 - p.x, y + h / 2 - p.y) < 180) overlap = true; });
+                if (!overlap) state.buildings.push(new Building(x, y, w, h));
+            }
+        }
+
+        function checkWallCollision(px, py, radius) {
+            for (let b of state.buildings) {
+                if (b.isDestroyed) continue; const cp = getClosestPointOnRect(px, py, b.x, b.y, b.w, b.h);
+                if ((px - cp.x) ** 2 + (py - cp.y) ** 2 < (radius - 2) ** 2) return true;
+            }
+            return false;
+        }
+
+        window.addEventListener('mousemove', e => { state.mouse.x = e.clientX; state.mouse.y = e.clientY; });
+        window.addEventListener('keydown', e => { if (e.code === 'KeyW') state.inputs.p1.up = true; if (e.code === 'KeyS') state.inputs.p1.down = true; if (e.code === 'KeyA') state.inputs.p1.left = true; if (e.code === 'KeyD') state.inputs.p1.right = true; if (e.code === 'Space') state.inputs.p1.dash = true; });
+        window.addEventListener('keyup', e => { if (e.code === 'KeyW') state.inputs.p1.up = false; if (e.code === 'KeyS') state.inputs.p1.down = false; if (e.code === 'KeyA') state.inputs.p1.left = false; if (e.code === 'KeyD') state.inputs.p1.right = false; if (e.code === 'Space') state.inputs.p1.dash = false; });
+        window.addEventListener('mousedown', e => { if (e.button === 0) state.inputs.p1.melee = true; if (e.button === 2) state.inputs.p1.skill = true; });
+        window.addEventListener('mouseup', e => { if (e.button === 0) state.inputs.p1.melee = false; if (e.button === 2) state.inputs.p1.skill = false; });
+        window.addEventListener('contextmenu', e => e.preventDefault());
+
+        function handleGamepad() {
+            const pads = navigator.getGamepads(); if (!pads || !pads[0]) return; const gp = pads[0]; const dz = 0.2;
+            state.inputs.p2.dx = Math.abs(gp.axes[0]) > dz ? gp.axes[0] : 0; state.inputs.p2.dy = Math.abs(gp.axes[1]) > dz ? gp.axes[1] : 0;
+            state.inputs.p2.dash = gp.buttons[0].pressed && !state.gamepad.prevA; state.gamepad.prevA = gp.buttons[0].pressed;
+            state.inputs.p2.melee = gp.buttons[2].pressed && !state.gamepad.prevX; state.gamepad.prevX = gp.buttons[2].pressed;
+            state.inputs.p2.skill = gp.buttons[7].pressed;
+        }
+
+        function createImpactEffect(x, y, color, count) { for (let i = 0; i < count; i++) { state.particles.push({ x, y, vx: (Math.random() - 0.5) * 8, vy: (Math.random() - 0.5) * 8, radius: Math.random() * 5 + 2, alpha: 1, color, decay: 0.02 }); } }
+
+        function gameLoop(timestamp) {
+            if (state.isGameOver) return; const dt = timestamp - state.lastFrameTime; state.lastFrameTime = timestamp; const dtFactor = Math.min(dt / 16.666, 3);
+            ctx.clearRect(0, 0, canvas.width, canvas.height); const timerEl = document.getElementById('timer'); if (timerEl) timerEl.innerText = ((Date.now() - state.startTime) / 1000).toFixed(1);
+            handleGamepad();
+            const p1dx = (state.inputs.p1.left ? -1 : 0) + (state.inputs.p1.right ? 1 : 0); const p1dy = (state.inputs.p1.up ? -1 : 0) + (state.inputs.p1.down ? 1 : 0);
+            state.players[0].update(p1dx, p1dy, state.inputs.p1.dash, state.inputs.p1.melee, state.inputs.p1.skill, state.players[1], dtFactor);
+            state.players[1].update(state.inputs.p2.dx, state.inputs.p2.dy, state.inputs.p2.dash, state.inputs.p2.melee, state.inputs.p2.skill, state.players[0], dtFactor);
+            ctx.strokeStyle = '#1e1e1e'; for (let i = 0; i < canvas.width; i += 50) { ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, canvas.height); ctx.stroke(); }
+            state.buildings.forEach(b => b.draw()); state.drops.forEach(d => d.draw());
+            for (let i = state.projectiles.length - 1; i >= 0; i--) { state.projectiles[i].update(dtFactor); if (state.projectiles[i].isDead) state.projectiles.splice(i, 1); else state.projectiles[i].draw(); }
+            for (let i = state.particles.length - 1; i >= 0; i--) { const p = state.particles[i]; p.x += p.vx * dtFactor; p.y += p.vy * dtFactor; p.alpha -= p.decay * dtFactor; if (p.alpha <= 0) state.particles.splice(i, 1); else { ctx.save(); ctx.globalAlpha = p.alpha; ctx.fillStyle = p.color; ctx.beginPath(); ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2); ctx.fill(); ctx.restore(); } }
+            state.players.forEach(p => p.draw()); requestAnimationFrame(gameLoop);
+        }
+
+        function endGame(winnerId) { state.isGameOver = true; document.getElementById('game-over').style.display = 'block'; document.getElementById('winner-text').innerText = winnerId + " VICTORY"; }
+        window.addEventListener('resize', () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; });
+        canvas.width = window.innerWidth; canvas.height = window.innerHeight; init();
+    </script>
+</body>
+
+</html>

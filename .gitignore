@@ -1,0 +1,46 @@
+# === MacOS 系統檔案 (優先排除) ===
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+
+# === Windows 系統檔案 ===
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# === 開發工具與 IDE ===
+.vscode/
+.idea/
+*.swp
+*.swo
+.project
+.settings/
+
+# === 依賴與 Node.js (如果你有用到 npm/yarn) ===
+node_modules/
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+npm-debug.log*
+
+# === 建置輸出 (Build Output) ===
+dist/
+build/
+out/
+.cache/
+
+# === 隱私與環境變數 ===
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# === 遊戲素材原始檔 (建議排除，僅上傳導出的 Web 格式) ===
+# 如果你有用 Aseprite, Photoshop, DragonBones 等，可以取消註解
+# *.ase
+# *.aseprite
+# *.psd
+# *.autosave

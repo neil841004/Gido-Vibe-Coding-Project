@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GIDO Core Combat Template - Visual Polish Update</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #121212; font-family: 'Inter', sans-serif; user-select: none; }
+        canvas { display: block; cursor: crosshair; }
+        #ui-overlay { position: absolute; top: 20px; left: 20px; pointer-events: none; color: white; width: 350px; }
+        .instruction-box { background: rgba(0, 0, 0, 0.8); padding: 15px; border-radius: 12px; border: 1px solid #333; pointer-events: auto; backdrop-filter: blur(4px); }
+        #game-over { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0, 0, 0, 0.95); color: white; padding: 40px; border-radius: 24px; text-align: center; display: none; border: 2px solid #ef4444; pointer-events: auto; }
+    </style>
+</head>
+<body>
+
+<div id="ui-overlay">
+    <div class="instruction-box">
+        <h1 class="text-xl font-bold mb-2 text-white">GIDO <span class="text-orange-500">Prototype Template</span></h1>
+        <p class="text-gray-400 text-xs mb-4 border-b border-white/10 pb-2">Dash 縮放修正 (方向一致版)</p>
+        
+        <div class="grid grid-cols-2 gap-4 text-[11px] mb-3">
+            <div class="text-white">
+                <p class="font-bold text-orange-400 mb-1">1P (鍵鼠)</p>
+                <ul class="space-y-1 opacity-80">
+                    <li>WASD - 移動</li>
+                    <li>Space - 衝刺 (沿方向伸長)</li>
+                    <li>LMB - 近戰攻擊</li>
+                </ul>
+            </div>
+            <div class="text-cyan-400">
+                <p class="font-bold text-cyan-400 mb-1">2P (手把)</p>
+                <ul class="space-y-1 opacity-80">
+                    <li>左搖桿 - 移動 / A 鈕 - 衝刺</li>
+                    <li>X 鈕 - 近戰攻擊</li>
+                </ul>
+            </div>
+        </div>
+        
+        <div class="mt-2 text-[10px] text-gray-500 flex flex-col gap-1">
+            <div class="flex justify-between">
+                <span>Runtime: <span id="timer">0.0</span>s</span>
+                <span class="text-orange-400 font-bold">已修正 Dash 縮放與角度同步</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="game-over">
+    <h2 id="winner-text" class="text-4xl font-bold mb-4">P1 VICTORY</h2>
+    <p class="mb-6 text-gray-400">戰鬥結束</p>
+    <button onclick="location.reload()" class="bg-white text-black font-bold py-2 px-8 rounded-full hover:bg-orange-500 hover:text-white transition-all">重新開始</button>
+</div>
+
+<canvas id="gameCanvas"></canvas>
+
+<script>
+    /**
+     * ============================================================
+     * 1. 全域配置 舊數值別動
+     * ============================================================
+     */
+    const CONFIG = {
+        playerMaxHp: 120,
+        playerMaxStamina: 100,
+        baseSpeed: 4.5,           
+        
+        // 近戰 (Melee)
+        meleeDamage: 15,
+        meleeCD: 350,           
+        meleeDuration: 200,     
+        meleeRange: 85,         
+        meleeAngle: 1.2,        
+        meleeLungeStartMult: 1.4, 
+
+        // 衝刺 (Dash)
+        dashSpeed: 14,
+        dashDuration: 270,      
+        dashCD: 1800,           
+        ghostInterval: 70,      
+
+        // 精力回覆
+        staminaRegen: 0.4,
+        buffFadeDuration: 500,  
+        
+        // 建築物與掉落物
+        buildingDensity: 0.000008, 
+        buildingMaxHp: 75,
+        dropRateHeart: 0.3,
+        dropRateCoffee: 0.2,
+        coffeeDuration: 10000
+    };
+
+    /**
+     * ============================================================
+     * 2. 核心類別
+     * ============================================================
+     */
+    class Building {
+        constructor(x, y, w, h) {
+            this.x = x; this.y = y; this.w = w; this.h = h;
+            this.hp = CONFIG.buildingMaxHp;
+            this.maxHp = CONFIG.buildingMaxHp;
+            this.isDestroyed = false;
+        }
+        takeDamage(amount) {
+            if (this.isDestroyed) return false;
+            this.hp -= amount;
+            if (this.hp <= 0) {
+                this.hp = 0; this.isDestroyed = true;
+                this.spawnDrop();
+                return true;
+            }
+            return false;
+        }
+        spawnDrop() {
+            const rand = Math.random();
+            const centerX = this.x + this.w / 2;
+            const centerY = this.y + this.h / 2;
+            if (rand < CONFIG.dropRateHeart) {
+                state.drops.push(new Drop(centerX, centerY, 'HEART'));
+            } else if (rand < CONFIG.dropRateHeart + CONFIG.dropRateCoffee) {
+                state.drops.push(new Drop(centerX, centerY, 'COFFEE'));
+            }
+        }
+        draw() {
+            if (this.isDestroyed) return;
+            ctx.fillStyle = '#2a2a2a'; ctx.strokeStyle = '#555'; ctx.lineWidth = 2;
+            ctx.fillRect(this.x, this.y, this.w, this.h);
+            ctx.strokeRect(this.x, this.y, this.w, this.h);
+            if (this.hp < this.maxHp) {
+                const bw = this.w * 0.8; const bx = this.x + (this.w - bw) / 2; const by = this.y - 10;
+                ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(bx, by, bw, 4);
+                ctx.fillStyle = '#fbbf24'; ctx.fillRect(bx, by, bw * (this.hp / this.maxHp), 4);
+            }
+        }
+    }
+
+    class Drop {
+        constructor(x, y, type) {
+            this.x = x; this.y = y; this.type = type;
+            this.radius = 12;
+        }
+        draw() {
+            const pulse = Math.sin(Date.now() / 200) * 3;
+            ctx.save(); ctx.translate(this.x, this.y);
+            if (this.type === 'HEART') {
+                ctx.fillStyle = '#f472b6'; ctx.shadowBlur = 15; ctx.shadowColor = '#f472b6';
+                ctx.beginPath(); ctx.arc(-5, -2, 6 + pulse/2, 0, Math.PI * 2);
+                ctx.arc(5, -2, 6 + pulse/2, 0, Math.PI * 2);
+                ctx.moveTo(-11, 0); ctx.lineTo(0, 12); ctx.lineTo(11, 0); ctx.fill();
+            } else {
+                ctx.fillStyle = '#92400e'; ctx.shadowBlur = 15; ctx.shadowColor = '#fbbf24';
+                ctx.beginPath(); ctx.arc(0, 0, this.radius + pulse, 0, Math.PI * 2); ctx.fill();
+                ctx.fillStyle = '#fff'; ctx.fillRect(-4, -4, 8, 8);
+            }
+            ctx.restore();
+        }
+    }
+
+    class Player {
+        constructor(id, x, y, color) {
+            this.id = id;
+            this.x = x; this.y = y;
+            this.color = color;
+            this.radius = 22;
+            this.angle = 0;
+            this.hp = CONFIG.playerMaxHp;
+            this.stamina = CONFIG.playerMaxStamina;
+            this.lastDashTime = 0;
+            this.dashActiveUntil = 0;
+            this.lastMeleeTime = 0;
+            this.meleeActiveUntil = 0;
+            this.recoil = { x: 0, y: 0 };
+            this.speedBuffUntil = 0;
+            this.speedBuffValue = 1.0; 
+            this.coffeeBuffUntil = 0;
+
+            // 動效變數
+            this.scaleX = 1;
+            this.scaleY = 1;
+            this.ghostTimer = 0; 
+        }
+
+        update(inputDx, inputDy, isDashPressed, isMeleePressed, target, dtFactor) {
+            const now = Date.now();
+            const isDashing = now < this.dashActiveUntil;
+            const isMeleeing = now < this.meleeActiveUntil;
+            const hasCoffee = now < this.coffeeBuffUntil;
+
+            // 1. 精力回覆
+            if (hasCoffee) {
+                this.stamina = CONFIG.playerMaxStamina;
+            } else if (this.stamina < CONFIG.playerMaxStamina) {
+                this.stamina = Math.min(CONFIG.playerMaxStamina, this.stamina + CONFIG.staminaRegen * dtFactor);
+            }
+
+            // 2. Dash 觸發
+            if (isDashPressed && now - this.lastDashTime > CONFIG.dashCD) {
+                this.lastDashTime = now;
+                this.dashActiveUntil = now + CONFIG.dashDuration;
+                this.ghostTimer = CONFIG.ghostInterval; 
+            }
+
+            // 更新縮放效果
+            if (isDashing) {
+                // 衝刺時沿著移動方向拉長，側面縮扁
+                this.scaleX = Math.min(this.scaleX + 0.1 * dtFactor, 1.4);
+                this.scaleY = Math.max(this.scaleY - 0.1 * dtFactor, 0.7);
+                
+                // 固定頻率產生形狀殘影
+                this.ghostTimer += 16.66 * dtFactor; 
+                if (this.ghostTimer >= CONFIG.ghostInterval) {
+                    this.ghostTimer = 0;
+                    state.particles.push({
+                        type: 'GHOST',
+                        x: this.x, y: this.y, 
+                        angle: this.angle,
+                        color: this.color,
+                        radius: this.radius,
+                        scaleX: this.scaleX, // 殘影繼承當下的縮放狀態
+                        scaleY: this.scaleY,
+                        alpha: 0.4, 
+                        decay: 0.04 * dtFactor
+                    });
+                }
+            } else {
+                // 恢復正常
+                this.scaleX += (1 - this.scaleX) * 0.2 * dtFactor;
+                this.scaleY += (1 - this.scaleY) * 0.2 * dtFactor;
+                this.ghostTimer = 0;
+            }
+
+            let moveX = 0;
+            let moveY = 0;
+
+            if (isMeleeing) {
+                const elapsed = now - this.lastMeleeTime;
+                const progress = Math.min(elapsed / CONFIG.meleeDuration, 1);
+                const currentMult = CONFIG.meleeLungeStartMult * (1 - progress);
+                const lungeSpeed = CONFIG.baseSpeed * currentMult;
+                moveX = Math.cos(this.angle) * lungeSpeed * dtFactor;
+                moveY = Math.sin(this.angle) * lungeSpeed * dtFactor;
+            } else {
+                let speedMult = 1.0;
+                if (now < this.speedBuffUntil) {
+                    speedMult = this.speedBuffValue;
+                } else if (now < this.speedBuffUntil + CONFIG.buffFadeDuration) {
+                    const fadeProgress = (now - this.speedBuffUntil) / CONFIG.buffFadeDuration;
+                    speedMult = this.speedBuffValue + (1.0 - this.speedBuffValue) * fadeProgress;
+                }
+
+                if (inputDx !== 0 || inputDy !== 0) {
+                    this.angle = Math.atan2(inputDy, inputDx);
+                    const speed = isDashing ? CONFIG.dashSpeed : CONFIG.baseSpeed * speedMult;
+                    const len = Math.sqrt(inputDx*inputDx + inputDy*inputDy);
+                    moveX = (inputDx/len) * speed * dtFactor;
+                    moveY = (inputDy/len) * speed * dtFactor;
+                }
+            }
+
+            moveX += this.recoil.x * dtFactor;
+            moveY += this.recoil.y * dtFactor;
+            this.resolveMovement(moveX, moveY);
+
+            this.recoil.x *= Math.pow(0.85, dtFactor);
+            this.recoil.y *= Math.pow(0.85, dtFactor);
+
+            for (let i = state.drops.length - 1; i >= 0; i--) {
+                const d = state.drops[i];
+                if (Math.hypot(d.x - this.x, d.y - this.y) < this.radius + d.radius) {
+                    this.applyDropEffect(d.type);
+                    state.drops.splice(i, 1);
+                }
+            }
+
+            if (isMeleePressed && now - this.lastMeleeTime > CONFIG.meleeCD) {
+                this.lastMeleeTime = now;
+                this.meleeActiveUntil = now + CONFIG.meleeDuration;
+                this.performMelee(target);
+            }
+        }
+
+        applyDropEffect(type) {
+            if (type === 'HEART') {
+                this.hp = Math.min(CONFIG.playerMaxHp, this.hp + CONFIG.playerMaxHp * 0.5);
+                createImpactEffect(this.x, this.y, '#f472b6', 15);
+            } else if (type === 'COFFEE') {
+                this.coffeeBuffUntil = Date.now() + CONFIG.coffeeDuration;
+                createImpactEffect(this.x, this.y, '#92400e', 15);
+            }
+        }
+
+        resolveMovement(mx, my) {
+            let nextX = this.x + mx;
+            if (!checkWallCollision(nextX, this.y, this.radius)) {
+                this.x = nextX;
+            } else { this.recoil.x = 0; }
+            let nextY = this.y + my;
+            if (!checkWallCollision(this.x, nextY, this.radius)) {
+                this.y = nextY;
+            } else { this.recoil.y = 0; }
+            this.x = Math.max(this.radius, Math.min(canvas.width - this.radius, this.x));
+            this.y = Math.max(this.radius, Math.min(canvas.height - this.radius, this.y));
+        }
+
+        performMelee(target) {
+            const dist = Math.hypot(target.x - this.x, target.y - this.y);
+            const angleToTarget = Math.atan2(target.y - this.y, target.x - this.x);
+            if (this.isInMeleeArc(dist, angleToTarget, target.radius)) {
+                target.hp -= CONFIG.meleeDamage;
+                target.recoil.x = Math.cos(this.angle) * 15;
+                target.recoil.y = Math.sin(this.angle) * 15;
+                createImpactEffect(target.x, target.y, '#ff4400', 10);
+                if (target.hp <= 0) endGame(this.id);
+            }
+
+            state.buildings.forEach(b => {
+                if (b.isDestroyed) return;
+                const step = 20; let isHit = false; let hitCoord = {x: 0, y: 0};
+                const samplePoints = [];
+                for (let sx = b.x; sx <= b.x + b.w; sx += step) {
+                    samplePoints.push({x: sx, y: b.y}, {x: sx, y: b.y + b.h});
+                }
+                for (let sy = b.y; sy <= b.y + b.h; sy += step) {
+                    samplePoints.push({x: b.x, y: sy}, {x: b.x + b.w, y: sy});
+                }
+                samplePoints.push({x: b.x + b.w/2, y: b.y + b.h/2});
+                for (let p of samplePoints) {
+                    const d = Math.hypot(p.x - this.x, p.y - this.y);
+                    const a = Math.atan2(p.y - this.y, p.x - this.x);
+                    if (this.isInMeleeArc(d, a, 0)) { isHit = true; hitCoord = p; break; }
+                }
+                if (isHit) {
+                    if (b.takeDamage(CONFIG.meleeDamage)) createImpactEffect(hitCoord.x, hitCoord.y, '#888', 20);
+                    else createImpactEffect(hitCoord.x, hitCoord.y, '#555', 5);
+                }
+            });
+        }
+
+        isInMeleeArc(dist, angleTo, targetRadius) {
+            if (dist > CONFIG.meleeRange + targetRadius) return false;
+            let diff = angleTo - this.angle;
+            while (diff < -Math.PI) diff += Math.PI * 2;
+            while (diff > Math.PI) diff -= Math.PI * 2;
+            return Math.abs(diff) < CONFIG.meleeAngle / 2;
+        }
+
+        draw() {
+            const now = Date.now();
+            ctx.save(); ctx.translate(this.x, this.y);
+            
+            // Melee 特效
+            if (now < this.meleeActiveUntil) {
+                const ratio = (this.meleeActiveUntil - now) / CONFIG.meleeDuration;
+                ctx.beginPath(); ctx.arc(0, 0, CONFIG.meleeRange, this.angle - CONFIG.meleeAngle/2, this.angle + CONFIG.meleeAngle/2);
+                ctx.strokeStyle = `rgba(255, 255, 255, ${ratio})`; ctx.lineWidth = 15 * ratio; ctx.stroke();
+            }
+
+            // --- 核心修正處：必須先旋轉 rotate 再縮放 scale ---
+            ctx.rotate(this.angle); 
+            ctx.scale(this.scaleX, this.scaleY);
+            
+            ctx.fillStyle = this.color;
+            if (now < this.dashActiveUntil) {
+                ctx.shadowBlur = 20; ctx.shadowColor = this.id === 'P1' ? '#fff' : '#88ccff';
+            }
+            
+            ctx.beginPath(); 
+            ctx.moveTo(this.radius, 0); 
+            ctx.lineTo(-this.radius * 0.7, -this.radius);
+            ctx.lineTo(-this.radius * 0.4, 0); 
+            ctx.lineTo(-this.radius * 0.7, this.radius);
+            ctx.closePath(); 
+            ctx.fill();
+            ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
+            
+            ctx.restore();
+            this.drawBars();
+        }
+
+        drawBars() {
+            const now = Date.now();
+            const barW = 50; const barH = 5; const sx = this.x - barW/2; const sy = this.y - 45;
+            ctx.fillStyle = '#333'; ctx.fillRect(sx, sy, barW, barH);
+            ctx.fillStyle = '#ef4444'; ctx.fillRect(sx, sy, barW * (Math.max(0, this.hp) / CONFIG.playerMaxHp), barH);
+            ctx.fillStyle = '#333'; ctx.fillRect(sx, sy + 7, barW, barH - 2);
+            if (now < this.coffeeBuffUntil) {
+                const hue = (now / 10) % 360;
+                const grad = ctx.createLinearGradient(sx, 0, sx + barW, 0);
+                grad.addColorStop(0, `hsl(${hue}, 80%, 60%)`);
+                grad.addColorStop(1, `hsl(${(hue + 60) % 360}, 80%, 60%)`);
+                ctx.fillStyle = grad; ctx.fillRect(sx, sy + 7, barW, barH - 2);
+            } else {
+                ctx.fillStyle = '#3b82f6';
+                ctx.fillRect(sx, sy + 7, barW * (this.stamina / CONFIG.playerMaxStamina), barH - 2);
+            }
+        }
+    }
+
+    /**
+     * ============================================================
+     * 3. 系統初始化與遊戲迴圈
+     * ============================================================
+     */
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+
+    let state = {
+        isGameOver: false,
+        startTime: Date.now(),
+        lastFrameTime: performance.now(),
+        players: [],
+        particles: [],
+        buildings: [],
+        drops: [],
+        inputs: {
+            p1: { up: false, down: false, left: false, right: false, dash: false, melee: false },
+            p2: { dx: 0, dy: 0, dash: false, melee: false }
+        },
+        gamepad: { prevA: false, prevX: false }
+    };
+
+    function init() {
+        state.players = [
+            new Player("P1", canvas.width * 0.1, canvas.height / 2, "#f97316"),
+            new Player("P2", canvas.width * 0.9, canvas.height / 2, "#0ea5e9")
+        ];
+        generateBuildings();
+        requestAnimationFrame(gameLoop);
+    }
+
+    function generateBuildings() {
+        state.buildings = [];
+        const area = canvas.width * canvas.height;
+        const targetCount = Math.max(4, Math.floor(area * CONFIG.buildingDensity));
+        let attempts = 0;
+        while(state.buildings.length < targetCount && attempts < 500) {
+            attempts++;
+            const w = 70 + Math.random() * 100;
+            const h = 70 + Math.random() * 100;
+            const x = 50 + Math.random() * (canvas.width - 100 - w);
+            const y = 50 + Math.random() * (canvas.height - 100 - h);
+            let invalid = false;
+            state.players.forEach(p => { if (Math.hypot(x + w/2 - p.x, y + h/2 - p.y) < 180) invalid = true; });
+            for(let other of state.buildings) {
+                const padding = 30; 
+                if (x < other.x + other.w + padding && x + w + padding > other.x &&
+                    y < other.y + other.h + padding && y + h + padding > other.y) {
+                    invalid = true; break;
+                }
+            }
+            if (!invalid) state.buildings.push(new Building(x, y, w, h));
+        }
+    }
+
+    function checkWallCollision(px, py, radius) {
+        for (let b of state.buildings) {
+            if (b.isDestroyed) continue;
+            const cx = Math.max(b.x, Math.min(px, b.x + b.w));
+            const cy = Math.max(b.y, Math.min(py, b.y + b.h));
+            if ((px - cx)**2 + (py - cy)**2 < radius * radius) return true;
+        }
+        return false;
+    }
+
+    window.addEventListener('contextmenu', e => e.preventDefault()); 
+
+    window.addEventListener('keydown', e => {
+        if (e.code === 'KeyW') state.inputs.p1.up = true;
+        if (e.code === 'KeyS') state.inputs.p1.down = true;
+        if (e.code === 'KeyA') state.inputs.p1.left = true;
+        if (e.code === 'KeyD') state.inputs.p1.right = true;
+        if (e.code === 'Space') state.inputs.p1.dash = true;
+    });
+    window.addEventListener('keyup', e => {
+        if (e.code === 'KeyW') state.inputs.p1.up = false;
+        if (e.code === 'KeyS') state.inputs.p1.down = false;
+        if (e.code === 'KeyA') state.inputs.p1.left = false;
+        if (e.code === 'KeyD') state.inputs.p1.right = false;
+        if (e.code === 'Space') state.inputs.p1.dash = false;
+    });
+    window.addEventListener('mousedown', e => { if (e.button === 0) state.inputs.p1.melee = true; });
+    window.addEventListener('mouseup', e => { if (e.button === 0) state.inputs.p1.melee = false; });
+
+    function handleGamepad() {
+        const pads = navigator.getGamepads();
+        if (!pads || !pads[0]) return;
+        const gp = pads[0];
+        const deadzone = 0.2;
+        state.inputs.p2.dx = Math.abs(gp.axes[0]) > deadzone ? gp.axes[0] : 0;
+        state.inputs.p2.dy = Math.abs(gp.axes[1]) > deadzone ? gp.axes[1] : 0;
+        const aPressed = gp.buttons[0].pressed;
+        state.inputs.p2.dash = aPressed && !state.gamepad.prevA;
+        state.gamepad.prevA = aPressed;
+        state.inputs.p2.melee = gp.buttons[2].pressed;
+    }
+
+    function createImpactEffect(x, y, color, count) {
+        for (let i = 0; i < count; i++) {
+            state.particles.push({
+                type: 'NORMAL',
+                x, y, vx: (Math.random() - 0.5) * 8, vy: (Math.random() - 0.5) * 8,
+                radius: Math.random() * 5 + 2, alpha: 1, color, decay: 0.02
+            });
+        }
+    }
+
+    function gameLoop(timestamp) {
+        if (state.isGameOver) return;
+        const dt = timestamp - state.lastFrameTime;
+        state.lastFrameTime = timestamp;
+        const dtFactor = Math.min(dt / 16.666, 3); 
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        document.getElementById('timer').innerText = ((Date.now() - state.startTime)/1000).toFixed(1);
+        handleGamepad();
+
+        const p1dx = (state.inputs.p1.left ? -1 : 0) + (state.inputs.p1.right ? 1 : 0);
+        const p1dy = (state.inputs.p1.up ? -1 : 0) + (state.inputs.p1.down ? 1 : 0);
+        state.players[0].update(p1dx, p1dy, state.inputs.p1.dash, state.inputs.p1.melee, state.players[1], dtFactor);
+        state.players[1].update(state.inputs.p2.dx, state.inputs.p2.dy, state.inputs.p2.dash, state.inputs.p2.melee, state.players[0], dtFactor);
+
+        ctx.strokeStyle = '#1e1e1e';
+        for(let i=0; i<canvas.width; i+=50) { ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i,canvas.height); ctx.stroke(); }
+        for(let j=0; j<canvas.height; j+=50) { ctx.beginPath(); ctx.moveTo(0,j); ctx.lineTo(canvas.width,j); ctx.stroke(); }
+        state.buildings.forEach(b => b.draw());
+        state.drops.forEach(d => d.draw());
+
+        for (let i = state.particles.length - 1; i >= 0; i--) {
+            const p = state.particles[i];
+            p.alpha -= p.decay * dtFactor;
+            
+            if (p.alpha <= 0) {
+                state.particles.splice(i, 1);
+                continue;
+            }
+
+            if (p.type === 'GHOST') {
+                ctx.save();
+                ctx.translate(p.x, p.y);
+                ctx.rotate(p.angle);
+                ctx.scale(p.scaleX, p.scaleY); // 殘影也使用同步的旋轉縮放邏輯
+                ctx.globalAlpha = p.alpha;
+                ctx.fillStyle = p.color;
+                ctx.beginPath();
+                ctx.moveTo(p.radius, 0); 
+                ctx.lineTo(-p.radius * 0.7, -p.radius);
+                ctx.lineTo(-p.radius * 0.4, 0); 
+                ctx.lineTo(-p.radius * 0.7, p.radius);
+                ctx.closePath();
+                ctx.fill();
+                ctx.restore();
+            } else {
+                p.x += p.vx * dtFactor; p.y += p.vy * dtFactor;
+                ctx.save();
+                ctx.globalAlpha = p.alpha; ctx.fillStyle = p.color;
+                ctx.beginPath(); ctx.arc(p.x, p.y, p.radius, 0, Math.PI*2); ctx.fill();
+                ctx.restore();
+            }
+        }
+
+        state.players.forEach(p => p.draw());
+        requestAnimationFrame(gameLoop);
+    }
+
+    function endGame(winnerId) {
+        state.isGameOver = true;
+        document.getElementById('game-over').style.display = 'block';
+        document.getElementById('winner-text').innerText = winnerId + " VICTORY";
+    }
+
+    function resize() {
+        const oldW = canvas.width;
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        if (Math.abs(oldW - canvas.width) > 100) { if (state.players.length > 0) generateBuildings(); }
+    }
+    window.addEventListener('resize', resize);
+    resize();
+    init();
+</script>
+</body>
+</html>

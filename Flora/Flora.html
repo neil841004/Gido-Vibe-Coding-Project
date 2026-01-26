@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flora Prototype - Duo Mode</title>
+    <script>
+        window.onerror = function (msg, url, line, col, error) {
+            const div = document.createElement('div');
+            div.style.position = 'absolute';
+            div.style.top = '10px';
+            div.style.left = '10px';
+            div.style.color = 'red';
+            div.style.background = 'rgba(0,0,0,0.8)';
+            div.style.padding = '20px';
+            div.style.zIndex = '9999';
+            div.innerHTML = `<h3>Error</h3><p>${msg}</p><p>${url}:${line}:${col}</p>`;
+            document.body.appendChild(div);
+            return false;
+        };
+    </script>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #202020;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        #info {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: white;
+            pointer-events: none;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 10px;
+            border-radius: 5px;
+            min-width: 300px;
+        }
+
+        #pulse-bar-container {
+            width: 100%;
+            height: 20px;
+            background-color: #444;
+            margin-top: 10px;
+            border-radius: 10px;
+            overflow: hidden;
+            border: 1px solid #777;
+        }
+
+        #pulse-bar {
+            width: 0%;
+            height: 100%;
+            background: linear-gradient(90deg, #ff00ff, #00ffff);
+            transition: width 0.1s linear;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="info">
+        <h3>Flora Duo Prototype</h3>
+        <p>1P (Red): WASD to Move, Click to Attack, R-Click to Charge</p>
+        <p>2P (Blue): Gamepad / Arrows to Move, Enter/East to Attack, Shift/RT to Charge</p>
+        <div id="debug"></div>
+        <div>Pulse Meter:</div>
+        <div id="pulse-bar-container">
+            <div id="pulse-bar"></div>
+        </div>
+    </div>
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
+            }
+        }
+    </script>
+    <script type="module">
+        import * as THREE from 'three';
+
+        // --- Configuration (數值設定) ---
+        const CONFIG = {
+            // 移動相關 (Movement)
+            movement: {
+                maxSpeed: 19,      // 最大合力速度 (World units per second)
+                acceleration: 60,  // 起步加速度
+                friction: 80,      // 停止時的摩擦力 (慣性減速)
+                rotationSpeed: 18,  // 轉身速度
+            },
+
+            // 戰鬥相關 (Combat)
+            combat: {
+                cooldown: 0.3,           // 攻擊冷卻時間 (秒)
+                attackLockDuration: 0, // 攻擊時無法移動的時間 (秒)
+                bulletSpeed: 30,         // 子彈飛行速度
+                bulletLife: 3.0,         // 子彈存在時間 (秒) - 暫時用
+            },
+
+            // 合體技相關 (Combo / Charge)
+            combo: {
+                chargeRateIndividual: 40, // 單人蓄力時脈衝增加速度 (每秒)
+                chargeRateDuo: 110,        // 雙人蓄力時脈衝增加速度 (每秒) - 鼓勵合作
+                decayRate: 30,            // 沒人蓄力時脈衝消退速度 (每秒)
+                beamDuration: 3.0,        // 組合技射線持續時間 (秒)
+                mergeDistance: 1.0,       // 子彈合併判定距離
+                mergeWindow: 500,         // 子彈合併判定時間窗口 (毫秒)
+            },
+
+            // 視覺相關 (Visuals)
+            visuals: {
+                arrowLength: 4,           // 方向箭頭長度
+                colors: {
+                    p1: 0xff4444,     // 1P 顏色 (紅)
+                    p2: 0x4444ff,     // 2P 顏色 (藍)
+                    body: 0x44aa44,   // 身體顏色 (綠)
+                    head: 0xaa44aa,   // 頭部顏色 (紫)
+                    mouth: 0xffff00,  // 嘴巴顏色 (黃)
+                    beam: 0xff00ff    // 射線顏色
+                }
+            }
+        };
+
+        // --- Game State ---
+        const state = {
+            input: {
+                p1: { move: new THREE.Vector2(), attack: false, charge: false },
+                p2: { move: new THREE.Vector2(), attack: false, charge: false }
+            },
+            bullets: [],
+            pulseValue: 0, // 0 to 100
+            comboActive: false,
+            lastTime: 0
+        };
+
+        // --- Scene Setup ---
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x333333);
+
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(0, 20, 10);
+        camera.lookAt(0, 0, 0);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        document.body.appendChild(renderer.domElement);
+
+        // Lighting
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+        scene.add(ambientLight);
+
+        const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        dirLight.position.set(10, 20, 10);
+        dirLight.castShadow = true;
+        scene.add(dirLight);
+
+        // Ground Protocol Grid
+        const gridHelper = new THREE.GridHelper(100, 100, 0x555555, 0x444444);
+        scene.add(gridHelper);
+
+        // --- Classes ---
+
+        class Bullet {
+            constructor(owner, position, direction, speed) {
+                this.owner = owner; // 'p1', 'p2', or 'merged'
+                this.type = owner === 'merged' ? 'large' : 'small';
+                this.direction = direction.clone();
+                this.speed = speed;
+                this.createdAt = performance.now();
+                this.markedForDeletion = false;
+
+                const size = this.type === 'large' ? 0.8 : 0.3;
+                const color = owner === 'p1' ? CONFIG.visuals.colors.p1 : (owner === 'p2' ? CONFIG.visuals.colors.p2 : 0xffff00);
+
+                const geo = new THREE.SphereGeometry(size);
+                const mat = new THREE.MeshBasicMaterial({ color: color });
+                this.mesh = new THREE.Mesh(geo, mat);
+                this.mesh.position.copy(position);
+
+                scene.add(this.mesh);
+            }
+
+            update(dt) {
+                this.mesh.position.add(this.direction.clone().multiplyScalar(this.speed * dt));
+
+                // Temp: auto-delete after 3 seconds
+                if (performance.now() - this.createdAt > CONFIG.combat.bulletLife * 1000) {
+                    this.markedForDeletion = true;
+                }
+            }
+
+            destroy() {
+                scene.remove(this.mesh);
+                this.mesh.geometry.dispose();
+                this.mesh.material.dispose();
+            }
+        }
+
+        class Flora {
+            constructor() {
+                this.mesh = new THREE.Group();
+                this.velocity = new THREE.Vector3();
+
+                // Combat State
+                this.cooldowns = { p1: 0, p2: 0 };
+                this.attackDurations = { p1: 0, p2: 0 }; // If > 0, player is in "Attack Phase"
+
+                // Combo State
+                this.isFiringBeam = false;
+                this.beamTimer = 0;
+
+                this.buildModel();
+                this.buildIndicators();
+
+                scene.add(this.mesh);
+            }
+
+            buildModel() {
+                // Main Group is center logic
+
+                // 1. Stem/Body (Green) - Center, slightly raised
+                const stemGeo = new THREE.BoxGeometry(1, 1.5, 1);
+                const stemMat = new THREE.MeshLambertMaterial({ color: CONFIG.visuals.colors.body });
+                this.stem = new THREE.Mesh(stemGeo, stemMat);
+                this.stem.position.y = 0.75;
+                this.stem.castShadow = true;
+                this.mesh.add(this.stem);
+
+                // 2. Head (Purple) - On top of stem
+                const headGeo = new THREE.BoxGeometry(1.2, 1, 1.4);
+                const headMat = new THREE.MeshLambertMaterial({ color: CONFIG.visuals.colors.head });
+                this.head = new THREE.Mesh(headGeo, headMat);
+                this.head.position.y = 1.5 + 0.5; // Stem height + half head
+                this.head.castShadow = true;
+                this.mesh.add(this.head);
+
+                // Mouth (Yellow) - Front of head
+                const mouthGeo = new THREE.BoxGeometry(0.8, 0.4, 0.2);
+                const mouthMat = new THREE.MeshBasicMaterial({ color: CONFIG.visuals.colors.mouth });
+                this.mouth = new THREE.Mesh(mouthGeo, mouthMat);
+                this.mouth.position.set(0, 0, 0.75); // Forward Z
+                this.head.add(this.mouth);
+
+                // 3. P1 Base/Leg (Red) - Left Side (-X)
+                const p1Geo = new THREE.BoxGeometry(0.8, 0.5, 1.2);
+                const p1Mat = new THREE.MeshLambertMaterial({ color: CONFIG.visuals.colors.p1 });
+                this.p1Part = new THREE.Mesh(p1Geo, p1Mat);
+                this.p1Part.position.set(-0.7, 0.25, 0);
+                this.p1Part.castShadow = true;
+                this.mesh.add(this.p1Part);
+
+                // 4. P2 Base/Leg (Blue) - Right Side (+X)
+                const p2Geo = new THREE.BoxGeometry(0.8, 0.5, 1.2);
+                const p2Mat = new THREE.MeshLambertMaterial({ color: CONFIG.visuals.colors.p2 });
+                this.p2Part = new THREE.Mesh(p2Geo, p2Mat);
+                this.p2Part.position.set(0.7, 0.25, 0);
+                this.p2Part.castShadow = true;
+                this.mesh.add(this.p2Part);
+
+                // 5. Beam Visual (Hidden initially)
+                // Cylinder
+                const beamGeo = new THREE.CylinderGeometry(0.5, 2, 20, 16); // TopRadius is small, BotRadius is big (cone-ish), length 20
+                beamGeo.rotateX(-Math.PI / 2); // Point Z
+                beamGeo.translate(0, 10, 0); // Active pivot is start, move mesh forward half length? No, Geometry translate
+                // Cylinder default is Y axis. Rotated X-90 -> Z axis. Center at 0.
+                // We want base at 0, pointing +Z. 
+                // Restore geometry logic:
+                // Cylinder centered at (0,0,0) height 20.
+                // rotateX(-90) -> points +Z.
+                // translate(0, 0, 10) -> moves center to +10Z, so base is at 0.
+
+                // Let's redo cleanly
+                const beamG = new THREE.CylinderGeometry(0.2, 4.0, 30, 12, 1, true);
+                beamG.rotateX(-Math.PI / 2);
+                beamG.translate(0, 0, 15); // Move center forward so one end is at 0
+
+                const beamMat = new THREE.MeshBasicMaterial({
+                    color: CONFIG.visuals.colors.beam,
+                    transparent: true,
+                    opacity: 0.8,
+                    blending: THREE.AdditiveBlending
+                });
+                this.beamMesh = new THREE.Mesh(beamG, beamMat);
+                this.beamMesh.visible = false;
+                this.mouth.add(this.beamMesh); // Child of mouth
+            }
+
+            buildIndicators() {
+                // Arrows to show input directions relative to world
+                // Added to SCENE to avoid inheriting character rotation
+                this.p1Arrow = new THREE.ArrowHelper(new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 2, 0), CONFIG.visuals.arrowLength, CONFIG.visuals.colors.p1);
+                scene.add(this.p1Arrow); // Add to scene, not this.mesh
+
+                this.p2Arrow = new THREE.ArrowHelper(new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 2, 0), CONFIG.visuals.arrowLength, CONFIG.visuals.colors.p2);
+                scene.add(this.p2Arrow); // Add to scene, not this.mesh
+            }
+
+            getForwardVector() {
+                const forward = new THREE.Vector3(0, 0, 1);
+                forward.applyQuaternion(this.mesh.quaternion);
+                return forward;
+            }
+
+            shoot(owner) {
+                const spawnPos = new THREE.Vector3();
+                this.mouth.getWorldPosition(spawnPos);
+                spawnPos.add(this.getForwardVector().multiplyScalar(0.5));
+
+                const bullet = new Bullet(owner, spawnPos, this.getForwardVector(), CONFIG.combat.bulletSpeed);
+                state.bullets.push(bullet);
+            }
+
+            activateCombo() {
+                state.comboActive = true;
+                this.isFiringBeam = true;
+                this.beamTimer = CONFIG.combo.beamDuration; // 3 seconds duration
+                this.beamMesh.visible = true;
+
+                // Scale animation in update
+                this.beamMesh.scale.set(0.1, 0.1, 0.1);
+            }
+
+            update(dt) {
+                // --- Combo Skill State ---
+                if (this.isFiringBeam) {
+                    this.beamTimer -= dt;
+
+                    // Visual pulse
+                    const scale = 1.0 + Math.sin(performance.now() * 0.02) * 0.2;
+                    // Grow in Z initially
+                    const growth = Math.min(1, (CONFIG.combo.beamDuration - this.beamTimer) * 5); // Fast grow
+                    this.beamMesh.scale.set(scale, scale, growth);
+
+                    if (this.beamTimer <= 0) {
+                        this.isFiringBeam = false;
+                        state.comboActive = false;
+                        this.beamMesh.visible = false;
+                        state.pulseValue = 0; // Reset
+                    }
+
+                    // Stop movement while firing beam? Yes usually.
+                    // But assume "Combo Skill" locks movement.
+                    // Return early to freeze movement physics?
+                    // Let's freeze position updates but maybe allow slight aiming?
+                    // User said: "Combo: Flora releases combo skill". 
+                    // Let's freeze completely for impact.
+                    return;
+                }
+
+
+                // --- Charge Logic ---
+                // "Any member holding charge enters charge state. Move/Melee disabled. Others can move."
+                const p1Charging = state.input.p1.charge;
+                const p2Charging = state.input.p2.charge;
+
+                // Pulse Meter Update
+                let rate = 0;
+                if (p1Charging && p2Charging) {
+                    rate = CONFIG.combo.chargeRateDuo;
+                } else if (p1Charging || p2Charging) {
+                    rate = CONFIG.combo.chargeRateIndividual;
+                } else {
+                    rate = -CONFIG.combo.decayRate;
+                }
+
+                state.pulseValue = Math.min(100, Math.max(0, state.pulseValue + rate * dt));
+
+                // Trigger Combo?
+                if (state.pulseValue >= 100 && !state.comboActive) {
+                    this.activateCombo();
+                    return; // Start combo frame
+                }
+
+
+                // --- Combat Inputs ---
+                if (this.cooldowns.p1 > 0) this.cooldowns.p1 -= dt;
+                if (this.cooldowns.p2 > 0) this.cooldowns.p2 -= dt;
+                if (this.attackDurations.p1 > 0) this.attackDurations.p1 -= dt;
+                if (this.attackDurations.p2 > 0) this.attackDurations.p2 -= dt;
+
+                // Fire P1
+                if (state.input.p1.attack && this.cooldowns.p1 <= 0 && !p1Charging) {
+                    this.shoot('p1');
+                    this.cooldowns.p1 = CONFIG.combat.cooldown;
+                    this.attackDurations.p1 = CONFIG.combat.attackLockDuration;
+                }
+                // Fire P2
+                if (state.input.p2.attack && this.cooldowns.p2 <= 0 && !p2Charging) {
+                    this.shoot('p2');
+                    this.cooldowns.p2 = CONFIG.combat.cooldown;
+                    this.attackDurations.p2 = CONFIG.combat.attackLockDuration;
+                }
+
+                // --- Movement Physics ---
+                const p1Input = state.input.p1.move;
+                const p2Input = state.input.p2.move;
+
+                const v1 = new THREE.Vector3(p1Input.x, 0, p1Input.y);
+                const v2 = new THREE.Vector3(p2Input.x, 0, p2Input.y);
+
+                // Update Arrow Visibility & Direction & Position
+                // Sync position to character
+                this.p1Arrow.position.copy(this.mesh.position);
+                this.p2Arrow.position.copy(this.mesh.position);
+
+                // Only show if input exists AND not charging (since charging disables input effect)
+                if (v1.lengthSq() > 0.01 && !p1Charging) {
+                    this.p1Arrow.visible = true;
+                    this.p1Arrow.setDirection(v1.normalize());
+                } else {
+                    this.p1Arrow.visible = false;
+                }
+
+                if (v2.lengthSq() > 0.01 && !p2Charging) {
+                    this.p2Arrow.visible = true;
+                    this.p2Arrow.setDirection(v2.normalize());
+                } else {
+                    this.p2Arrow.visible = false;
+                }
+
+                // Dual Force Logic
+                const p1CanMove = this.attackDurations.p1 <= 0 && v1.lengthSq() > 0.01 && !p1Charging;
+                const p2CanMove = this.attackDurations.p2 <= 0 && v2.lengthSq() > 0.01 && !p2Charging;
+
+                // Calculate Target Velocity based on Input
+                const dir1 = p1CanMove ? v1 : new THREE.Vector3();
+                const dir2 = p2CanMove ? v2 : new THREE.Vector3();
+
+                // Sum directions
+                const inputDir = new THREE.Vector3().add(dir1).add(dir2);
+                const targetVel = new THREE.Vector3();
+
+                if (inputDir.lengthSq() > 0.001) {
+                    // Normalize and scale by maxSpeed
+                    inputDir.normalize().multiplyScalar(CONFIG.movement.maxSpeed);
+                    targetVel.copy(inputDir);
+                }
+
+                // Apply Acceleration vs Friction
+                const currentVel = this.velocity;
+                const diff = targetVel.clone().sub(currentVel);
+                const dist = diff.length();
+
+                if (dist > 0.001) {
+                    // If user is inputting movement, use acceleration.
+                    // If user is NOT inputting (target is 0), use friction.
+                    const isMoving = targetVel.lengthSq() > 0.001;
+                    const changeRate = isMoving ? CONFIG.movement.acceleration : CONFIG.movement.friction;
+
+                    const step = changeRate * dt;
+
+                    if (dist < step) {
+                        currentVel.copy(targetVel);
+                    } else {
+                        currentVel.add(diff.normalize().multiplyScalar(step));
+                    }
+                }
+
+                // Apply Velocity to Position
+                this.mesh.position.add(currentVel.clone().multiplyScalar(dt));
+
+                // Rotation: Face movement direction if moving
+                if (currentVel.lengthSq() > 0.1) {
+                    const targetAngle = Math.atan2(currentVel.x, currentVel.z);
+                    const currentAngle = this.mesh.rotation.y;
+
+                    let deltaAngle = targetAngle - currentAngle;
+                    while (deltaAngle > Math.PI) deltaAngle -= Math.PI * 2;
+                    while (deltaAngle < -Math.PI) deltaAngle += Math.PI * 2;
+
+                    const rotStep = CONFIG.movement.rotationSpeed * dt;
+                    if (Math.abs(deltaAngle) < rotStep) {
+                        this.mesh.rotation.y = targetAngle;
+                    } else {
+                        this.mesh.rotation.y += Math.sign(deltaAngle) * rotStep;
+                    }
+                }
+
+                // Camera Follow
+                camera.position.x = this.mesh.position.x;
+                camera.position.z = this.mesh.position.z + 10;
+                camera.lookAt(this.mesh.position);
+            }
+        }
+
+        // --- Input Handling ---
+
+        function setupInputs() {
+            // P1: Keyboard
+            const keys = {};
+            window.addEventListener('keydown', (e) => keys[e.code] = true);
+            window.addEventListener('keyup', (e) => keys[e.code] = false);
+
+            // Mouse for P1 Attack/Charge
+            window.addEventListener('mousedown', (e) => {
+                if (e.button === 0) state.input.p1.attack = true;
+                if (e.button === 2) state.input.p1.charge = true;
+            });
+            window.addEventListener('mouseup', (e) => {
+                if (e.button === 0) state.input.p1.attack = false;
+                if (e.button === 2) state.input.p1.charge = false;
+            });
+            window.addEventListener('contextmenu', e => e.preventDefault());
+
+            // P2: Gamepad Support
+            window.addEventListener("gamepadconnected", (e) => {
+                console.log("Gamepad connected");
+            });
+
+            // Polling function
+            state.pollInputs = () => {
+                // P1 Keyboard Vector
+                let vx = 0, vy = 0;
+                if (keys['KeyW']) vy -= 1;
+                if (keys['KeyS']) vy += 1;
+                if (keys['KeyA']) vx -= 1;
+                if (keys['KeyD']) vx += 1;
+                state.input.p1.move.set(vx, vy).normalize();
+                state.input.p1.charge = keys['ShiftLeft'] || state.input.p1.charge; // Add Shift as alt charge for P1
+
+                // P2 Gamepad (Index 0) or Arrows (Debug)
+                const gp = navigator.getGamepads()[0];
+                if (gp) {
+                    // Left Stick
+                    const axisX = gp.axes[0];
+                    const axisY = gp.axes[1];
+                    const deadzone = 0.1;
+                    state.input.p2.move.set(
+                        Math.abs(axisX) > deadzone ? axisX : 0,
+                        Math.abs(axisY) > deadzone ? axisY : 0
+                    );
+
+                    // Buttons 
+                    state.input.p2.attack = gp.buttons[2].pressed; // West Button (X/Square)
+                    state.input.p2.charge = gp.buttons[7].pressed;
+                } else {
+                    // Fallback P2 Keys (Arrows, Enter, Shift)
+                    let p2x = 0, p2y = 0;
+                    if (keys['ArrowUp']) p2y -= 1;
+                    if (keys['ArrowDown']) p2y += 1;
+                    if (keys['ArrowLeft']) p2x -= 1;
+                    if (keys['ArrowRight']) p2x += 1;
+                    state.input.p2.move.set(p2x, p2y).normalize();
+
+                    state.input.p2.attack = keys['Enter'];
+                    state.input.p2.charge = keys['ShiftRight'];
+                }
+            };
+        }
+
+        // --- Bullet Management ---
+        function updateBullets(dt) {
+            // Move and Clean
+            for (let i = state.bullets.length - 1; i >= 0; i--) {
+                const b = state.bullets[i];
+                b.update(dt);
+                if (b.markedForDeletion) {
+                    b.destroy();
+                    state.bullets.splice(i, 1);
+                }
+            }
+
+            // Merging Logic
+            const now = performance.now();
+            const candidates = state.bullets.filter(b => b.type === 'small' && (now - b.createdAt) < CONFIG.combo.mergeWindow);
+
+            for (let i = 0; i < candidates.length; i++) {
+                for (let j = i + 1; j < candidates.length; j++) {
+                    const b1 = candidates[i];
+                    const b2 = candidates[j];
+
+                    if (b1.owner !== b2.owner && !b1.markedForDeletion && !b2.markedForDeletion) {
+                        const dist = b1.mesh.position.distanceTo(b2.mesh.position);
+                        if (dist < CONFIG.combo.mergeDistance) { // Threshold
+                            b1.markedForDeletion = true;
+                            b2.markedForDeletion = true;
+
+                            const midPos = b1.mesh.position.clone().add(b2.mesh.position).multiplyScalar(0.5);
+                            const avgDir = b1.direction.clone().add(b2.direction).normalize();
+
+                            const bigBullet = new Bullet('merged', midPos, avgDir.lengthSq() > 0 ? avgDir : new THREE.Vector3(0, 0, 1), 25);
+                            state.bullets.push(bigBullet);
+                        }
+                    }
+                }
+            }
+        }
+
+        // --- Main Loop ---
+
+        const flora = new Flora();
+        setupInputs();
+
+        function animate(time) {
+            requestAnimationFrame(animate);
+
+            const dt = Math.min((time - state.lastTime) / 1000, 0.1);
+            state.lastTime = time;
+
+            state.pollInputs();
+            flora.update(dt);
+            updateBullets(dt);
+
+            // UI Updates
+            const bar = document.getElementById('pulse-bar');
+            bar.style.width = state.pulseValue + '%';
+
+            // Debug Info
+            document.getElementById('debug').innerHTML = `
+                P1: Attack=${state.input.p1.attack}, Charge=${state.input.p1.charge ? 'ON' : 'OFF'}<br>
+                P2: Attack=${state.input.p2.attack}, Charge=${state.input.p2.charge ? 'ON' : 'OFF'}<br>
+                Pulse: ${state.pulseValue.toFixed(1)}% <br>
+                Bullets: ${state.bullets.length}
+            `;
+
+            renderer.render(scene, camera);
+        }
+
+        requestAnimationFrame(animate);
+
+        // Window Resize
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+    </script>
+</body>
+
+</html>
