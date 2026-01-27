@@ -202,7 +202,10 @@
                     speed: 29,
                     life: 5.0,
                     gravity: 0,
-                    shockwave: { radius: 4, angle: Math.PI / 3 }
+                    shockwave: {
+                        radius: 6,         // [半徑] 震波傳播多遠 (數值越大飛越遠)
+                        angle: Math.PI / 1.5 // [角度] 震波扇形寬度 (弧度)
+                    }
                 },
                 quad: {
                     size: 1.2, // Burst shots are smaller? Or maybe larger. Let's keep distinct.
@@ -211,7 +214,10 @@
                     gravity: 0,
                     burstCount: 3,
                     burstInterval: 0.17, // Seconds between burst shots
-                    shockwave: { radius: 4, angle: Math.PI / 3 }
+                    shockwave: {
+                        radius: 6,          // [半徑] 震波傳播多遠 (數值越大飛越遠)
+                        angle: Math.PI / 1.5  // [角度] 震波扇形寬度 (弧度: PI=180度, PI/2=90度, PI/4=45度)
+                    }
                 }
             },
 
@@ -902,9 +908,7 @@
             }
 
             shoot(type) {
-                const spawnPos = new THREE.Vector3();
-                this.mouth.getWorldPosition(spawnPos);
-                spawnPos.add(this.getForwardVector().multiplyScalar(0.5));
+                // Removed static spawnPos capture
 
                 let speed, life, gravity, direction, size, config;
 
@@ -914,10 +918,15 @@
                 // Helper to spawn one bullet
                 const spawnBullet = (bType, offsetTime = 0, useDynamicDir = false) => {
                     setTimeout(() => {
+                        // Recalculate spawn position DYNAMICALLY
+                        const currentSpawnPos = new THREE.Vector3();
+                        this.mouth.getWorldPosition(currentSpawnPos);
+                        currentSpawnPos.add(this.getForwardVector().multiplyScalar(0.5));
+
                         // Recalculate direction if dynamic (for Quad)
                         const finalDir = useDynamicDir ? getDynamicDirection() : direction;
 
-                        const bullet = new Bullet(bType, spawnPos, finalDir, speed, life, gravity, size);
+                        const bullet = new Bullet(bType, currentSpawnPos, finalDir, speed, life, gravity, size);
                         state.bullets.push(bullet);
                     }, offsetTime * 1000);
                 };
@@ -934,9 +943,20 @@
                     // Or just reusing Particle class implies small boxes. 
                     // Let's create a temporary Shockwave logic inside the bullet or standalone?
                     // Let's just spawn a bunch of particles in a fan shape.
+                    // Shockwave Particles
                     const count = 20;
                     const angle = waveConfig.angle;
-                    const baseDir = this.getForwardVector();
+                    const baseDir = this.getForwardVector(); // Note: baseDir is captured at call time (which is delayed for Burst)
+
+                    // Recalculate spawn position DYNAMICALLY
+                    const currentSpawnPos = new THREE.Vector3();
+                    this.mouth.getWorldPosition(currentSpawnPos);
+                    currentSpawnPos.add(this.getForwardVector().multiplyScalar(0.5));
+
+                    // Radius = Speed * Life
+                    // Let's fix speed at 20 for "impact", so Life = Radius / 20
+                    const waveSpeed = 20;
+                    const waveLife = waveConfig.radius / waveSpeed;
 
                     for (let i = 0; i < count; i++) {
                         const a = (i / count - 0.5) * angle;
@@ -944,14 +964,14 @@
 
                         // Custom "Shockwave Particle"
                         state.particles.push({
-                            life: 0.5, maxLife: 0.5,
+                            life: waveLife, maxLife: waveLife,
                             mesh: (() => {
                                 const m = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.1, 0.5), new THREE.MeshBasicMaterial({ color: 0xffff00 }));
-                                m.position.copy(spawnPos);
+                                m.position.copy(currentSpawnPos);
                                 scene.add(m);
                                 return m;
                             })(),
-                            velocity: dir.multiplyScalar(20),
+                            velocity: dir.multiplyScalar(waveSpeed),
                             update: function (dt) {
                                 this.life -= dt;
                                 this.mesh.position.add(this.velocity.clone().multiplyScalar(dt));
@@ -1003,7 +1023,7 @@
                     config = CONFIG.bullet.single;
                     speed = CONFIG.bullet.single.speedMin + Math.random() * (CONFIG.bullet.single.speedMax - CONFIG.bullet.single.speedMin);
                     life = CONFIG.bullet.single.lifeMin + Math.random() * (CONFIG.bullet.single.lifeMax - CONFIG.bullet.single.lifeMin);
-                    gravity = 0;
+                    gravity = config.gravity;
                     size = config.size;
 
                     // Spread
