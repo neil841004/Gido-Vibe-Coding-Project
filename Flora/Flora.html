@@ -60,7 +60,8 @@
         /* Rhythm Assist UI */
         #rhythm-helper {
             position: absolute;
-            bottom: 50px;
+            bottom: 120px;
+            /* Moved up */
             left: 50%;
             transform: translateX(-50%);
             width: 400px;
@@ -70,6 +71,45 @@
             align-items: center;
             justify-content: center;
         }
+
+        /* Pulse Meter - Moved to Center Bottom */
+        #pulse-container-central {
+            position: absolute;
+            bottom: 50px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 300px;
+            height: 30px;
+            background: #222;
+            border: 2px solid #555;
+            border-radius: 15px;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #pulse-bar {
+            width: 0%;
+            height: 100%;
+            background: linear-gradient(90deg, #ff00ff, #00ffff);
+            transition: width 0.1s linear;
+        }
+
+        .pulse-locked {
+            filter: grayscale(100%);
+            background: #444 !important;
+        }
+
+        #pulse-text {
+            position: absolute;
+            color: white;
+            font-weight: bold;
+            text-shadow: 1px 1px 2px black;
+            z-index: 10;
+        }
+
+
 
         .beat-line {
             position: absolute;
@@ -139,10 +179,6 @@
         <p>1P (Red): WASD to Move, Click to Attack, R-Click to Charge</p>
         <p>2P (Blue): Gamepad / Arrows to Move, Enter/East to Attack, Shift/RT to Charge</p>
         <div id="debug"></div>
-        <div>Pulse Meter:</div>
-        <div id="pulse-bar-container">
-            <div id="pulse-bar"></div>
-        </div>
         <button id="mode-toggle" style="margin-top:10px; pointer-events:auto;">Switch to 2P Mode</button>
     </div>
 
@@ -150,7 +186,12 @@
         <div class="beat-line"></div>
         <div class="center-target" id="rhythm-target"></div>
         <div class="beat-cursor" id="rhythm-cursor"></div>
-        <!-- Indicators will be injected here or just keep fixed ones if we recycle DOM -->
+    </div>
+
+    <!-- New Location for Pulse Meter -->
+    <div id="pulse-container-central">
+        <div id="pulse-bar"></div>
+        <div id="pulse-text">PULSE</div>
     </div>
     <script type="importmap">
         {
@@ -228,14 +269,24 @@
                 decayRate: 30,            // 沒人蓄力時脈衝消退速度 (每秒)
 
                 preCastDelay: 2.3,        // 前搖時間 (秒)
-                activeDuration: 5.0,      // 傷害持續時間 (秒)
-                radius: 16.0,             // 攻擊半徑 (Larger for 4P)
-                vineCount: 4,             // 藤蔓數量 (4P version)
                 vineSpeed: 2.0,           // 揮舞速度
                 moveSpeedFactor: 0.4,     // 施法時移動速度倍率
 
                 mergeDistance: 1.0,       // 子彈合併判定距離
                 mergeWindow: 500,         // 子彈合併判定時間窗口 (毫秒)
+
+                // [New] Mode Specific Settings
+                maxVineCount: 6, // Pool Size (Max needed for Quad)
+                duo: {
+                    activeDuration: 5.0,  // 傷害持續時間
+                    radius: 10.0,         // 攻擊半徑
+                    vineCount: 2          // 藤蔓數量
+                },
+                quad: {
+                    activeDuration: 5.0,  // 傷害持續時間
+                    radius: 16.0,         // 攻擊半徑
+                    vineCount: 4          // 藤蔓數量
+                }
             },
 
             // 視覺相關 (Visuals)
@@ -261,6 +312,10 @@
 
         // --- Game State ---
         const state = {
+            comboCooldown: 0, // [New] Cooldown timer
+            comboCooldownMax: 20.0, // 20 Seconds
+            pulse: 0,
+            maxPulse: 100,
             mode: 'quad', // 'duo' or 'quad'
             playerCount: 4,
 
@@ -437,8 +492,6 @@
                 // Special Case: P4 bullet should be Cyan (fixed in previous step via CONFIG colors, but ensuring here)
                 // Actually owner 'p4' will hit CONFIG.visuals.colors['p4'] which is Cyan.
                 // But for 'quad', 'trio' etc we might want special colors? 
-                // User said "4P射出的子彈要是跟身體一樣的淺藍色".
-                // If the shot is a Synergy shot (Quad), should it be Yellow or P4 color?
                 // Usually Synergy = Yellow/Gold. 
                 // Let's stick to Yellow for 'merged'/'quad'/'trio' types unless specified.
 
@@ -609,13 +662,13 @@
         }
 
         class Vine {
-            constructor(parent, index, total) {
+            constructor(parent, index, total, radius) {
                 this.mesh = new THREE.Group();
                 parent.add(this.mesh);
 
                 this.segments = [];
                 const segmentCount = 6;
-                const length = CONFIG.combo.radius;
+                const length = radius; // Use passed radius
                 const segLen = length / segmentCount;
 
                 // Create segments
@@ -698,6 +751,13 @@
                         // seg.pivot.rotation.y = jitter; // Keep Y mostly stable in pre-cast?
                     });
                 }
+            }
+            destroy() {
+                this.segments.forEach(s => {
+                    s.mesh.geometry.dispose();
+                    s.mesh.material.dispose();
+                });
+                if (this.mesh.parent) this.mesh.parent.remove(this.mesh);
             }
         }
 
@@ -798,10 +858,6 @@
                 this.mesh.add(this.p2Part);
 
                 // 4A. P3 Base/Leg (Orange) - Back (-Z)
-                const p3Geo = new THREE.BoxGeometry(1.2, 0.5, 0.8); // Rotated dimensions compared to side legs? No, just box
-                // Actually let's just use same dimensions but rotated position?
-                // Side legs are 0.8 x 0.5 x 1.2 (Long along Z).
-                // Front/Back legs should be Long along X? -> 1.2 x 0.5 x 0.8.
                 const p3GeoRot = new THREE.BoxGeometry(1.2, 0.5, 0.8);
                 const p3Mat = new THREE.MeshLambertMaterial({ color: CONFIG.visuals.colors.p3 });
                 this.p3Part = new THREE.Mesh(p3GeoRot, p3Mat);
@@ -850,7 +906,9 @@
                 scene.add(this.comboGroup); // Attached to Scene (World Space)
 
                 // A. Radius Indicator (Ring)
-                const r = CONFIG.combo.radius;
+                // A. Radius Indicator (Ring)
+                // We will create a default one here, but update it dynamically in activateCombo
+                const r = CONFIG.combo.quad.radius; // Default to Max
                 const ringGeo = new THREE.RingGeometry(r - 0.2, r, 64);
                 ringGeo.rotateX(-Math.PI / 2);
                 const ringMat = new THREE.MeshBasicMaterial({
@@ -864,12 +922,9 @@
                 this.comboGroup.add(this.comboRing);
 
                 // B. Vines
+                // B. Vines
                 this.vines = [];
-                for (let i = 0; i < CONFIG.combo.vineCount; i++) {
-                    const vine = new Vine(this.comboGroup, i, CONFIG.combo.vineCount);
-                    vine.setVisible(false);
-                    this.vines.push(vine);
-                }
+                // Vines are now created dynamically in activateCombo logic
             }
 
             buildIndicators() {
@@ -1043,15 +1098,31 @@
                 this.comboState = 'precast';
                 this.comboTimer = CONFIG.combo.preCastDelay;
 
+                // Update Geometry/Visuals based on Mode
+                const config = CONFIG.combo[state.mode];
+
+                // 1. Update Ring Radius
+                const r = config.radius;
+                this.comboRing.geometry.dispose();
+                this.comboRing.geometry = new THREE.RingGeometry(r - 0.5, r, 64);
+                this.comboRing.geometry.rotateX(-Math.PI / 2);
+
                 // Visuals Setup
+                this.comboRing.visible = true;
                 this.comboRing.material.opacity = 0.5;
                 this.comboRing.scale.set(0, 0, 0);
 
-                // Vines hidden during pre-cast
-                this.vines.forEach(v => {
-                    v.setVisible(false);
-                    v.timer = 0;
-                });
+                // Rebuild Vines Dynamically
+                if (this.vines) this.vines.forEach(v => v.destroy());
+                this.vines = [];
+
+                for (let i = 0; i < config.vineCount; i++) {
+                    // Pass radius explicitly
+                    const vine = new Vine(this.comboGroup, i, config.vineCount, config.radius);
+                    vine.setVisible(false); // Hide initially
+                    vine.timer = 0;
+                    this.vines.push(vine);
+                }
             }
 
             update(dt) {
@@ -1071,7 +1142,10 @@
                         if (this.comboTimer <= 0) {
                             // Transition to Active
                             this.comboState = 'active';
-                            this.comboTimer = CONFIG.combo.activeDuration;
+
+                            // Get config again
+                            const config = CONFIG.combo[state.mode];
+                            this.comboTimer = config.activeDuration;
 
                             // Visual Pop
                             this.comboRing.material.opacity = 0.8;
@@ -1084,14 +1158,22 @@
                     }
                     // 2. Active Phase
                     else if (this.comboState === 'active') {
+                        const config = CONFIG.combo[state.mode];
+                        // Update All Active Vines
                         this.vines.forEach(v => v.update(dt, true));
-                        const remain = this.comboTimer / CONFIG.combo.activeDuration;
+
+                        const remain = this.comboTimer / config.activeDuration;
                         this.comboRing.material.opacity = remain * 0.8;
                         if (this.comboTimer <= 0) {
                             state.comboActive = false;
+
+                            // Start Cooldown
+                            state.comboCooldown = state.comboCooldownMax;
+                            state.pulse = 0; // Reset Pulse
+
+                            // Hide visuals
                             this.comboRing.material.opacity = 0;
                             this.vines.forEach(v => v.setVisible(false));
-                            state.pulseValue = 0;
                         }
                     }
                 }
@@ -1110,9 +1192,10 @@
                 else if (chargeCount === 1) rate = CONFIG.combo.chargeRateIndividual;
 
                 state.pulseValue = Math.min(100, Math.max(0, state.pulseValue + rate * dt));
+                state.pulse = state.pulseValue; // Keep state.pulse in sync with state.pulseValue
 
                 // Trigger Combo?
-                if (state.pulseValue >= 100 && !state.comboActive) {
+                if (state.pulseValue >= 100 && !state.comboActive && state.comboCooldown <= 0) {
                     this.activateCombo();
                     return; // Start combo frame
                 }
@@ -1404,6 +1487,34 @@
 
             // Polling function
             state.pollInputs = () => {
+                // Poll Gamepads
+                const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
+
+                // Update Cooldown State
+                if (state.comboCooldown > 0) {
+                    state.comboCooldown -= 0.016; // Approx per frame
+                    if (state.comboCooldown < 0) state.comboCooldown = 0;
+
+                    // Update UI
+                    const pulseDiv = document.getElementById('pulse-container-central');
+                    const pulseBar = document.getElementById('pulse-bar');
+                    const pulseText = document.getElementById('pulse-text');
+
+                    pulseDiv.classList.add('pulse-locked');
+                    pulseBar.style.width = '100%'; // Full bar but gray
+                    pulseBar.style.background = '#555'; // Gray
+                    pulseText.innerText = `COOLDOWN: ${Math.ceil(state.comboCooldown)}`;
+                } else {
+                    const pulseDiv = document.getElementById('pulse-container-central');
+                    const pulseBar = document.getElementById('pulse-bar');
+                    const pulseText = document.getElementById('pulse-text');
+
+                    pulseDiv.classList.remove('pulse-locked');
+                    pulseBar.style.width = (state.pulse / state.maxPulse * 100) + '%';
+                    pulseBar.style.background = 'linear-gradient(90deg, #ff00ff, #00ffff)';
+                    pulseText.innerText = 'PULSE(Hold Skill Button)';
+                }
+
                 // --- P1 (Keyboard/Mouse) ---
                 let vx = 0, vy = 0;
                 if (keys['KeyW']) vy -= 1;
@@ -1413,76 +1524,64 @@
                 state.input.p1.move.set(vx, vy).normalize();
                 // P1 Attack: Mouse Left OR Key 1
                 state.input.p1.attack = mouseAttack || keys['Digit1'];
-                state.input.p1.charge = mouseCharge || keys['ShiftLeft'];
-
-                // --- Helper for Gamepad ---
-                const getGamepadInput = (index) => {
-                    const gp = navigator.getGamepads()[index];
-                    if (!gp) return null;
-                    const axisX = gp.axes[0];
-                    const axisY = gp.axes[1];
-                    const deadzone = 0.1;
-                    return {
-                        move: new THREE.Vector2(Math.abs(axisX) > deadzone ? axisX : 0, Math.abs(axisY) > deadzone ? axisY : 0),
-                        attackVal: gp.buttons[2].pressed, // X / Square (West)
-                        chargeVal: gp.buttons[7].pressed  // RT / R2
-                    };
-                };
+                // Charge logic with cooldown check
+                const p1RawCharge = mouseCharge || keys['ShiftLeft'];
+                state.input.p1.charge = (state.comboCooldown <= 0) && p1RawCharge;
 
                 // --- P2 (Gamepad 0) ---
-                const gp0 = getGamepadInput(0);
-                if (gp0) {
-                    state.input.p2.move.copy(gp0.move);
-                    state.input.p2.attack = gp0.attackVal || keys['Digit2']; // Gamepad OR Key 2
-                    state.input.p2.charge = gp0.chargeVal;
-                } else {
-                    // Fallback P2 Keys (Arrows, Enter, ShiftRight)
-                    let p2x = 0, p2y = 0;
-                    if (keys['ArrowUp']) p2y -= 1;
-                    if (keys['ArrowDown']) p2y += 1;
-                    if (keys['ArrowLeft']) p2x -= 1;
-                    if (keys['ArrowRight']) p2x += 1;
-                    state.input.p2.move.set(p2x, p2y).normalize();
+                const gp2 = gamepads[0];
+                if (gp2) {
+                    const axisX = Math.abs(gp2.axes[0]) > 0.1 ? gp2.axes[0] : 0;
+                    const axisY = Math.abs(gp2.axes[1]) > 0.1 ? gp2.axes[1] : 0;
+                    state.input.p2.move.set(axisX, axisY);
+                    if (state.input.p2.move.length() > 1) state.input.p2.move.normalize();
 
-                    state.input.p2.attack = keys['Enter'] || keys['Digit2']; // Enter OR Key 2
-                    state.input.p2.charge = keys['ShiftRight'];
+                    state.input.p2.attack = gp2.buttons[2].pressed; // West button (X/Square)
+                    // Charge logic with cooldown check
+                    const p2RawCharge = gp2.buttons[7].pressed; // RT/R2
+                    state.input.p2.charge = (state.comboCooldown <= 0) && p2RawCharge;
+                } else {
+                    // Debug Keys Arrows
+                    let vx2 = 0, vy2 = 0;
+                    if (keys['ArrowUp']) vy2 -= 1;
+                    if (keys['ArrowDown']) vy2 += 1;
+                    if (keys['ArrowLeft']) vx2 -= 1;
+                    if (keys['ArrowRight']) vx2 += 1;
+                    state.input.p2.move.set(vx2, vy2).normalize();
+                    state.input.p2.attack = keys['Enter'] || keys['Digit2']; // Fixed: Added Digit2
+                    // Charge logic with cooldown check
+                    const p2RawCharge = keys['ShiftRight'];
+                    state.input.p2.charge = (state.comboCooldown <= 0) && p2RawCharge;
                 }
+                if (keys['Digit2']) state.input.p2.attack = true;
 
                 // --- P3 (Gamepad 1) ---
-                const gp1 = getGamepadInput(1);
-                if (gp1) {
-                    state.input.p3.move.copy(gp1.move);
-                    state.input.p3.attack = gp1.attackVal || keys['Digit3']; // Gamepad OR Key 3
-                    state.input.p3.charge = gp1.chargeVal;
-                } else {
-                    // Fallback P3 (IJKL, O, P) - for debugging
-                    let p3x = 0, p3y = 0;
-                    if (keys['KeyI']) p3y -= 1;
-                    if (keys['KeyK']) p3y += 1;
-                    if (keys['KeyJ']) p3x -= 1;
-                    if (keys['KeyL']) p3x += 1;
-                    state.input.p3.move.set(p3x, p3y).normalize();
-                    state.input.p3.attack = keys['KeyO'] || keys['Digit3']; // O OR Key 3
-                    state.input.p3.charge = keys['KeyP'];
+                const gp3 = gamepads[1];
+                state.input.p3.charge = false; // Default
+                state.input.p3.attack = false; // Default
+                if (gp3) {
+                    const axisX = Math.abs(gp3.axes[0]) > 0.1 ? gp3.axes[0] : 0;
+                    const axisY = Math.abs(gp3.axes[1]) > 0.1 ? gp3.axes[1] : 0;
+                    state.input.p3.move.set(axisX, axisY);
+                    state.input.p3.attack = gp3.buttons[2].pressed; // West
+                    const p3RawCharge = gp3.buttons[7].pressed; // RT
+                    state.input.p3.charge = (state.comboCooldown <= 0) && p3RawCharge;
                 }
+                if (keys['Digit3']) state.input.p3.attack = true;
 
                 // --- P4 (Gamepad 2) ---
-                const gp2 = getGamepadInput(2);
-                if (gp2) {
-                    state.input.p4.move.copy(gp2.move);
-                    state.input.p4.attack = gp2.attackVal || keys['Digit4']; // Gamepad OR Key 4
-                    state.input.p4.charge = gp2.chargeVal;
-                } else {
-                    // Fallback P4 (Numpad)
-                    let p4x = 0, p4y = 0;
-                    if (keys['Numpad8']) p4y -= 1;
-                    if (keys['Numpad5']) p4y += 1;
-                    if (keys['Numpad4']) p4x -= 1;
-                    if (keys['Numpad6']) p4x += 1;
-                    state.input.p4.move.set(p4x, p4y).normalize();
-                    state.input.p4.attack = keys['Numpad7'] || keys['Digit4']; // Numpad7 OR Key 4
-                    state.input.p4.charge = keys['Numpad9'];
+                const gp4 = gamepads[2];
+                state.input.p4.charge = false; // Default
+                state.input.p4.attack = false; // Default
+                if (gp4) {
+                    const axisX = Math.abs(gp4.axes[0]) > 0.1 ? gp4.axes[0] : 0;
+                    const axisY = Math.abs(gp4.axes[1]) > 0.1 ? gp4.axes[1] : 0;
+                    state.input.p4.move.set(axisX, axisY);
+                    state.input.p4.attack = gp4.buttons[2].pressed; // West
+                    const p4RawCharge = gp4.buttons[7].pressed; // RT
+                    state.input.p4.charge = (state.comboCooldown <= 0) && p4RawCharge;
                 }
+                if (keys['Digit4']) state.input.p4.attack = true;
             };
         }
 
