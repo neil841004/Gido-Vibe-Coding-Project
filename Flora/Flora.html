@@ -164,12 +164,10 @@
             },
 
             // 戰鬥相關 (Combat)
-            // 戰鬥相關 (Combat)
             combat: {
                 preFireDelay: 0.5,       // 攻擊前搖時間 (秒)
-                duoWindow: 0.2,          // 雙人子彈合體判定窗口 (秒) - 建議與前搖時間一致
-                cooldown: 0.5,           // 攻擊冷卻時間 (秒) - 發射後開始計算
-                // attackLockDuration: 0, // [已移除] 攻擊不鎖定移動
+                duoWindow: 0.25,          // 雙人子彈合體判定窗口 (秒)
+                cooldown: 0.3,           // 攻擊冷卻時間 (秒) - 發射後開始計算
                 bufferWindow: 0.15        // 輸入預緩衝窗口 (秒)
             },
 
@@ -221,6 +219,11 @@
                     mouth: 0x44aa44,  // 嘴巴顏色 (黃)
                     beam: 0xff00ff    // 射線顏色
                 }
+            },
+
+            // 節奏相關 (Rhythm)
+            rhythm: {
+                beatInterval: 1 // 每一拍的時間 (秒) - 獨立設定
             }
         };
 
@@ -850,8 +853,8 @@
 
                 // --- Combat Inputs ---
                 // Rhythm UI Update
-                // Dynamic Cycle Time = PreFire + Cooldown
-                const cycleTime = CONFIG.combat.preFireDelay + CONFIG.combat.cooldown;
+                // Decoupled Rhythm Time: Uses distinct config
+                const cycleTime = CONFIG.rhythm.beatInterval;
                 const prevRhythm = state.rhythmTime;
                 state.rhythmTime = (state.rhythmTime + (dt / cycleTime)) % 1.0;
 
