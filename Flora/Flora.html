@@ -164,6 +164,11 @@
             background-color: #00ffff;
         }
 
+
+
+
+
+
         .indicator-duo {
             background-color: #ffff00;
             width: 40px;
@@ -216,9 +221,11 @@
 
             // [New] Enemy Stats
             enemy: {
-                spawnRate: 3.0,       // Spawn interval (seconds)
+                maxEnemies: 10,          // [New] Max enemies on screen
+                spawnRateDuo: 7.0,       // [Duo] Spawn interval
+                spawnRateQuad: 2.6,      // [Quad] Faster spawn
                 melee: {
-                    hp: 14,
+                    hp: 24,
                     damage: 4,
                     speed: 3,
                     attackRange: 2.0,
@@ -288,7 +295,8 @@
                     spread: 0.4,         // [單人] 散射角度 (弧度)
                     gravity: 25,         // [單人] 重力下墜值
                     penetration: 0,      // [New] 穿透人數 (0 = hit 1)
-                    recoil: 0          // [New] 後座力係數 (x recoilForce)
+                    recoil: 0,          // [New] 後座力係數 (x recoilForce)
+                    knockback: 6         // [New] Bullet Knockback (Small)
                 },
                 duo: {
                     damage: 14,          // [雙人] 傷害
@@ -297,7 +305,8 @@
                     life: 4.0,           // [雙人] 存在時間 (固定)
                     gravity: 0,          // [雙人] 重力 (無)
                     penetration: 1,      // [New] 穿透人數
-                    recoil: 1.5
+                    recoil: 1.5,
+                    knockback: 14         // [New] Bullet Knockback
                 },
                 // [New] 四人獸專用強化版 (Stronger Single/Duo)
                 ultraSingle: {
@@ -310,7 +319,8 @@
                     spread: 0.4,         // [四人-單] 更準
                     gravity: 25,         // [四人-單] 較輕
                     penetration: 0,      // [四人-單] 穿透1人!
-                    recoil: 0
+                    recoil: 0,
+                    knockback: 6         // [New] Bullet Knockback
                 },
                 ultraDuo: {
                     damage: 14,          // [四人-雙] 傷害 (Buffed from 14)
@@ -319,36 +329,47 @@
                     life: 4.0,
                     gravity: 0,
                     penetration: 2,      // [四人-雙] 穿透2人!
-                    recoil: 1.5
+                    recoil: 1.5,
+                    knockback: 14,        // [New] Bullet Knockback
+                    shockwave: {
+                        radius: 4,
+                        angle: Math.PI / 0.5,
+                        damage: 6,
+                        knockback: 30    // [New] Shockwave Knockback
+                    }
                 },
                 trio: {
                     damage: 24,          // [三人] 傷害
-                    size: 0.9,
-                    speed: 29,
+                    size: 1,
+                    speed: 32,
                     life: 5.0,
                     gravity: 0,
-                    penetration: 3,      // [New]
-                    recoil: 1.7,
+                    penetration: 3,
+                    recoil: 1.6,
+                    knockback: 18,       // [New] Bullet Knockback
                     shockwave: {
-                        radius: 6,         // [半徑] 震波傳播多遠 (數值越大飛越遠)
-                        angle: Math.PI / 1.5, // [角度] 震波扇形寬度 (弧度)
-                        damage: 12         // [New] Default Damage
+                        radius: 5.5,
+                        angle: Math.PI / 0.5,
+                        damage: 6,
+                        knockback: 33    // [New] Shockwave Knockback
                     }
                 },
                 quad: {
-                    damage: 20,          // [四人] 傷害 (Per bullet in burst)
+                    damage: 20,          // [四人] 傷害
                     size: 1.2,
-                    speed: 33,
+                    speed: 32,
                     life: 5.0,
                     gravity: 0,
                     burstCount: 3,
-                    burstInterval: 0.17, // Seconds between burst shots
-                    penetration: 10,     // [New]
+                    burstInterval: 0.17,
+                    penetration: 10,
                     recoil: 1.6,
+                    knockback: 18,       // [New] Bullet Knockback
                     shockwave: {
-                        radius: 6,          // [半徑] 震波傳播多遠 (數值越大飛越遠)
-                        angle: Math.PI / 1.5,  // [角度] 震波扇形寬度 (弧度: PI=180度, PI/2=90度, PI/4=45度)
-                        damage: 12          // [New] Default Damage
+                        radius: 7,
+                        angle: Math.PI / 0.5,
+                        damage: 6,
+                        knockback: 36    // [New] Shockwave Knockback
                     }
                 }
             },
@@ -592,6 +613,7 @@
                 // [New] Stats
                 this.damage = stats.damage || 5;
                 this.penetration = stats.penetration || 0;
+                this.knockback = stats.knockback; // [New]
                 this.hitEntities = new Set(); // Track unique entity IDs or objects to avoid hitting same target twice if frames overlap? 
                 // Actually simpler: cooldown per target? Or just hit once.
                 // For penetration, we MUST NOT hit the same entity every frame.
@@ -1117,14 +1139,16 @@
                 this.hpBar = new HealthBar(this.manager.scene, 1.2); // Attached to scene, tracking mesh
             }
 
-            takeDamage(amount, sourcePos) {
+            takeDamage(amount, sourcePos, knockbackForce) {
                 this.hp -= amount;
                 this.flashTimer = 0.1;
 
                 // Knockback Logic
                 if (sourcePos) {
                     const dir = this.mesh.position.clone().sub(sourcePos).normalize();
-                    const force = amount * CONFIG.combat.knockbackBase;
+                    dir.y = 0; // Flatten the force to horizontal plane
+                    // Use passed force, or default base if not provided (fallback)
+                    const force = (knockbackForce !== undefined) ? knockbackForce : amount * CONFIG.combat.knockbackBase;
                     this.knockbackVel.add(dir.multiplyScalar(force));
                 }
 
@@ -1162,6 +1186,7 @@
                 // Knockback Physics
                 if (this.knockbackVel.lengthSq() > 0.001) {
                     this.mesh.position.add(this.knockbackVel.clone().multiplyScalar(dt));
+                    this.mesh.position.y = 1.0; // Enforce floor level
                     this.knockbackVel.multiplyScalar(0.9); // Friction
                 }
 
@@ -1264,6 +1289,7 @@
                 // Knockback
                 if (this.knockbackVel.lengthSq() > 0.001) {
                     this.mesh.position.add(this.knockbackVel.clone().multiplyScalar(dt));
+                    this.mesh.position.y = 1.0; // Enforce floor level
                     this.knockbackVel.multiplyScalar(0.9);
                     return;
                 }
@@ -1306,6 +1332,29 @@
                     // Clamp to floor
                     backPos.y = 1.0;
 
+                    // Visual: Teleport Effect (Old Position)
+                    const smokeGeo = new THREE.SphereGeometry(1, 8, 8);
+                    const smokeMat = new THREE.MeshBasicMaterial({ color: 0x555555, transparent: true, opacity: 0.8 });
+                    const smoke = new THREE.Mesh(smokeGeo, smokeMat);
+                    smoke.position.copy(this.mesh.position);
+                    this.manager.scene.add(smoke);
+
+                    // Animate Smoke Fade
+                    let sOp = 0.8;
+                    const animSmoke = () => {
+                        sOp -= 0.05;
+                        if (sOp <= 0) {
+                            this.manager.scene.remove(smoke);
+                            smoke.geometry.dispose();
+                            smoke.material.dispose();
+                            return;
+                        }
+                        smoke.material.opacity = sOp;
+                        smoke.scale.multiplyScalar(1.1); // Expand
+                        requestAnimationFrame(animSmoke);
+                    };
+                    animSmoke();
+
                     this.mesh.position.copy(backPos);
 
                     // Start Warning
@@ -1329,7 +1378,8 @@
                 this.mesh.material.color.setHex(this.color);
 
                 // Always Play Visual (Commit to attack)
-                const slashGeo = new THREE.RingGeometry(2, 5, 32, 1, 0, Math.PI); // Semi-circle
+                // [Adjusted Size]: Inner 1, Outer 4 to match Range 4.0
+                const slashGeo = new THREE.RingGeometry(1.0, 2.5, 32, 1, 0, Math.PI); // Semi-circle
                 const slashMat = new THREE.MeshBasicMaterial({ color: 0x00ffff, side: THREE.DoubleSide, transparent: true, opacity: 0.8 });
                 const slash = new THREE.Mesh(slashGeo, slashMat);
 
@@ -1370,6 +1420,59 @@
                 this.recoveryTimer = 0.5;
             }
         }
+
+        class DummyEnemy extends Enemy {
+            constructor(manager, pos) {
+                // High HP, Brown Color
+                super(manager, pos, { hp: 100, damage: 0, speed: 0, attackRange: 0, attackRate: 999, color: 0x8B4513 });
+                this.hpBar.yOffset = 2.5; // Custom Offset
+                this.mesh.scale.set(1.5, 1.5, 1.5);
+                this.healing = false;
+            }
+
+            update(dt, playerPos) {
+                // Override to skip movement/attack
+
+                // HP Bar
+                if (this.hpBar) this.hpBar.update(this.mesh.position, this.hp, this.maxHP);
+
+                // Flash Logic
+                if (this.flashTimer > 0) {
+                    this.flashTimer -= dt;
+                    // Flash Green on heal? White on hit.
+                    if (this.healing) {
+                        this.mesh.material.emissive.setHex(0x00ff00);
+                        if (this.flashTimer <= 0) this.healing = false;
+                    } else {
+                        this.mesh.material.emissive.setHex(this.flashTimer > 0 ? 0xffffff : 0x000000);
+                    }
+                }
+
+                // Knockback Physics ONLY
+                if (this.knockbackVel.lengthSq() > 0.001) {
+                    this.mesh.position.add(this.knockbackVel.clone().multiplyScalar(dt));
+                    this.mesh.position.y = 1.0; // Enforce floor level
+                    this.knockbackVel.multiplyScalar(0.9); // Friction
+                }
+            }
+
+            takeDamage(amount, sourcePos, knockbackForce) {
+                super.takeDamage(amount, sourcePos, knockbackForce);
+                // Immortal Logic
+                if (this.hp <= 0) {
+                    this.hp = this.maxHP;
+                    this.isDead = false; // Prevent death
+                    this.healing = true;
+                    this.flashTimer = 0.2; // Flash
+                }
+            }
+
+            die() {
+                // Prevent death
+                return;
+            }
+        }
+
         class TauntEnemy extends Enemy {
             constructor(manager, pos) {
                 super(manager, pos, CONFIG.enemy.boss);
@@ -1505,10 +1608,21 @@
             update(dt, playerPos) {
                 // Spawning
                 if (state.spawnerEnabled) {
-                    this.spawnTimer += dt;
-                    if (this.spawnTimer >= CONFIG.enemy.spawnRate) {
-                        this.spawnTimer = 0;
-                        this.spawnEnemy(playerPos);
+
+                    // Check Enemy Limit
+                    if (this.enemies.length < CONFIG.enemy.maxEnemies) {
+                        this.spawnTimer += dt;
+
+                        // Determine Rate based on Mode
+                        const currentRate = (state.mode === 'quad') ? CONFIG.enemy.spawnRateQuad : CONFIG.enemy.spawnRateDuo;
+
+                        if (this.spawnTimer >= currentRate) {
+                            this.spawnTimer = 0;
+                            this.spawnEnemy(playerPos);
+                        }
+                    } else {
+                        // Limit Reached: Pause Timer (Optional: Reset? User said "Stop Timing")
+                        // If we just stop adding dt, it effectively pauses.
                     }
 
                     // [New] Spawn Boss after delay
@@ -1592,6 +1706,24 @@
                 if (enemy) this.enemies.push(enemy);
             }
 
+            spawnDummy(playerPos) {
+                // Spawn 10 units in front
+                const fwd = new THREE.Vector3(0, 0, 1); // Default if playerPos undefined?
+                // But we have playerPos passed? Yes.
+                // Need Window.floraInstance for true direction
+                let spawnPos;
+                if (window.floraInstance) {
+                    const dir = window.floraInstance.getForwardVector().normalize();
+                    spawnPos = window.floraInstance.mesh.position.clone().add(dir.multiplyScalar(8));
+                } else {
+                    spawnPos = new THREE.Vector3(0, 1, -10);
+                }
+                spawnPos.y = 1;
+
+                const dummy = new DummyEnemy(this, spawnPos);
+                this.enemies.push(dummy);
+            }
+
             killAll() {
                 this.enemies.forEach(e => e.die());
                 this.enemies = [];
@@ -1617,7 +1749,7 @@
                             if (b.hitEntities.has(e.mesh.uuid)) continue;
                             b.hitEntities.add(e.mesh.uuid);
 
-                            e.takeDamage(b.damage, b.mesh.position); // Pass bullet pos
+                            e.takeDamage(b.damage, b.mesh.position, b.knockback); // Pass knockback
 
                             // Penetration Logic
                             b.penetration--;
@@ -1639,7 +1771,6 @@
 
                 this.hp = CONFIG.stats.playerHP;
                 this.maxHP = CONFIG.stats.playerHP;
-                this.isDead = false;
                 this.isDead = false;
                 this.damageFlashTimer = 0;
 
@@ -1916,10 +2047,13 @@
                     const angle = waveConfig.angle;
                     const baseDir = this.getForwardVector();
 
-                    // Recalculate spawn position DYNAMICALLY
-                    const currentSpawnPos = new THREE.Vector3();
-                    this.mouth.getWorldPosition(currentSpawnPos);
-                    currentSpawnPos.add(this.getForwardVector().multiplyScalar(0.5));
+                    // Recalculate spawn position DYNAMICALLY - FROM FLOOR/CENTER
+                    const currentSpawnPos = this.mesh.position.clone();
+                    currentSpawnPos.y = 0.1; // Near floor
+                    // currentSpawnPos.add(this.getForwardVector().multiplyScalar(0.5)); // Optional forward offset?
+                    // User said "Character Center", so maybe no offset or slight forward?
+                    // "角色中心的靠近地板位置". Center is fine. Let's keep it centered or slightly forward to not clip self visually?
+                    // Particles move fast, center is safe.
 
                     const waveSpeed = 20;
                     const waveLife = waveConfig.radius / waveSpeed;
@@ -1969,7 +2103,8 @@
                                 if (dot > threshold) {
                                     // Shockwave Damage + Knockback (from spawn center)
                                     // Use configured damage
-                                    e.takeDamage(waveConfig.damage || damage, currentSpawnPos);
+                                    // Use configured damage and knockback
+                                    e.takeDamage(waveConfig.damage || damage, currentSpawnPos, waveConfig.knockback);
                                 }
                             }
                         });
@@ -2006,7 +2141,7 @@
                     life = config.life;
                     gravity = config.gravity;
                     size = config.size;
-                    stats = { damage: config.damage, penetration: config.penetration, recoil: config.recoil };
+                    stats = { damage: config.damage, penetration: config.penetration, recoil: config.recoil, knockback: config.knockback };
                     direction = this.getForwardVector();
 
                     // Burst Fire 
@@ -2016,7 +2151,7 @@
                         spawnBullet('quad', i * config.burstInterval, true, decay);
                     }
                     // Shockwave x3
-                    for (let i = 0; i < 3; i++) {
+                    for (let i = 0; i < 1; i++) {
                         setTimeout(() => spawnShockwave(config.shockwave, config.damage), i * config.burstInterval * 1000);
                     }
                 } else if (type === 'trio') {
@@ -2025,7 +2160,7 @@
                     life = config.life;
                     gravity = config.gravity;
                     size = config.size;
-                    stats = { damage: config.damage, penetration: config.penetration, recoil: config.recoil };
+                    stats = { damage: config.damage, penetration: config.penetration, recoil: config.recoil, knockback: config.knockback };
                     direction = this.getForwardVector();
 
                     spawnBullet('trio');
@@ -2041,9 +2176,10 @@
                     life = config.life;
                     gravity = config.gravity;
                     size = config.size;
-                    stats = { damage: config.damage, penetration: config.penetration, recoil: config.recoil };
+                    stats = { damage: config.damage, penetration: config.penetration, recoil: config.recoil, knockback: config.knockback };
                     direction = this.getForwardVector();
                     spawnBullet('duo');
+                    if (config.shockwave) spawnShockwave(config.shockwave, config.damage);
                 } else {
                     // Single
                     if (state.mode === 'quad') {
@@ -2056,7 +2192,7 @@
                     life = config.lifeMin + Math.random() * (config.lifeMax - config.lifeMin);
                     gravity = config.gravity;
                     size = config.size;
-                    stats = { damage: config.damage, penetration: config.penetration, recoil: config.recoil };
+                    stats = { damage: config.damage, penetration: config.penetration, recoil: config.recoil, knockback: config.knockback };
 
                     // Spread
                     const spread = (Math.random() - 0.5) * config.spread;
@@ -2798,6 +2934,25 @@
 
             if (!state.spawnerEnabled) {
                 if (state.enemyManager) state.enemyManager.killAll();
+            }
+        });
+
+        // Dummy Toggle (Moved to Info Container)
+        const dummyBtn = document.createElement('button');
+        dummyBtn.id = 'dummy-toggle';
+        dummyBtn.innerText = 'Spawn Dummy';
+        // Style to match others (and Color Brown)
+        dummyBtn.style.marginTop = '10px';
+        dummyBtn.style.marginLeft = '10px';
+        dummyBtn.style.pointerEvents = 'auto';
+        dummyBtn.style.backgroundColor = '#aa8844';
+        dummyBtn.style.color = 'white';
+
+        document.getElementById('info').appendChild(dummyBtn);
+
+        dummyBtn.addEventListener('click', () => {
+            if (state.enemyManager && window.floraInstance) {
+                state.enemyManager.spawnDummy(window.floraInstance.mesh.position);
             }
         });
 
