@@ -60,7 +60,7 @@
         /* Rhythm Assist UI */
         #rhythm-helper {
             position: absolute;
-            bottom: 120px;
+            bottom: 22%;
             /* Moved up */
             left: 50%;
             transform: translateX(-50%);
@@ -75,10 +75,10 @@
         /* Pulse Meter - Moved to Center Bottom */
         #pulse-container-central {
             position: absolute;
-            bottom: 50px;
+            bottom: 10%;
             left: 50%;
             transform: translateX(-50%);
-            width: 300px;
+            width: 500px;
             height: 30px;
             background: #222;
             border: 2px solid #555;
@@ -180,6 +180,9 @@
         <p>2P (Blue): Gamepad / Arrows to Move, Enter/East to Attack, Shift/RT to Charge</p>
         <div id="debug"></div>
         <button id="mode-toggle" style="margin-top:10px; pointer-events:auto;">Switch to 2P Mode</button>
+        <button id="spawner-toggle"
+            style="margin-top:10px; pointer-events:auto; background-color: #44aa44; color: white;">Start Enemy
+            Spawn</button>
     </div>
 
     <div id="rhythm-helper">
@@ -205,59 +208,126 @@
 
         // --- Configuration (數值設定) ---
         const CONFIG = {
+            // [New] General Stats
+            stats: {
+                playerHP: 200,        // 角色血量
+                structureHPBase: 0.5   // 建築血量基值 (per unit volume)
+            },
+
+            // [New] Enemy Stats
+            enemy: {
+                spawnRate: 3.0,       // Spawn interval (seconds)
+                melee: {
+                    hp: 30,
+                    damage: 6,
+                    speed: 3,
+                    attackRange: 2.0,
+                    attackRate: 1.0,  // Seconds
+                    color: 0xff4444
+                },
+                ranged: {
+                    hp: 10,
+                    damage: 8,
+                    speed: 2,
+                    attackRange: 15.0, // Stop distance
+                    attackRate: 2.0,
+                    projectileSpeed: 15,
+                    color: 0xaa44ff
+                }
+            },
+
             // 移動相關 (Movement)
             movement: {
-                maxSpeed: 9,      // 最大合力速度 (World units per second)
-                acceleration: 60,  // 起步加速度
+                maxSpeed: 6,      // 最大合力速度 (World units per second)
+                acceleration: 25,  // 起步加速度
                 friction: 80,      // 停止時的摩擦力 (慣性減速)
-                rotationSpeed: 18,  // 轉身速度
+                rotationSpeed: 4,  // 轉身速度
             },
 
             // 戰鬥相關 (Combat)
             combat: {
                 preFireDelay: 0.5,       // 攻擊前搖時間 (秒)
-                duoWindow: 0.25,          // 雙人子彈合體判定窗口 (秒)
+                duoWindow: 0.22,          // 雙人子彈合體判定窗口 (秒)
+                quadWindow: 0.28,         // [New] 四人容許窗口 (更寬鬆)
                 cooldown: 0.3,           // 攻擊冷卻時間 (秒) - 發射後開始計算
-                bufferWindow: 0.15        // 輸入預緩衝窗口 (秒)
+                bufferWindow: 0.15,       // 輸入預緩衝窗口 (秒)
+                recoilForce: 10,           // [New] Recoil Force base (scaled by bullet type)
+                knockbackBase: 0.2         // [New] Enemy Knockback = Damage * kickbackBase
             },
 
             // 子彈參數 (Bullets)
             bullet: {
                 single: {
+                    damage: 6,           // [單人] 傷害
                     size: 0.4,           // [單人] 子彈大小
                     speedMin: 18,        // [單人] 飛行速度最小值
                     speedMax: 22,        // [單人] 飛行速度最大值
                     lifeMin: 0.9,        // [單人] 存在時間最小值 (秒)
                     lifeMax: 1.3,        // [單人] 存在時間最大值 (秒)
-                    spread: 0.4,        // [單人] 散射角度 (弧度)
+                    spread: 0.4,         // [單人] 散射角度 (弧度)
                     gravity: 25,         // [單人] 重力下墜值
+                    penetration: 0,      // [New] 穿透人數 (0 = hit 1)
+                    recoil: 0          // [New] 後座力係數 (x recoilForce)
                 },
                 duo: {
+                    damage: 14,          // [雙人] 傷害
                     size: 0.7,           // [雙人] 子彈大小
                     speed: 25,           // [雙人] 飛行速度 (固定)
                     life: 4.0,           // [雙人] 存在時間 (固定)
                     gravity: 0,          // [雙人] 重力 (無)
+                    penetration: 1,      // [New] 穿透人數
+                    recoil: 1.5
+                },
+                // [New] 四人獸專用強化版 (Stronger Single/Duo)
+                ultraSingle: {
+                    damage: 6,          // [四人-單] 傷害 (Buffed from 6)
+                    size: 0.55,           // [四人-單] 稍大
+                    speedMin: 20,        // [四人-單] 更快
+                    speedMax: 24,
+                    lifeMin: 1,
+                    lifeMax: 1.4,
+                    spread: 0.4,         // [四人-單] 更準
+                    gravity: 25,         // [四人-單] 較輕
+                    penetration: 0,      // [四人-單] 穿透1人!
+                    recoil: 0
+                },
+                ultraDuo: {
+                    damage: 14,          // [四人-雙] 傷害 (Buffed from 14)
+                    size: 0.8,           // [四人-雙] 巨大
+                    speed: 30,           // [四人-雙] 很快
+                    life: 4.0,
+                    gravity: 0,
+                    penetration: 2,      // [四人-雙] 穿透2人!
+                    recoil: 1.5
                 },
                 trio: {
+                    damage: 24,          // [三人] 傷害
                     size: 0.9,
                     speed: 29,
                     life: 5.0,
                     gravity: 0,
+                    penetration: 3,      // [New]
+                    recoil: 1.7,
                     shockwave: {
                         radius: 6,         // [半徑] 震波傳播多遠 (數值越大飛越遠)
-                        angle: Math.PI / 1.5 // [角度] 震波扇形寬度 (弧度)
+                        angle: Math.PI / 1.5, // [角度] 震波扇形寬度 (弧度)
+                        damage: 15         // [New] Default Damage
                     }
                 },
                 quad: {
-                    size: 1.2, // Burst shots are smaller? Or maybe larger. Let's keep distinct.
+                    damage: 26,          // [四人] 傷害 (Per bullet in burst)
+                    size: 1.2,
                     speed: 33,
                     life: 5.0,
                     gravity: 0,
                     burstCount: 3,
                     burstInterval: 0.17, // Seconds between burst shots
+                    penetration: 10,     // [New]
+                    recoil: 1.6,
                     shockwave: {
                         radius: 6,          // [半徑] 震波傳播多遠 (數值越大飛越遠)
-                        angle: Math.PI / 1.5  // [角度] 震波扇形寬度 (弧度: PI=180度, PI/2=90度, PI/4=45度)
+                        angle: Math.PI / 1.5,  // [角度] 震波扇形寬度 (弧度: PI=180度, PI/2=90度, PI/4=45度)
+                        damage: 15          // [New] Default Damage
                     }
                 }
             },
@@ -270,21 +340,22 @@
 
                 preCastDelay: 2.3,        // 前搖時間 (秒)
                 vineSpeed: 2.0,           // 揮舞速度
-                moveSpeedFactor: 0.4,     // 施法時移動速度倍率
+                moveSpeedFactor: 0.5,     // 施法時移動速度倍率
 
-                mergeDistance: 1.0,       // 子彈合併判定距離
-                mergeWindow: 500,         // 子彈合併判定時間窗口 (毫秒)
+                // [New] DoT Settings (Damage over Time)
+                dotInterval: 0.5,         // 傷害頻率 (秒/次)
+                dotDamage: 8,            // 每次傷害數值
 
                 // [New] Mode Specific Settings
                 maxVineCount: 6, // Pool Size (Max needed for Quad)
                 duo: {
                     activeDuration: 5.0,  // 傷害持續時間
-                    radius: 10.0,         // 攻擊半徑
+                    radius: 8.0,         // 攻擊半徑
                     vineCount: 2          // 藤蔓數量
                 },
                 quad: {
-                    activeDuration: 5.0,  // 傷害持續時間
-                    radius: 16.0,         // 攻擊半徑
+                    activeDuration: 7.0,  // 傷害持續時間
+                    radius: 12.0,         // 攻擊半徑
                     vineCount: 4          // 藤蔓數量
                 }
             },
@@ -313,7 +384,7 @@
         // --- Game State ---
         const state = {
             comboCooldown: 0, // [New] Cooldown timer
-            comboCooldownMax: 20.0, // 20 Seconds
+            comboCooldownMax: 30.0, // 30 Seconds
             pulse: 0,
             maxPulse: 100,
             mode: 'quad', // 'duo' or 'quad'
@@ -397,23 +468,34 @@
                     this.ctx.resume();
                 }
             },
-            playKick: function () {
+            playOpenHiHat: function () {
                 if (!this.ctx) return;
-                const t = this.ctx.currentTime;
-                const osc = this.ctx.createOscillator();
-                const gain = this.ctx.createGain();
+                // White noise buffer (Longer for Open HH)
+                const bufferSize = this.ctx.sampleRate * 0.5; // 0.5s
+                const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+                const data = buffer.getChannelData(0);
+                for (let i = 0; i < bufferSize; i++) {
+                    data[i] = Math.random() * 2 - 1;
+                }
 
-                osc.connect(gain);
+                const noise = this.ctx.createBufferSource();
+                noise.buffer = buffer;
+
+                // Filter Highpass (Metallic shimmery sound)
+                const filter = this.ctx.createBiquadFilter();
+                filter.type = 'highpass';
+                filter.frequency.value = 1000; // Lower than closed HH for fuller sound
+
+                const gain = this.ctx.createGain();
+                const t = this.ctx.currentTime;
+                gain.gain.setValueAtTime(0.4, t);
+                gain.gain.exponentialRampToValueAtTime(0.01, t + 0.3); // Long decay
+
+                noise.connect(filter);
+                filter.connect(gain);
                 gain.connect(this.ctx.destination);
 
-                osc.frequency.setValueAtTime(150, t);
-                osc.frequency.exponentialRampToValueAtTime(0.01, t + 0.5);
-
-                gain.gain.setValueAtTime(1, t);
-                gain.gain.exponentialRampToValueAtTime(0.01, t + 0.5);
-
-                osc.start(t);
-                osc.stop(t + 0.5);
+                noise.start();
             },
             playHiHat: function () {
                 if (!this.ctx) return;
@@ -458,6 +540,9 @@
         renderer.shadowMap.enabled = true;
         document.body.appendChild(renderer.domElement);
 
+        // Expose Camera mainly for UI lookAt
+        window.camera = camera;
+
         // Lighting
         const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
         scene.add(ambientLight);
@@ -474,7 +559,7 @@
         // --- Classes ---
 
         class Bullet {
-            constructor(owner, position, direction, speed, life, gravity, size) {
+            constructor(owner, position, direction, speed, life, gravity, size, stats = {}) {
                 this.owner = owner;
                 this.direction = direction.clone();
                 this.velocity = this.direction.clone().multiplyScalar(speed);
@@ -482,6 +567,14 @@
                 this.maxLife = life;
                 this.lifeTimer = 0;
                 this.markedForDeletion = false;
+
+                // [New] Stats
+                this.damage = stats.damage || 5;
+                this.penetration = stats.penetration || 0;
+                this.hitEntities = new Set(); // Track unique entity IDs or objects to avoid hitting same target twice if frames overlap? 
+                // Actually simpler: cooldown per target? Or just hit once.
+                // For penetration, we MUST NOT hit the same entity every frame.
+
 
                 // Color Logic
                 let color;
@@ -761,10 +854,614 @@
             }
         }
 
+        // --- Level System ---
+        class LevelManager {
+            constructor(scene) {
+                this.scene = scene;
+                this.blocks = [];
+                this.generateLevel();
+            }
+
+            generateLevel() {
+                const count = 20;
+                const range = 40;
+
+                // Clear existing
+                if (this.blocks) {
+                    this.blocks.forEach(b => {
+                        this.scene.remove(b.mesh);
+                        b.mesh.geometry.dispose();
+                        b.mesh.material.dispose();
+                    });
+                }
+                this.blocks = [];
+                const blockBoxes = []; // Cache Box3 for overlap check
+
+                let attempts = 0;
+                while (this.blocks.length < count && attempts < 200) {
+                    attempts++;
+
+                    // Random Size
+                    const sx = 2 + Math.random() * 3;
+                    const sy = 2 + Math.random() * 6; // Height
+                    const sz = 2 + Math.random() * 3;
+
+                    // Random Position (Avoid center 0,0)
+                    const x = (Math.random() - 0.5) * range;
+                    const z = (Math.random() - 0.5) * range;
+
+                    // Distance check from center
+                    if (x * x + z * z < 100) continue; // Min radius 10
+
+                    // Overlap Check (AABB)
+                    const tempBox = new THREE.Box3();
+                    // Y is always sy/2 (on ground)
+                    tempBox.min.set(x - sx / 2 - 0.5, 0, z - sz / 2 - 0.5); // Add spacing padding
+                    tempBox.max.set(x + sx / 2 + 0.5, sy, z + sz / 2 + 0.5);
+
+                    let overlap = false;
+                    for (let box of blockBoxes) {
+                        if (tempBox.intersectsBox(box)) {
+                            overlap = true;
+                            break;
+                        }
+                    }
+
+                    if (overlap) continue;
+
+                    // Valid Placement
+                    const geo = new THREE.BoxGeometry(sx, sy, sz);
+                    const mat = new THREE.MeshLambertMaterial({ color: 0x888888 });
+                    const mesh = new THREE.Mesh(geo, mat);
+                    mesh.position.set(x, sy / 2, z);
+                    mesh.castShadow = true;
+                    mesh.receiveShadow = true;
+                    this.scene.add(mesh);
+
+                    // HP Calculation
+                    const volume = sx * sy * sz;
+                    const maxHP = volume * CONFIG.stats.structureHPBase; // [Updated] Base Value
+
+                    this.blocks.push({
+                        mesh: mesh,
+                        hp: maxHP,
+                        maxHP: maxHP,
+                        isDead: false,
+                        flashTimer: 0,
+                        id: Math.random().toString(36).substr(2, 9) // ID for bullet tracking
+                    });
+                    blockBoxes.push(tempBox);
+                }
+            }
+
+            checkCollisions(bullets) {
+                // Bullet vs Block
+                const box = new THREE.Box3();
+                bullets.forEach(b => {
+                    if (b.markedForDeletion) return;
+                    if (b.damage <= 0) return; // Spent bullet
+
+                    for (let block of this.blocks) {
+                        if (block.isDead) continue;
+
+                        // Optimization: Check cooldown per bullet for this block?
+                        // For now: Simple hit
+                        box.setFromObject(block.mesh);
+                        if (box.containsPoint(b.mesh.position)) {
+                            // Hit!
+                            // Check if bullet already hit this block (if we want to prevent multi-hit per frame? No, penetration handles flow)
+                            // But usually a bullet hits a block and STOPS or goes through.
+                            // If it hits, we decrement penetration.
+
+                            // Prevent hitting same block multiple times?
+                            if (b.hitEntities.has(block.id)) continue;
+
+                            b.hitEntities.add(block.id);
+
+                            // Damage Block
+                            block.hp -= b.damage;
+                            block.flashTimer = 0.1;
+
+                            // Penetration Logic -> DISABLED FOR BLOCKS (Walls block bullets)
+                            b.markedForDeletion = true; // Always stop on block collision
+                            b.penetration = -1;
+
+                            if (block.hp <= 0) {
+                                block.isDead = true;
+                                this.scene.remove(block.mesh);
+                                block.mesh.geometry.dispose();
+                                block.mesh.material.dispose();
+
+                                // Spawn Debris
+                                this.spawnDebris(block.mesh.position, block.mesh.scale);
+                            }
+
+                            if (b.markedForDeletion) break; // Bullet died
+                        }
+                    }
+                });
+            }
+
+            update(dt) {
+                // Update visuals (Flash)
+                this.blocks.forEach(b => {
+                    if (b.isDead) return;
+                    if (b.flashTimer > 0) {
+                        b.flashTimer -= dt;
+                        b.mesh.material.emissive.setHex(b.flashTimer > 0 ? 0xff0000 : 0x000000);
+                    }
+                });
+            }
+
+            spawnDebris(pos, scale) {
+                // Simple particles
+                const count = 5;
+                for (let i = 0; i < count; i++) {
+                    const p = new Particle(pos, 0x555555);
+                    state.particles.push(p);
+                }
+            }
+        }
+
+
+        // --- Helper: Health Bar ---
+        class HealthBar {
+            constructor(scene, yOffset, width = 1.5, height = 0.15) {
+                this.group = new THREE.Group();
+                this.yOffset = yOffset;
+                this.initialWidth = width;
+
+                // Attach to Scene (World Space) so rotation is independent of parent
+                scene.add(this.group);
+
+                // BG (Red)
+                const bgGeo = new THREE.PlaneGeometry(width, height);
+                const bgMat = new THREE.MeshBasicMaterial({ color: 0x550000, depthTest: false, transparent: true });
+                this.bg = new THREE.Mesh(bgGeo, bgMat);
+                this.bg.renderOrder = 999;
+                this.group.add(this.bg);
+
+                // FG (Green)
+                const fgGeo = new THREE.PlaneGeometry(width, height);
+                const fgMat = new THREE.MeshBasicMaterial({ color: 0x00ff00, depthTest: false, transparent: true });
+                this.fg = new THREE.Mesh(fgGeo, fgMat);
+                this.fg.position.z = 0.01; // Front
+                this.fg.renderOrder = 1000;
+                this.group.add(this.fg);
+
+                // Ensure render order if depthTest issue (optional)
+            }
+
+            update(position, current, max) {
+                // Sync Position
+                this.group.position.copy(position);
+                this.group.position.y += this.yOffset;
+
+                const pct = Math.max(0, current / max);
+                this.fg.scale.x = pct;
+                this.fg.position.x = (pct - 1) * this.initialWidth / 2;
+
+                // Billboard (Screen Aligned)
+                if (window.camera) {
+                    this.group.quaternion.copy(window.camera.quaternion);
+                }
+            }
+
+            destroy() {
+                // Cleanup
+                if (this.group.parent) this.group.parent.remove(this.group);
+            }
+        }
+
+        // --- Enemy System ---
+        class Enemy {
+            constructor(manager, pos, config) {
+                this.manager = manager;
+                this.hp = config.hp;
+                this.damage = config.damage;
+                this.speed = config.speed;
+                this.attackRange = config.attackRange;
+                this.attackRate = config.attackRate;
+                this.color = config.color;
+
+                this.mesh = new THREE.Mesh(
+                    new THREE.BoxGeometry(0.8, 2.0, 0.8), // Taller (2.0 Height)
+                    new THREE.MeshLambertMaterial({ color: this.color })
+                );
+                this.mesh.position.copy(pos);
+                // Adjust Height visual center 
+                // Box is 2.0 High. Center should be +1.0 from ground.
+                this.mesh.position.y = 1.0;
+
+                this.mesh.castShadow = true;
+                manager.scene.add(this.mesh);
+
+                // Shadow
+                const shadowGeo = new THREE.CircleGeometry(0.6, 16);
+                const shadowMat = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.5 });
+                this.shadowMesh = new THREE.Mesh(shadowGeo, shadowMat);
+                this.shadowMesh.rotation.x = -Math.PI / 2;
+                this.shadowMesh.position.set(0, -0.98, 0); // Relative to mesh center (at 1.0). Shadow at 0.02.
+                // Actually easier to add to scene and track position, OR add to mesh and offset y.
+                // If added to mesh, if mesh rotates, shadow rotates (fine for circle).
+                this.mesh.add(this.shadowMesh);
+
+                this.attackTimer = 0;
+                this.isDead = false;
+                this.flashTimer = 0;
+                this.knockbackVel = new THREE.Vector3(); // [New]
+
+                // HP Bar
+                this.maxHP = this.hp;
+                this.hpBar = new HealthBar(this.manager.scene, 1.2); // Attached to scene, tracking mesh
+            }
+
+            takeDamage(amount, sourcePos) {
+                this.hp -= amount;
+                this.flashTimer = 0.1;
+
+                // Knockback Logic
+                if (sourcePos) {
+                    const dir = this.mesh.position.clone().sub(sourcePos).normalize();
+                    const force = amount * CONFIG.combat.knockbackBase;
+                    this.knockbackVel.add(dir.multiplyScalar(force));
+                }
+
+                if (this.hp <= 0) this.die();
+            }
+
+            die() {
+                this.isDead = true;
+                this.manager.scene.remove(this.mesh);
+                this.mesh.geometry.dispose();
+                this.mesh.material.dispose();
+                // Particles
+                for (let i = 0; i < 8; i++) {
+                    state.particles.push(new Particle(this.mesh.position, this.color));
+                }
+                // HP Bar Cleanup
+                if (this.hpBar) this.hpBar.destroy();
+            }
+
+            update(dt, playerPos) {
+                if (this.isDead) return;
+
+                // HP Bar
+                if (this.hpBar) this.hpBar.update(this.mesh.position, this.hp, this.maxHP);
+
+                // Flash Logic
+                if (this.flashTimer > 0) {
+                    this.flashTimer -= dt;
+                    this.mesh.material.emissive.setHex(this.flashTimer > 0 ? 0xffffff : 0x000000);
+                }
+
+                // Movement & Attack
+                const dist = this.mesh.position.distanceTo(playerPos);
+
+                // Knockback Physics
+                if (this.knockbackVel.lengthSq() > 0.001) {
+                    this.mesh.position.add(this.knockbackVel.clone().multiplyScalar(dt));
+                    this.knockbackVel.multiplyScalar(0.9); // Friction
+                }
+
+                if (dist > this.attackRange) {
+                    // Chase
+                    const dir = playerPos.clone().sub(this.mesh.position).normalize();
+                    dir.y = 0; // Keep flat
+                    this.mesh.position.add(dir.multiplyScalar(this.speed * dt));
+                    this.mesh.lookAt(playerPos);
+                } else {
+                    // Attack
+                    if (this.attackTimer <= 0) {
+                        this.performAttack(playerPos);
+                        this.attackTimer = this.attackRate;
+                    }
+                }
+                if (this.attackTimer > 0) this.attackTimer -= dt;
+            }
+
+            performAttack(targetPos) {
+                // Override
+            }
+        }
+
+        class MeleeEnemy extends Enemy {
+            constructor(manager, pos) {
+                super(manager, pos, CONFIG.enemy.melee);
+            }
+            performAttack(targetPos) {
+                // Visual Flash
+                const flash = new THREE.Mesh(
+                    new THREE.SphereGeometry(1.2, 8, 8),
+                    new THREE.MeshBasicMaterial({ color: 0xff0000, transparent: true, opacity: 0.5 })
+                );
+                flash.position.copy(this.mesh.position);
+                this.manager.scene.add(flash);
+                setTimeout(() => { this.manager.scene.remove(flash); flash.geometry.dispose(); flash.material.dispose(); }, 100);
+
+                // Check distance
+                if (this.mesh.position.distanceTo(targetPos) < this.attackRange * 1.5) {
+                    // Deal Damage
+                    window.floraInstance.takeDamage(this.damage);
+                }
+            }
+        }
+
+        class RangedEnemy extends Enemy {
+            constructor(manager, pos) {
+                super(manager, pos, CONFIG.enemy.ranged);
+            }
+            performAttack(targetPos) {
+                // Shoot Projectile
+                const dir = targetPos.clone().sub(this.mesh.position).normalize();
+
+                // Use Bullet class but with enemy flag
+                const stats = {
+                    damage: this.damage,
+                    penetration: 0 // Enemy bullets don't penetrate for now
+                };
+
+                const bullet = new Bullet('enemy', this.mesh.position.clone().add(new THREE.Vector3(0, 0.5, 0)),
+                    dir,
+                    CONFIG.enemy.ranged.projectileSpeed, 2.0, 0, 0.4, stats);
+
+                bullet.isEnemy = true;
+                bullet.mesh.material.color.setHex(0xff00ff);
+                state.bullets.push(bullet);
+            }
+        }
+
+        class TauntEnemy extends Enemy {
+            constructor(manager, pos) {
+                super(manager, pos, { hp: 600, damage: 0, speed: 2, attackRange: 0, attackRate: 0, color: 0x8800ff });
+                this.targetPos = pos.clone();
+                this.waitTime = 0;
+
+                // Bigger Visuals
+                this.mesh.scale.set(2.5, 2.5, 2.5);
+
+                // Adjust HP Bar Offset for Size
+                // Enemy default 1.2 is for height 2.0 (Top=2.0, Center=1.0. Offset from Ground=2.2)
+                // Boss Scale 2.5. Height 5.0. Top = 5.0 (since pivot at bottom? No, pivot center).
+                // Mesh pos is at Y=1.0. Geo height is 2.0.
+                // Wait, mesh.position.y = 1.0 means center is at 1.0. Top is at 1.0 + 1.0 = 2.0.
+                // If Scale 2.5, center is at 1.0. Top is 1.0 + 1.0*2.5 = 3.5.
+                // So we need offset > 3.5 - 1.0 = 2.5 relative to center?
+                // HP Bar update uses mesh.position (1.0).
+                // Need offset 3.0?
+                if (this.hpBar) {
+                    this.hpBar.yOffset = 4.0; // Higher for Boss
+                    // And maybe wider?
+                    // Recreate? Or update scale? 
+                    // Let's just update offset for now. Visual width is fine?
+                    // Actually 1.5 width on giant boss looks tiny.
+                    if (this.hpBar.destroy) this.hpBar.destroy();
+                    this.hpBar = new HealthBar(this.manager.scene, 4.0, 4.0, 0.4);
+                }
+            }
+
+            update(dt, playerPos) {
+                if (this.isDead) return;
+
+                // Flash
+                if (this.flashTimer > 0) {
+                    this.flashTimer -= dt;
+                    this.mesh.material.emissive.setHex(this.flashTimer > 0 ? 0xffffff : 0x000000);
+                }
+
+                // HP Bar
+                // HP Bar
+                if (this.hpBar) this.hpBar.update(this.mesh.position, this.hp, this.maxHP);
+
+                // Knockback
+                if (this.knockbackVel.lengthSq() > 0.001) {
+                    this.mesh.position.add(this.knockbackVel.clone().multiplyScalar(dt));
+                    this.knockbackVel.multiplyScalar(0.9);
+                }
+
+                // AI: Random Walk with Collision Check
+                if (this.waitTime > 0) {
+                    this.waitTime -= dt;
+                    return;
+                }
+
+                // If close to target, pick new one
+                const dist = this.mesh.position.distanceTo(this.targetPos);
+                if (dist < 1.0) {
+                    this.pickNewTarget();
+                } else {
+                    const dir = this.targetPos.clone().sub(this.mesh.position).normalize();
+                    const moveStep = dir.multiplyScalar(this.speed * dt);
+                    const nextPos = this.mesh.position.clone().add(moveStep);
+
+                    // Block Collision Check
+                    let hitBlock = false;
+                    if (state.levelManager) {
+                        // Simple Point vs AABB (inflated) check
+                        // Block radius ~2.5 (5x5 block). Boss Radius ~1.2 (Scale 2.5).
+                        // Safe margin ~4.0 check
+                        state.levelManager.blocks.forEach(b => {
+                            if (hitBlock) return;
+                            const dx = Math.abs(b.mesh.position.x - nextPos.x);
+                            const dz = Math.abs(b.mesh.position.z - nextPos.z);
+                            // Block is 5x5. Half=2.5. Boss Radius ~1.2.
+                            // Total Radius ~3.7. Let's use 4.0 margin.
+                            if (dx < 4.0 && dz < 4.0) {
+                                hitBlock = true;
+                            }
+                        });
+                    }
+
+                    if (hitBlock) {
+                        // Hit wall, immediately pick new target away from wall?
+                        // Just picking random might pick into wall again.
+                        // But for simplicity: Pick new target.
+                        this.pickNewTarget();
+                    } else {
+                        this.mesh.position.add(moveStep);
+                        this.mesh.lookAt(this.targetPos);
+                    }
+                }
+            }
+
+            pickNewTarget() {
+                const angle = Math.random() * Math.PI * 2;
+                const r = Math.random() * 20; // Wander area
+                this.targetPos.set(Math.sin(angle) * r, 1, Math.cos(angle) * r);
+                this.waitTime = 1.0 + Math.random() * 2.0;
+            }
+
+            die() {
+                super.die();
+                // VICTORY
+                const div = document.createElement('div');
+                div.style.position = 'absolute';
+                div.style.top = '50%';
+                div.style.left = '50%';
+                div.style.transform = 'translate(-50%, -50%)';
+                div.style.color = '#ffD700'; // Gold
+                div.style.fontSize = '100px';
+                div.style.fontFamily = 'Impact, sans-serif';
+                div.style.textShadow = '0 0 30px black';
+                div.style.zIndex = '9999';
+                div.innerText = 'VICTORY!';
+                document.body.appendChild(div);
+
+                state.spawnerEnabled = false;
+
+                // Kill all other enemies?
+                this.manager.killAll();
+            }
+        }
+
+        class EnemyManager {
+            constructor(scene) {
+                this.scene = scene;
+                this.enemies = [];
+                this.spawnTimer = 0;
+            }
+
+            update(dt, playerPos) {
+                // Spawning
+                if (state.spawnerEnabled) {
+                    this.spawnTimer += dt;
+                    if (this.spawnTimer >= CONFIG.enemy.spawnRate) {
+                        this.spawnTimer = 0;
+                        this.spawnEnemy(playerPos);
+                    }
+
+                    // [New] Spawn Boss once when spawner starts
+                    if (!this.bossSpawned) {
+                        this.bossSpawned = true;
+
+                        // Find Safe Spawn Position (Avoid Blocks)
+                        let spawnPos = new THREE.Vector3(0, 1, -10); // Try center-ish
+                        let safe = false;
+                        let attempts = 0;
+
+                        while (!safe && attempts < 10) {
+                            let hitBlock = false;
+                            if (state.levelManager) {
+                                state.levelManager.blocks.forEach(b => {
+                                    if (hitBlock) return;
+                                    const dx = Math.abs(b.mesh.position.x - spawnPos.x);
+                                    const dz = Math.abs(b.mesh.position.z - spawnPos.z);
+                                    if (dx < 4.0 && dz < 4.0) hitBlock = true;
+                                });
+                            }
+
+                            if (!hitBlock) {
+                                safe = true;
+                            } else {
+                                // Retry random
+                                const angle = Math.random() * Math.PI * 2;
+                                const r = 5 + Math.random() * 15;
+                                spawnPos.set(Math.sin(angle) * r, 1, Math.cos(angle) * r);
+                                attempts++;
+                            }
+                        }
+
+                        const boss = new TauntEnemy(this, spawnPos);
+                        this.enemies.push(boss);
+                    }
+                }
+
+                // [Old Boss Spawn removed from here]
+
+                // Update Enemies
+                this.enemies.forEach(e => e.update(dt, playerPos));
+                this.enemies = this.enemies.filter(e => !e.isDead);
+            }
+
+            spawnEnemy(playerPos) {
+                // Random position outside radius
+                const angle = Math.random() * Math.PI * 2;
+                const dist = 25 + Math.random() * 10;
+                const x = Math.sin(angle) * dist;
+                const z = Math.cos(angle) * dist;
+                const pos = new THREE.Vector3(x, 1, z); // Y=1
+
+                // Type
+                const isMelee = Math.random() < 0.6;
+                const enemy = isMelee ? new MeleeEnemy(this, pos) : new RangedEnemy(this, pos);
+                this.enemies.push(enemy);
+            }
+
+            killAll() {
+                this.enemies.forEach(e => e.die());
+                this.enemies = [];
+            }
+
+            checkCollisions(bullets) {
+                const box = new THREE.Box3();
+                bullets.forEach(b => {
+                    if (b.markedForDeletion || b.isEnemy) return; // Player bullets only
+                    if (b.damage <= 0) return;
+
+                    for (let e of this.enemies) {
+                        if (e.isDead) continue;
+
+                        // 2D Check (XZ Plane only for reliability)
+                        // Bullet Radius ~ 0.2-0.6, Enemy Radius ~ 0.5 (box is 0.8 width)
+                        // Let's use simple distance check
+                        const distSq = (e.mesh.position.x - b.mesh.position.x) ** 2 + (e.mesh.position.z - b.mesh.position.z) ** 2;
+                        const hitDist = 1.0 + b.size; // Generous hitbox
+
+                        if (distSq < hitDist * hitDist) {
+
+                            if (b.hitEntities.has(e.mesh.uuid)) continue;
+                            b.hitEntities.add(e.mesh.uuid);
+
+                            e.takeDamage(b.damage, b.mesh.position); // Pass bullet pos
+
+                            // Penetration Logic
+                            b.penetration--;
+                            if (b.penetration < 0) {
+                                b.markedForDeletion = true;
+                            }
+
+                            break;
+                        }
+                    }
+                });
+            }
+        }
+
         class Flora {
             constructor() {
                 this.mesh = new THREE.Group();
                 this.velocity = new THREE.Vector3();
+
+                this.hp = CONFIG.stats.playerHP;
+                this.maxHP = CONFIG.stats.playerHP;
+                this.isDead = false;
+                this.isDead = false;
+                this.damageFlashTimer = 0;
+
+                // Player HP Bar (Global UI or Floating?)
+                // Raising to 4.5 (approx +20px equivalent?) to avoid clipping
+                this.hpBar = new HealthBar(scene, 4.5, 2.0, 0.2); // Scene attached
+
 
                 // Combat State
                 // Combat State
@@ -807,6 +1504,39 @@
                 this.darkColorP4 = this.baseColorP4.clone().multiplyScalar(0.4);
 
                 scene.add(this.mesh);
+            }
+
+            takeDamage(amount) {
+                if (this.isDead) return;
+                this.hp -= amount;
+                this.damageFlashTimer = 0.2;
+
+                if (this.hp <= 0) {
+                    this.die();
+                }
+            }
+
+            die() {
+                this.isDead = true;
+                // Game Over Logic
+                alert("GAME OVER");
+                location.reload();
+            }
+
+            checkCollisions(bullets) {
+                if (this.isDead) return;
+
+                const pPos = this.mesh.position;
+                const hitRadius = 0.8;
+
+                bullets.forEach(b => {
+                    if (b.markedForDeletion || !b.isEnemy) return; // Only Enemy bullets hurt player
+
+                    if (b.mesh.position.distanceTo(pPos) < hitRadius) {
+                        b.markedForDeletion = true;
+                        this.takeDamage(b.damage || 10);
+                    }
+                });
             }
 
             buildModel() {
@@ -963,15 +1693,14 @@
             }
 
             shoot(type) {
-                // Removed static spawnPos capture
-
                 let speed, life, gravity, direction, size, config;
+                let stats = {};
 
                 // Direction capturing helper
                 const getDynamicDirection = () => this.getForwardVector();
 
                 // Helper to spawn one bullet
-                const spawnBullet = (bType, offsetTime = 0, useDynamicDir = false) => {
+                const spawnBullet = (bType, offsetTime = 0, useDynamicDir = false, recoilScale = 1.0) => {
                     setTimeout(() => {
                         // Recalculate spawn position DYNAMICALLY
                         const currentSpawnPos = new THREE.Vector3();
@@ -981,43 +1710,40 @@
                         // Recalculate direction if dynamic (for Quad)
                         const finalDir = useDynamicDir ? getDynamicDirection() : direction;
 
-                        const bullet = new Bullet(bType, currentSpawnPos, finalDir, speed, life, gravity, size);
+                        const bullet = new Bullet(bType, currentSpawnPos, finalDir, speed, life, gravity, size, stats);
                         state.bullets.push(bullet);
+
+                        // Recoil Application (Apply once per shot call? Or per bullet? Typically per shot event)
+                        // If burst, maybe small recoil each? Let's apply recoil here for each bullet fired.
+                        // Recoil Force
+                        const force = stats.recoil * CONFIG.combat.recoilForce * recoilScale;
+                        const recoilVec = finalDir.clone().normalize().multiplyScalar(-force);
+                        // Add to velocity directly
+                        this.velocity.add(recoilVec);
+
                     }, offsetTime * 1000);
                 };
 
                 // Spawn Shockwave Helper
-                const spawnShockwave = (waveConfig) => {
-                    // Create a visible shockwave ring/fan
-                    // For prototype: Just a yellow expanding ring particle
-
-
-                    // Animate in Main Loop or simple closure loop?
-                    // Let's make a specialized Particle for Shockwave later. 
-                    // For now, use existing Particle system just for burst visual?
-                    // Or just reusing Particle class implies small boxes. 
-                    // Let's create a temporary Shockwave logic inside the bullet or standalone?
-                    // Let's just spawn a bunch of particles in a fan shape.
+                const spawnShockwave = (waveConfig, damage) => {
                     // Shockwave Particles
                     const count = 20;
                     const angle = waveConfig.angle;
-                    const baseDir = this.getForwardVector(); // Note: baseDir is captured at call time (which is delayed for Burst)
+                    const baseDir = this.getForwardVector();
 
                     // Recalculate spawn position DYNAMICALLY
                     const currentSpawnPos = new THREE.Vector3();
                     this.mouth.getWorldPosition(currentSpawnPos);
                     currentSpawnPos.add(this.getForwardVector().multiplyScalar(0.5));
 
-                    // Radius = Speed * Life
-                    // Let's fix speed at 20 for "impact", so Life = Radius / 20
                     const waveSpeed = 20;
                     const waveLife = waveConfig.radius / waveSpeed;
 
+                    // Visuals
                     for (let i = 0; i < count; i++) {
                         const a = (i / count - 0.5) * angle;
                         const dir = baseDir.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), a);
 
-                        // Custom "Shockwave Particle"
                         state.particles.push({
                             life: waveLife, maxLife: waveLife,
                             mesh: (() => {
@@ -1037,6 +1763,56 @@
                             }
                         });
                     }
+
+                    // Damage Logic (Instant Cone Check)
+                    // We check for enemies within radius and angle
+                    if (state.enemyManager) {
+                        state.enemyManager.enemies.forEach(e => {
+                            if (e.isDead) return;
+
+                            // Distance Check
+                            const dx = e.mesh.position.x - currentSpawnPos.x;
+                            const dz = e.mesh.position.z - currentSpawnPos.z;
+                            const distSq = dx * dx + dz * dz;
+
+                            if (distSq < waveConfig.radius * waveConfig.radius) {
+                                // Angle Check
+                                const toEnemy = new THREE.Vector3(dx, 0, dz).normalize();
+                                const dot = toEnemy.dot(baseDir); // Dot Product
+                                const threshold = Math.cos(angle / 2); // Threshold for half-angle
+
+                                if (dot > threshold) {
+                                    // Shockwave Damage + Knockback (from spawn center)
+                                    // Use configured damage
+                                    e.takeDamage(waveConfig.damage || damage, currentSpawnPos);
+                                }
+                            }
+                        });
+                    }
+
+                    // Damage Logic for Blocks (Optional: low damage to blocks? Or full?)
+                    // Let's apply damage to blocks too for consistency
+                    if (state.levelManager) {
+                        state.levelManager.blocks.forEach(b => {
+                            if (b.isDead) return;
+                            const dx = b.mesh.position.x - currentSpawnPos.x;
+                            const dz = b.mesh.position.z - currentSpawnPos.z;
+                            const distSq = dx * dx + dz * dz;
+                            if (distSq < waveConfig.radius * waveConfig.radius) {
+                                const toBlock = new THREE.Vector3(dx, 0, dz).normalize();
+                                const dot = toBlock.dot(baseDir);
+                                if (dot > Math.cos(angle / 2)) {
+                                    b.hp -= damage;
+                                    b.flashTimer = 0.1;
+                                    if (b.hp <= 0) {
+                                        b.isDead = true;
+                                        scene.remove(b.mesh);
+                                        b.mesh.geometry.dispose(); b.mesh.material.dispose();
+                                    }
+                                }
+                            }
+                        });
+                    }
                 };
 
                 if (type === 'quad') {
@@ -1045,15 +1821,18 @@
                     life = config.life;
                     gravity = config.gravity;
                     size = config.size;
-                    direction = this.getForwardVector(); // Fallback initial dir
+                    stats = { damage: config.damage, penetration: config.penetration, recoil: config.recoil };
+                    direction = this.getForwardVector();
 
-                    // Burst Fire - Dynamic Direction
+                    // Burst Fire 
                     for (let i = 0; i < config.burstCount; i++) {
-                        spawnBullet('quad', i * config.burstInterval, true); // Use dynamic dir
+                        // Recoil Decay: 100%, 50%, 25%...
+                        const decay = Math.pow(0.5, i);
+                        spawnBullet('quad', i * config.burstInterval, true, decay);
                     }
                     // Shockwave x3
                     for (let i = 0; i < 3; i++) {
-                        setTimeout(() => spawnShockwave(config.shockwave), i * config.burstInterval * 1000);
+                        setTimeout(() => spawnShockwave(config.shockwave, config.damage), i * config.burstInterval * 1000);
                     }
                 } else if (type === 'trio') {
                     config = CONFIG.bullet.trio;
@@ -1061,34 +1840,45 @@
                     life = config.life;
                     gravity = config.gravity;
                     size = config.size;
+                    stats = { damage: config.damage, penetration: config.penetration, recoil: config.recoil };
                     direction = this.getForwardVector();
 
                     spawnBullet('trio');
-                    spawnShockwave(config.shockwave);
+                    spawnShockwave(config.shockwave, config.damage);
                 } else if (type === 'duo') {
-                    config = CONFIG.bullet.duo;
+                    // Check Mode
+                    if (state.mode === 'quad') {
+                        config = CONFIG.bullet.ultraDuo; // Stronger
+                    } else {
+                        config = CONFIG.bullet.duo;
+                    }
                     speed = config.speed;
                     life = config.life;
                     gravity = config.gravity;
                     size = config.size;
+                    stats = { damage: config.damage, penetration: config.penetration, recoil: config.recoil };
                     direction = this.getForwardVector();
                     spawnBullet('duo');
                 } else {
                     // Single
-                    config = CONFIG.bullet.single;
-                    speed = CONFIG.bullet.single.speedMin + Math.random() * (CONFIG.bullet.single.speedMax - CONFIG.bullet.single.speedMin);
-                    life = CONFIG.bullet.single.lifeMin + Math.random() * (CONFIG.bullet.single.lifeMax - CONFIG.bullet.single.lifeMin);
+                    if (state.mode === 'quad') {
+                        config = CONFIG.bullet.ultraSingle; // Stronger
+                    } else {
+                        config = CONFIG.bullet.single;
+                    }
+
+                    speed = config.speedMin + Math.random() * (config.speedMax - config.speedMin);
+                    life = config.lifeMin + Math.random() * (config.lifeMax - config.lifeMin);
                     gravity = config.gravity;
                     size = config.size;
+                    stats = { damage: config.damage, penetration: config.penetration, recoil: config.recoil };
 
                     // Spread
-                    const spread = (Math.random() - 0.5) * CONFIG.bullet.single.spread;
+                    const spread = (Math.random() - 0.5) * config.spread;
                     direction = this.getForwardVector().applyAxisAngle(new THREE.Vector3(0, 1, 0), spread);
 
-                    spawnBullet(type); // type is 'p1', 'p2' etc
+                    spawnBullet(type);
                 }
-
-
             }
 
             activateCombo() {
@@ -1126,6 +1916,24 @@
             }
 
             update(dt) {
+                // HP Bar
+                if (this.hpBar) this.hpBar.update(this.mesh.position, this.hp, this.maxHP);
+
+                // Damage Flash
+                if (this.damageFlashTimer > 0) {
+                    this.damageFlashTimer -= dt;
+                    if (this.damageFlashTimer <= 0) {
+                        // Restore colors
+                        this.updateVisibility(); // Reset to base/dark colors (hacky but works)
+                        // Actually we need to force reset materials in loop
+                    } else {
+                        // Flash Red
+                        this.p1HeadPart.material.color.setHex(0xff0000);
+                        this.p2HeadPart.material.color.setHex(0xff0000);
+                        // ...
+                    }
+                }
+
                 // --- Combo Skill State ---
                 if (state.comboActive) {
                     this.comboTimer -= dt;
@@ -1142,6 +1950,7 @@
                         if (this.comboTimer <= 0) {
                             // Transition to Active
                             this.comboState = 'active';
+                            this.comboDotTimer = 0; // [New] Init DoT Timer
 
                             // Get config again
                             const config = CONFIG.combo[state.mode];
@@ -1161,6 +1970,53 @@
                         const config = CONFIG.combo[state.mode];
                         // Update All Active Vines
                         this.vines.forEach(v => v.update(dt, true));
+
+                        // Combo Damage Logic (AoE DoT)
+                        // Accumulate Timer
+                        if (!this.comboDotTimer) this.comboDotTimer = 0;
+                        this.comboDotTimer += dt;
+
+                        if (this.comboDotTimer > CONFIG.combo.dotInterval) {
+                            this.comboDotTimer = 0; // Reset
+
+                            // Apply Tick Damage
+                            const damage = CONFIG.combo.dotDamage;
+
+                            // Enemies
+                            if (state.enemyManager) {
+                                state.enemyManager.enemies.forEach(e => {
+                                    if (e.isDead) return;
+                                    // 2D Distance Check (XZ Plane) + Hit Margin
+                                    const dx = e.mesh.position.x - this.mesh.position.x;
+                                    const dz = e.mesh.position.z - this.mesh.position.z;
+                                    const dist = Math.sqrt(dx * dx + dz * dz);
+
+                                    if (dist < config.radius + 1.0) { // +1.0 for Enemy Radius overlap
+                                        e.takeDamage(damage);
+                                    }
+                                });
+                            }
+
+                            // Blocks
+                            if (state.levelManager) {
+                                state.levelManager.blocks.forEach(b => {
+                                    if (b.isDead) return;
+                                    const dx = b.mesh.position.x - this.mesh.position.x;
+                                    const dz = b.mesh.position.z - this.mesh.position.z;
+                                    const dist = Math.sqrt(dx * dx + dz * dz);
+
+                                    if (dist < config.radius + 2.0) { // +2.0 for Block Size overlap
+                                        b.hp -= damage;
+                                        b.flashTimer = 0.1;
+                                        if (b.hp <= 0) {
+                                            b.isDead = true;
+                                            scene.remove(b.mesh);
+                                            b.mesh.geometry.dispose(); b.mesh.material.dispose();
+                                        }
+                                    }
+                                });
+                            }
+                        }
 
                         const remain = this.comboTimer / config.activeDuration;
                         this.comboRing.material.opacity = remain * 0.8;
@@ -1206,17 +2062,51 @@
                 state.rhythmTime = (state.rhythmTime + (dt / cycleTime)) % 1.0;
 
                 // Sound Triggers
-                if (prevRhythm < 0.5 && state.rhythmTime >= 0.5) SoundSystem.playKick();
+                if (prevRhythm < 0.5 && state.rhythmTime >= 0.5) {
+                    SoundSystem.playOpenHiHat();
+                    // Character Bounce (Visual Beat)
+                    this.pulseScale = 1.15; // Jump to 1.15x
+                }
                 if (state.rhythmTime < prevRhythm) SoundSystem.playHiHat();
 
                 const cursor = document.getElementById('rhythm-cursor');
                 const target = document.getElementById('rhythm-target');
                 cursor.style.left = (state.rhythmTime * 100) + '%';
-                const distToCenter = Math.abs(state.rhythmTime - 0.5);
-                if (distToCenter < 0.05) {
-                    target.style.transform = 'scale(1.3)';
+
+                // Dynamic Target Size based on Window
+                const currentWindow = (state.mode === 'quad') ? CONFIG.combat.quadWindow : CONFIG.combat.duoWindow;
+                const windowFraction = currentWindow / cycleTime; // e.g. 0.35 / 2.0 = 0.175
+
+                // Visual Circle Size:
+                // Range is +/- window/2. Total width = window.
+                // Circle Diameter should represent the full window width relative to the timeline?
+                // User said: "Circle intersection points = tolerance range". 
+                // Line is 0..1. Center 0.5. Tolerance +/- w/2.
+                // Intersection points are (0.5 - w/2) and (0.5 + w/2).
+                // Distance between them is w.
+                // So Circle Width should be w.
+                const percentWidth = windowFraction * 100;
+                target.style.width = percentWidth + '%';
+                // Keep aspect ratio 1:1 using calculated pixel width relative to container or just use aspect-ratio css if supported
+                // Since container is 500px, height needs to match.
+                // Let's just use CSS 'aspect-ratio: 1'.
+                // Update: Inline style for width, ensure CSS has aspect-ratio or handle height.
+                // Simple hack: set height to 'auto' and use aspect-ratio in CSS, or calculate px.
+                // Let's rely on CSS update in next step for aspect-ratio, or set height here if possible? 
+                // Easier: target.style.height/width in px.
+                const containerWidth = document.getElementById('rhythm-helper').clientWidth;
+                const pxSize = containerWidth * windowFraction;
+                target.style.width = pxSize + 'px';
+                target.style.height = pxSize + 'px';
+
+                // Color Feedback
+                const distToCenter = Math.abs(state.rhythmTime - 0.5) * cycleTime;
+                if (distToCenter <= currentWindow / 2) {
+                    target.style.border = '2px solid #ffff00'; // Yellow when in zone
+                    target.style.transform = 'scale(1.1)';
                     cursor.style.backgroundColor = '#ffff00';
                 } else {
+                    target.style.border = '2px solid white';
                     target.style.transform = 'scale(1)';
                     cursor.style.backgroundColor = 'white';
                 }
@@ -1256,7 +2146,8 @@
 
                         // Rhythm Check
                         const timeDiff = Math.abs(state.rhythmTime - 0.5) * cycleTime;
-                        this.rhythmBonus[p] = timeDiff <= (CONFIG.combat.duoWindow / 2);
+                        const validWindow = (state.mode === 'quad') ? CONFIG.combat.quadWindow : CONFIG.combat.duoWindow;
+                        this.rhythmBonus[p] = timeDiff <= (validWindow / 2);
 
                         console.log(`${p.toUpperCase()} Rhythm: ${this.rhythmBonus[p]}`);
 
@@ -1384,31 +2275,64 @@
 
                 // 5. Movement Physics
                 let totalInput = new THREE.Vector3();
+                let totalRotationInput = new THREE.Vector3(); // [New] Separate rotation
+                const activeDirs = []; // Track directions for Synergy Boost
 
                 players.forEach(p => {
                     const moveInput = state.input[p].move;
-                    const canMove = moveInput.lengthSq() > 0.01 && !state.input[p].charge;
+                    const hasInput = moveInput.lengthSq() > 0.01;
+                    const isCharging = state.input[p].charge;
+                    // [New] Is Attacking? (Windup or Cooldown)
+                    const isAttacking = this.isWindup[p] || this.cooldowns[p] > 0.05; // Small buffer for cooldown? Or just > 0.
+                    // User said "Start of windup to end of cooldown".
+                    // Windup sets isWindup=true. Cooldown sets cooldown>0. 
+                    // Note: Cooldown starts exactly when Windup ends (in shoot()).
+                    // So (isWindup || cooldown > 0) covers the whole period.
 
-                    // Arrow Visibility
+                    // Arrow Visualization
                     const arrowMap = { p1: this.p1Arrow, p2: this.p2Arrow, p3: this.p3Arrow, p4: this.p4Arrow };
                     const arrow = arrowMap[p];
 
-                    if (canMove) {
-                        const dir = new THREE.Vector3(moveInput.x, 0, moveInput.y).normalize();
+                    if (hasInput && !isCharging) {
+                        const inputVec = new THREE.Vector3(moveInput.x, 0, moveInput.y);
+                        const dir = inputVec.clone().normalize();
+
+                        // 1. Rotation: Always allowed if not charging
+                        totalRotationInput.add(inputVec);
+
+                        // 2. Movement: Allowed only if NOT Attacking
+                        if (!isAttacking) {
+                            totalInput.add(inputVec);
+                            activeDirs.push(dir); // Store for check
+                        }
+
+                        // Arrow shows Input Direction (Rotation intent)
                         arrow.visible = true;
                         arrow.position.copy(this.mesh.position);
                         arrow.setDirection(dir);
-
-                        // Add to Total
-                        totalInput.add(new THREE.Vector3(moveInput.x, 0, moveInput.y));
                     } else {
                         arrow.visible = false;
                     }
                 });
 
+                // Check Synergy Boost (Any pair < 45 degrees)
+                let speedMult = 1.0;
+                if (activeDirs.length >= 2) {
+                    for (let i = 0; i < activeDirs.length; i++) {
+                        for (let j = i + 1; j < activeDirs.length; j++) {
+                            const dot = activeDirs[i].dot(activeDirs[j]);
+                            if (dot > 0.707) { // cos(45) ~ 0.707
+                                speedMult = 1.5; // 50% Boost
+                                break;
+                            }
+                        }
+                        if (speedMult > 1.0) break;
+                    }
+                }
+
                 const targetVel = new THREE.Vector3();
                 if (totalInput.lengthSq() > 0.001) {
-                    totalInput.normalize().multiplyScalar(CONFIG.movement.maxSpeed);
+                    totalInput.normalize().multiplyScalar(CONFIG.movement.maxSpeed * speedMult);
                     if (state.comboActive && this.comboState === 'active') {
                         totalInput.multiplyScalar(CONFIG.combo.moveSpeedFactor);
                     }
@@ -1422,7 +2346,13 @@
 
                 if (dist > 0.001) {
                     const isMoving = targetVel.lengthSq() > 0.001;
-                    const changeRate = isMoving ? CONFIG.movement.acceleration : CONFIG.movement.friction;
+                    let changeRate = isMoving ? CONFIG.movement.acceleration : CONFIG.movement.friction;
+
+                    // Smart Braking / Turning (Fix for weak excessive sliding against recoil)
+                    // If we are inputting movement roughly opposite to current velocity, use Friction (Stronger)
+                    if (isMoving && currentVel.dot(targetVel) < 0) {
+                        changeRate = CONFIG.movement.friction + 20; // Extra grip for turning
+                    }
                     const step = changeRate * dt;
                     if (dist < step) currentVel.copy(targetVel);
                     else currentVel.add(diff.normalize().multiplyScalar(step));
@@ -1430,9 +2360,65 @@
 
                 this.mesh.position.add(currentVel.clone().multiplyScalar(dt));
 
-                // Rotation
-                if (currentVel.lengthSq() > 0.1) {
-                    const targetAngle = Math.atan2(currentVel.x, currentVel.z);
+                // Player-Block Collision
+                // Simple Circle-Box or Box-Box resolution
+                // Player radius ~ 0.8
+                if (state.levelManager) {
+                    const pRadius = 0.8;
+                    const pPos = this.mesh.position;
+
+                    state.levelManager.blocks.forEach(b => {
+                        if (b.isDead) return;
+
+                        // AABB check first?
+                        // Box Center logic
+                        // b.mesh.position is center.
+                        // b.mesh.geometry.parameters.width/height/depth
+                        const width = b.mesh.geometry.parameters.width;
+                        const depth = b.mesh.geometry.parameters.depth;
+
+                        const minX = b.mesh.position.x - width / 2 - pRadius;
+                        const maxX = b.mesh.position.x + width / 2 + pRadius;
+                        const minZ = b.mesh.position.z - depth / 2 - pRadius;
+                        const maxZ = b.mesh.position.z + depth / 2 + pRadius;
+
+                        if (pPos.x > minX && pPos.x < maxX && pPos.z > minZ && pPos.z < maxZ) {
+                            // Inside expanded bounds. Resolve.
+                            // Find closest point on box clamp
+                            const clampX = Math.max(b.mesh.position.x - width / 2, Math.min(pPos.x, b.mesh.position.x + width / 2));
+                            const clampZ = Math.max(b.mesh.position.z - depth / 2, Math.min(pPos.z, b.mesh.position.z + depth / 2));
+
+                            const diffX = pPos.x - clampX;
+                            const diffZ = pPos.z - clampZ;
+                            const distSq = diffX * diffX + diffZ * diffZ;
+
+                            // Check against radius squared (allow small overlap for smooth sliding?)
+                            if (distSq < pRadius * pRadius && distSq > 0.0001) {
+                                const dist = Math.sqrt(distSq);
+                                const pen = pRadius - dist;
+                                const normalX = diffX / dist;
+                                const normalZ = diffZ / dist;
+
+                                // Push out
+                                this.mesh.position.x += normalX * pen;
+                                this.mesh.position.z += normalZ * pen;
+
+                                // Kill velocity in normal direction?
+                                // const vDot = this.velocity.x * normalX + this.velocity.z * normalZ;
+                                // if (vDot < 0) {
+                                //    this.velocity.x -= normalX * vDot;
+                                //    this.velocity.z -= normalZ * vDot;
+                                // }
+                            }
+                        }
+                    });
+                }
+
+                // Rotation - FIXED
+                // Rotate towards INPUT Direction (totalRotationInput), ignore recoil velocity
+                // If no input, keep current rotation
+                if (totalRotationInput.lengthSq() > 0.01) {
+                    const targetAngle = Math.atan2(totalRotationInput.x, totalRotationInput.z);
                     const currentAngle = this.mesh.rotation.y;
                     let deltaAngle = targetAngle - currentAngle;
                     while (deltaAngle > Math.PI) deltaAngle -= Math.PI * 2;
@@ -1447,6 +2433,14 @@
                 camera.position.z = this.mesh.position.z + 10;
                 camera.lookAt(this.mesh.position);
                 if (this.comboGroup) this.comboGroup.position.copy(this.mesh.position);
+
+                // Scale Decay Logic (Beat Bounce) - Global
+                if (!this.pulseScale) this.pulseScale = 1.0;
+                if (this.pulseScale > 1.0) {
+                    this.pulseScale -= (this.pulseScale - 1.0) * 10.0 * dt; // Decay speed
+                    if (this.pulseScale < 1.0) this.pulseScale = 1.0;
+                }
+                this.mesh.scale.set(this.pulseScale, this.pulseScale, this.pulseScale);
 
             }
         }
@@ -1610,6 +2604,22 @@
             state.setMode(newMode);
         });
 
+        // Spawner Toggle
+        const spawnerBtn = document.getElementById('spawner-toggle');
+        spawnerBtn.addEventListener('click', () => {
+            state.spawnerEnabled = !state.spawnerEnabled;
+            spawnerBtn.innerText = state.spawnerEnabled ? "Enemy Spawner: ON" : "Enemy Spawner: OFF";
+            spawnerBtn.style.backgroundColor = state.spawnerEnabled ? "#aa4444" : "#44aa44";
+
+            if (!state.spawnerEnabled) {
+                if (state.enemyManager) state.enemyManager.killAll();
+            }
+        });
+
+        // Initialize Systems
+        state.levelManager = new LevelManager(scene);
+        state.enemyManager = new EnemyManager(scene);
+
         setupInputs();
 
         function animate(time) {
@@ -1618,8 +2628,20 @@
             const dt = Math.min((time - state.lastTime) / 1000, 0.1);
             state.lastTime = time;
 
-            flora.update(dt); // Flora update moved to before input polling
+            flora.update(dt);
+            flora.checkCollisions(state.bullets); // Player check logic
+
             state.pollInputs();
+            // Update Systems
+            if (state.levelManager) {
+                state.levelManager.update(dt);
+                state.levelManager.checkCollisions(state.bullets);
+            }
+            if (state.enemyManager) {
+                state.enemyManager.update(dt, flora.mesh.position);
+                state.enemyManager.checkCollisions(state.bullets);
+            }
+
             // Update Bullets
             updateBullets(dt);
 
