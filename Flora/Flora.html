@@ -332,7 +332,7 @@
                     recoil: 1.5,
                     knockback: 14,        // [New] Bullet Knockback
                     shockwave: {
-                        radius: 4,
+                        radius: 5,
                         angle: Math.PI / 0.5,
                         damage: 6,
                         knockback: 30    // [New] Shockwave Knockback
@@ -348,7 +348,7 @@
                     recoil: 1.6,
                     knockback: 18,       // [New] Bullet Knockback
                     shockwave: {
-                        radius: 5.5,
+                        radius: 6.5,
                         angle: Math.PI / 0.5,
                         damage: 6,
                         knockback: 33    // [New] Shockwave Knockback
@@ -366,7 +366,7 @@
                     recoil: 1.6,
                     knockback: 18,       // [New] Bullet Knockback
                     shockwave: {
-                        radius: 7,
+                        radius: 7.5,
                         angle: Math.PI / 0.5,
                         damage: 6,
                         knockback: 36    // [New] Shockwave Knockback
@@ -2059,29 +2059,39 @@
                     const waveLife = waveConfig.radius / waveSpeed;
 
                     // Visuals
-                    for (let i = 0; i < count; i++) {
-                        const a = (i / count - 0.5) * angle;
-                        const dir = baseDir.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), a);
+                    // Visuals: Expanding Ring
+                    const ringGeo = new THREE.RingGeometry(0.8, 1.0, 32); // Thick ring
+                    const ringMat = new THREE.MeshBasicMaterial({
+                        color: 0xffff00,
+                        side: THREE.DoubleSide,
+                        transparent: true,
+                        opacity: 0.8
+                    });
+                    const waveMesh = new THREE.Mesh(ringGeo, ringMat);
+                    waveMesh.position.copy(currentSpawnPos);
+                    waveMesh.rotation.x = -Math.PI / 2; // Flat
+                    scene.add(waveMesh);
 
-                        state.particles.push({
-                            life: waveLife, maxLife: waveLife,
-                            mesh: (() => {
-                                const m = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.1, 0.5), new THREE.MeshBasicMaterial({ color: 0xffff00 }));
-                                m.position.copy(currentSpawnPos);
-                                scene.add(m);
-                                return m;
-                            })(),
-                            velocity: dir.multiplyScalar(waveSpeed),
-                            update: function (dt) {
-                                this.life -= dt;
-                                this.mesh.position.add(this.velocity.clone().multiplyScalar(dt));
-                                const s = this.life / this.maxLife;
-                                this.mesh.scale.set(s, s, s);
-                                if (this.life <= 0) { scene.remove(this.mesh); return false; }
-                                return true;
+                    state.particles.push({
+                        mesh: waveMesh,
+                        life: 0.3,
+                        maxLife: 0.3,
+                        targetScale: waveConfig.radius, // Base radius is 1.0 (outer), so scale to target
+                        update: function (dt) {
+                            this.life -= dt;
+                            if (this.life <= 0) {
+                                scene.remove(this.mesh);
+                                this.mesh.geometry.dispose();
+                                this.mesh.material.dispose();
+                                return false;
                             }
-                        });
-                    }
+                            const p = 1 - (this.life / this.maxLife);
+                            const currentScale = 0.5 + (this.targetScale - 0.5) * p; // Start at 0.5 radius
+                            this.mesh.scale.set(currentScale, currentScale, currentScale);
+                            this.mesh.material.opacity = 0.8 * (1 - p);
+                            return true;
+                        }
+                    });
 
                     // Damage Logic (Instant Cone Check)
                     // We check for enemies within radius and angle
@@ -2416,13 +2426,15 @@
                 // Let's rely on CSS update in next step for aspect-ratio, or set height here if possible? 
                 // Easier: target.style.height/width in px.
                 const containerWidth = document.getElementById('rhythm-helper').clientWidth;
-                const pxSize = containerWidth * windowFraction;
+                // Visual Circle Size Adjustment (0.7x to match strict feel)
+                const visualScale = 0.7;
+                const pxSize = containerWidth * windowFraction * visualScale;
                 target.style.width = pxSize + 'px';
                 target.style.height = pxSize + 'px';
 
-                // Color Feedback
+                // Color Feedback (Visual Only - Matches Visual Size)
                 const distToCenter = Math.abs(state.rhythmTime - 0.5) * cycleTime;
-                if (distToCenter <= currentWindow / 2) {
+                if (distToCenter <= (currentWindow * visualScale) / 2) {
                     target.style.border = '2px solid #ffff00'; // Yellow when in zone
                     target.style.transform = 'scale(1.1)';
                     cursor.style.backgroundColor = '#ffff00';
