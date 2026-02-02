@@ -87,7 +87,8 @@
             /* Ensure children absolute positioning works */
         }
 
-        #wind-marker {
+        #wind-marker,
+        #wind-marker-max {
             position: absolute;
             top: 0;
             left: 0%;
@@ -150,6 +151,7 @@
     <div id="wind-container-central">
         <div id="wind-bar"></div>
         <div id="wind-marker"></div>
+        <div id="wind-marker-max"></div>
         <div id="wind-text">WIND: 0</div>
     </div>
 
@@ -172,23 +174,36 @@
         const CONFIG = {
             // 一般數值
             stats: {
-                playerHP: 200,          // 玩家生命值
+                playerHP: 240,          // 玩家生命值
                 structureHPBase: 0.5    // 建築物基礎生命值
             },
 
             // 風力與飛行設定
             wind: {
                 max: 100,
-                threshold: 70,       // 飛行閾值
-                decayRate: 9.0,      // 每秒扣除風力
-                gainPerAttack: 4,  // 每次攻擊獲得風力 (需要調整)
+                // Split by mode
+                duo: {
+                    flightMin: 38,       // [New] 飛行區間下限
+                    flightMax: 62,       // [New] 飛行區間上限
+                    decayRate: 7,        // 每秒扣除風力
+                    gainPerAttack: 4.5,  // 每次攻擊獲得風力
+                    damagePenalty: 0.6,  // [New] 受傷扣除風力倍率 (Damage * 3.0)
+                },
+                quad: {
+                    flightMin: 33,       // Default (or different)
+                    flightMax: 66,
+                    decayRate: 7,
+                    gainPerAttack: 2.8,
+                    damagePenalty: 0.9,  // [New] 受傷扣除風力倍率 (Damage * 4.5)
+                }
             },
 
             // 飛行參數 (與地面區分)
             flight: {
-                height: 5,          // 飛行時高度 (Config specified)
-                heightGround: 0.5,    // 地面高度
-                smoothSpeed: 2.5,     // 高度切換平滑度
+                height: 5,          // 飛行時高度
+                heightGround: 0.5,  // 地面高度
+                transitionTime: 2.0, // [New] 起飛/降落時間 (秒)
+                bufferTime: 0.5,     // [New] Buffer time for exiting flight
             },
 
             // 敵人設定
@@ -200,7 +215,7 @@
 
                 // 敵人種類數值
                 melee: {
-                    hp: 24, damage: 4, speed: 3, attackRange: 2.0, attackRate: 1.0,
+                    hp: 24, damage: 5, speed: 3, attackRange: 2.0, attackRate: 1.0,
                     color: 0xff4444, spawnWeight: 52
                 },
                 ranged: {
@@ -208,51 +223,58 @@
                     projectileSpeed: 15, color: 0xaa44ff, spawnWeight: 26
                 },
                 ninja: {
-                    hp: 9, damage: 8, speed: 4.0, attackRange: 2.5, attackRate: 2.0,
+                    hp: 9, damage: 7, speed: 4.0, attackRange: 2.5, attackRate: 2.0,
                     teleportDist: 8, warningTime: 1.0, color: 0x222222, spawnWeight: 18
                 },
                 boss: {
-                    hp: 600, damage: 25, speed: 2.0, attackRange: 4.0,
-                    spawnDelay: 15.0, color: 0x8800ff
+                    hp: 600, damage: 8, speed: 0, attackRange: 15.0,  // Increased range for shooting
+                    spawnDelay: 15.0, color: 0x8800ff,
+                    projectileSpeed: 15.0 // [New]
                 }
+            },
+
+            // UI設定 [New]
+            ui: {
+                windBottom: '25%',   // 風力計底部距離
+                pulseBottom: '20%'    // 節奏計底部距離
             },
 
             // 移動參數 (地面/飛行拆分)
             movement: {
                 ground: {
-                    maxSpeed: 5,
+                    maxSpeed: 4.5,
                     acceleration: 30,
                     friction: 80,
                     rotationSpeed: 4,
                 },
                 flight: {
-                    maxSpeed: 9,       // 飛行時更快? 或不同? User didn't specify exact nums, assume diff config possible
-                    acceleration: 20,
-                    friction: 15,        // 飛行慣性大 (摩擦小)
+                    maxSpeed: 9.5,       // 飛行時更快? 或不同? User didn't specify exact nums, assume diff config possible
+                    acceleration: 15,
+                    friction: 10,        // 飛行慣性大 (摩擦小)
                     rotationSpeed: 3,
                 }
             },
 
             // 戰鬥參數 (Ptero專用)
             combat: {
-                cooldown: 0.5,          // 攻擊冷卻時間
+                cooldown: 0.6,          // 攻擊冷卻時間
                 swingSpeed: 0.15,       // 翅膀揮動速度 (秒)
                 movementLockDuration: 0.2, // [New] 攻擊時鎖定移動的時間
                 propulsion: {      // [New] 普攻推進 (距離/時間)
                     ground: { force: 0, duration: 0.2 },
-                    flight: { force: 2.2, duration: 0.4 } // Adjusted defaults for smoother feel
+                    flight: { force: 2.2, duration: 0.6 } // Adjusted defaults for smoother feel
                 },
 
                 // 2P 模式 (左/右翅膀)
                 duo: {
                     damage: 15,
-                    range: 5.0,
+                    range: 3.5,
                     angle: 140,
                     // Flight override
                     flight: {
                         damage: 25,     // 飛行傷害
-                        range: 6.0,
-                        angle: 160,
+                        range: 7.0,
+                        angle: 150,
                         knockback: 5.0
                     }
                 },
@@ -260,12 +282,12 @@
                 // 4P 模式 (四方位)
                 quad: {
                     damage: 12,
-                    range: 5,
+                    range: 4,
                     angle: 140,
                     flight: {
                         damage: 20,
                         range: 8.0,
-                        angle: 160,
+                        angle: 150,
                         knockback: 5.0
                     }
                 },
@@ -475,6 +497,37 @@
                 scene.remove(this.mesh);
                 this.mesh.geometry.dispose();
                 this.mesh.material.dispose();
+            }
+        }
+
+        class HomingBullet extends Bullet {
+            constructor(owner, position, target, speed, life, damage) {
+                // Gravity 0, Size 0.6 (larger)
+                super(owner, position, new THREE.Vector3(0, 0, 1), speed, life, 0, 0.6, { damage: damage });
+                this.target = target;
+                this.ignoreFlight = true; // [New] Hits flying players
+                this.turnSpeed = 8.0; // [Tuned] Increased from 2.0 to 8.0 for tighter tracking
+                this.mesh.material.color.setHex(0xff0000); // Red
+
+                // Set initial velocity towards target if possible
+                if (target) {
+                    const dir = target.mesh.position.clone().sub(position).normalize();
+                    this.velocity = dir.multiplyScalar(speed);
+                }
+            }
+
+            update(dt) {
+                if (this.target && !this.target.isDead) {
+                    // Steer towards target
+                    const desiredDir = this.target.mesh.position.clone().sub(this.mesh.position).normalize();
+                    const currentDir = this.velocity.clone().normalize();
+
+                    // Simple Lerp of direction
+                    const newDir = new THREE.Vector3().lerpVectors(currentDir, desiredDir, this.turnSpeed * dt).normalize();
+                    this.velocity = newDir.multiplyScalar(this.velocity.length());
+                }
+
+                super.update(dt);
             }
         }
 
@@ -1126,10 +1179,66 @@
                     if (this.hpBar.destroy) this.hpBar.destroy();
                     this.hpBar = new HealthBar(this.manager.scene, 4.0, 4.0, 0.4);
                 }
+
+                this.shootTimer = 0; // [New]
+
+                // [New] Visualize Attack Range
+                const range = CONFIG.enemy.boss.attackRange;
+                const rangeGeo = new THREE.RingGeometry(range - 0.2, range, 64);
+                rangeGeo.rotateX(-Math.PI / 2); // Flat on ground
+                const rangeMat = new THREE.MeshBasicMaterial({
+                    color: 0xff0000,
+                    transparent: true,
+                    opacity: 0.3,
+                    side: THREE.DoubleSide
+                });
+                this.rangeMesh = new THREE.Mesh(rangeGeo, rangeMat);
+                // Adjust Y so it doesn't z-fight with ground, but boss is scaled 2.5, so adding to mesh children scales it too?
+                // If I add to `this.mesh`, it inherits scale (2.5). 
+                // So if range is 15.0, geometry needs to be 15.0 / 2.5 = 6.0 in local space.
+                // Or better: Add to SCENE and follow boss.
+                // ADDING TO SCENE IS SAFER for correct world scale.
+                this.rangeMesh.position.copy(pos);
+                this.rangeMesh.position.y = 0.05; // Slightly above ground
+                this.manager.scene.add(this.rangeMesh);
             }
 
             update(dt, playerPos) {
-                if (this.isDead) return;
+                if (this.isDead) {
+                    if (this.rangeMesh) {
+                        this.manager.scene.remove(this.rangeMesh);
+                        this.rangeMesh.geometry.dispose();
+                        this.rangeMesh.material.dispose();
+                        this.rangeMesh = null;
+                    }
+                    return;
+                }
+
+                // Sync Range Mesh Position
+                if (this.rangeMesh) {
+                    this.rangeMesh.position.x = this.mesh.position.x;
+                    this.rangeMesh.position.z = this.mesh.position.z;
+                }
+
+                // [New] Homing Attack Logic
+                // If player in range, shoot
+                this.shootTimer -= dt;
+
+                // Get Player Instance (Global)
+                const target = window.pteroInstance;
+                if (target && !target.isDead) {
+                    const dist = this.mesh.position.distanceTo(target.mesh.position);
+                    const range = CONFIG.enemy.boss.attackRange; // 15.0
+
+                    if (dist < range && this.shootTimer <= 0) {
+                        this.shootTimer = 2.0; // Cooldown 2s
+                        // Spawn Homing Bullet
+                        // Start slightly above (mouth/chest?)
+                        const spawnPos = this.mesh.position.clone().add(new THREE.Vector3(0, 3.0, 0));
+                        const bullet = new HomingBullet(this, spawnPos, target, CONFIG.enemy.boss.projectileSpeed, 4.0, CONFIG.enemy.boss.damage);
+                        state.bullets.push(bullet);
+                    }
+                }
 
                 // Flash
                 if (this.flashTimer > 0) {
@@ -1420,6 +1529,8 @@
                 // Wind & Flight State
                 this.windPower = 0;
                 this.isFlying = false;
+                this.flightProgress = 0.0; // 0.0 (Ground) -> 1.0 (Flight Max)
+                this.flightBufferTimer = 0; // [New] Buffer timer for exiting flight
                 this.flightHeight = CONFIG.flight.heightGround;
 
                 // Propulsion State (Stackable Array)
@@ -1428,6 +1539,12 @@
                 this.buildModel();
                 this.buildIndicators();
                 this.buildShadow(); // [New]
+
+                // Apply UI Config
+                const windContainer = document.getElementById('wind-container-central');
+                const pulseContainer = document.getElementById('pulse-container-central');
+                if (windContainer) windContainer.style.bottom = CONFIG.ui.windBottom;
+                if (pulseContainer) pulseContainer.style.bottom = CONFIG.ui.pulseBottom;
 
                 scene.add(this.mesh);
             }
@@ -1454,12 +1571,21 @@
                 return this.isFlying ? CONFIG.movement.flight : CONFIG.movement.ground;
             }
 
-            takeDamage(amount) {
+            takeDamage(amount, ignoreFlight = false) {
                 if (this.isDead) return;
-                if (this.isFlying) return; // Invincible during flight
+
+                // Flight Invincibility check (can be bypassed by ignoreFlight)
+                if (this.isFlying && !ignoreFlight) return;
 
                 this.hp -= amount;
                 this.damageFlashTimer = 0.2;
+
+                // [New] Reduce Wind Power on Damage
+                // Wind Penalty = Damage * Multiplier
+                const wConfig = (state.mode === 'quad') ? CONFIG.wind.quad : CONFIG.wind.duo;
+                const penalty = amount * (wConfig.damagePenalty || 0);
+                this.windPower = Math.max(0, this.windPower - penalty);
+
                 if (this.hp <= 0) this.die();
             }
 
@@ -1477,7 +1603,7 @@
                     if (b.markedForDeletion || !b.isEnemy) return;
                     if (b.mesh.position.distanceTo(pPos) < 1.0) {
                         b.markedForDeletion = true;
-                        this.takeDamage(b.damage);
+                        this.takeDamage(b.damage, b.ignoreFlight || false);
                     }
                 });
             }
@@ -1622,6 +1748,179 @@
                     this.wings['p4'].pivot.rotation.y = this.wings['p4'].baseAngle;
                 }
             }
+            createSectorShockwave(p) {
+                // Fan-shaped shockwave
+                // Angle: 120 degrees? Or match attack angle?
+                // Let's match Config angle for visual consistency if possible, or fixed 120.
+                // Config angle depends on mode (Duo/Quad) and Ground/Flight.
+                const stats = this.getCombatStats();
+                const angleRad = stats.angle * Math.PI / 180;
+
+                // Shockwave Geometry
+                const geometry = new THREE.RingGeometry(0.5, stats.range, 32, 1, -angleRad / 2, angleRad);
+
+                // Color set to Player Color (Red/Blue/etc)
+                const pColor = CONFIG.visuals.colors[p];
+                const material = new THREE.MeshBasicMaterial({
+                    color: pColor,
+                    transparent: true,
+                    opacity: 0.8,
+                    side: THREE.DoubleSide
+                });
+                const shockwave = new THREE.Mesh(geometry, material);
+
+                // Position and Rotation
+                const wingDir = this.getWingDirection(p);
+                // Propagate from player position, but FIX Y to ground level
+                shockwave.position.copy(this.mesh.position).add(wingDir.clone().multiplyScalar(1.0));
+
+                // [Fix] Project to ground level (Y=0.5) even if flying
+                shockwave.position.y = 0.5;
+
+                // Rotation
+                shockwave.rotation.x = -Math.PI / 2; // Flat
+                const angleOffset = Math.atan2(wingDir.x, wingDir.z);
+                shockwave.rotation.set(-Math.PI / 2, 0, angleOffset);
+
+                scene.add(shockwave);
+
+                // Animate
+                const duration = 0.6;
+                let timer = 0;
+                const animate = () => {
+                    timer += 0.016;
+                    const t = timer / duration;
+                    if (t >= 1) {
+                        scene.remove(shockwave);
+                        geometry.dispose();
+                        material.dispose();
+                        return;
+                    }
+
+                    const scale = 0.2 + t * 0.8; // Max 1.0 * geometry size
+                    shockwave.scale.set(scale, scale, scale);
+                    shockwave.material.opacity = 0.8 * (1.0 - t);
+                    requestAnimationFrame(animate);
+                };
+                animate();
+            }
+
+            createSpeedLine(direction) {
+                // Geometry: Thin stretched box
+                const len = 5.0 + Math.random() * 5.0;
+                const geometry = new THREE.BoxGeometry(0.1, 0.1, len);
+                const material = new THREE.MeshBasicMaterial({
+                    color: 0x00ffff, // Cyan/White
+                    transparent: true,
+                    opacity: 0.6
+                });
+                const mesh = new THREE.Mesh(geometry, material);
+
+                // Position: Random offset around player
+                // Horizontal offset (perpendicular to direction) + Vertical offset
+                const offset = new THREE.Vector3((Math.random() - 0.5) * 4, (Math.random() - 0.5) * 2, (Math.random() - 0.5) * 4);
+                // Ensure offset isn't too close to center (hole in middle)
+                if (offset.lengthSq() < 1.0) offset.multiplyScalar(2.0);
+
+                mesh.position.copy(this.mesh.position).add(offset);
+
+                // Align with direction
+                mesh.lookAt(mesh.position.clone().add(direction));
+
+                scene.add(mesh);
+
+                state.particles.push({
+                    life: 0.3, maxLife: 0.3, mesh: mesh, dir: direction, speed: 20 + Math.random() * 10,
+                    update: function (dt) {
+                        this.life -= dt;
+                        if (this.life <= 0) {
+                            scene.remove(this.mesh);
+                            this.mesh.geometry.dispose();
+                            this.mesh.material.dispose();
+                            return false;
+                        }
+                        // Move line opposite to motion? Or with motion?
+                        // To make it look fast, lines should move BACKWARDS relative to character.
+                        this.mesh.position.sub(this.dir.clone().multiplyScalar(this.speed * dt));
+                        this.mesh.material.opacity = (this.life / this.maxLife) * 0.6;
+                        return true;
+                    }
+                });
+            }
+
+            getWingDirection(p) {
+                // Helper to get direction for mechanics/visuals
+                const w = this.wings[p];
+                const dir = new THREE.Vector3(0, 0, 1);
+                dir.applyAxisAngle(new THREE.Vector3(0, 1, 0), this.mesh.rotation.y + w.baseAngle);
+                return dir;
+            }
+
+
+            createLandingEffect() {
+                // visual effect to indicate landing state (Dust/Ring)
+                // White/Grey "Dust" Ring
+                const geometry = new THREE.RingGeometry(0.5, 1.5, 32);
+                geometry.rotateX(-Math.PI / 2);
+                const material = new THREE.MeshBasicMaterial({
+                    color: 0xaaaaaa, // Grey/White
+                    transparent: true,
+                    opacity: 0.6,
+                    side: THREE.DoubleSide
+                });
+                const mesh = new THREE.Mesh(geometry, material);
+                mesh.position.copy(this.mesh.position);
+                mesh.position.y = 0.05; // Ground level
+                scene.add(mesh);
+
+                state.particles.push({
+                    life: 0.5, maxLife: 0.5, mesh: mesh,
+                    update: function (dt) {
+                        this.life -= dt;
+                        if (this.life <= 0) {
+                            scene.remove(this.mesh);
+                            this.mesh.geometry.dispose();
+                            this.mesh.material.dispose();
+                            return false;
+                        }
+                        const t = 1.0 - (this.life / this.maxLife);
+                        // Expand and fade
+                        const s = 1.0 + t * 1.0;
+                        this.mesh.scale.set(s, s, s);
+                        this.mesh.material.opacity = 0.6 * (1.0 - t);
+                        return true;
+                    }
+                });
+
+                // Add some small dust particles
+                for (let i = 0; i < 8; i++) {
+                    const dust = new THREE.Mesh(
+                        new THREE.BoxGeometry(0.2, 0.2, 0.2),
+                        new THREE.MeshBasicMaterial({ color: 0xcccccc })
+                    );
+                    const ang = Math.random() * Math.PI * 2;
+                    const r = 0.5 + Math.random() * 0.5;
+                    const dx = Math.cos(ang) * r;
+                    const dz = Math.sin(ang) * r;
+                    dust.position.set(this.mesh.position.x + dx, 0.1, this.mesh.position.z + dz);
+                    scene.add(dust);
+
+                    state.particles.push({
+                        life: 0.4 + Math.random() * 0.3, maxLife: 0.6, mesh: dust,
+                        vel: new THREE.Vector3(dx * 2, Math.random() * 2, dz * 2),
+                        update: function (dt) {
+                            this.life -= dt;
+                            if (this.life <= 0) {
+                                scene.remove(this.mesh);
+                                return false;
+                            }
+                            this.mesh.position.add(this.vel.clone().multiplyScalar(dt));
+                            this.mesh.scale.multiplyScalar(0.95);
+                            return true;
+                        }
+                    });
+                }
+            }
 
             performWingAttack(p) {
                 const wState = this.wingStates[p];
@@ -1639,40 +1938,46 @@
                 const damage = stats.damage;
                 const angleRad = angleDeg * Math.PI / 180;
 
-                // 1. Visual Indicator (Sector)
-                // Spawn a temporary mesh for the attack area
-                const sectorGeo = new THREE.RingGeometry(0.5, range, 32, 1, -angleRad / 2, angleRad);
-                // Rotate to lie flat (X=-PI/2) and then align with wing
-                sectorGeo.rotateX(-Math.PI / 2);
+                // 1. Visual Indicator
+                if (this.isFlying) {
+                    // Flight: Sector Shockwave
+                    this.createSectorShockwave(p);
+                } else {
+                    // Ground: Standard Sector Visual (Existing)
+                    // Spawn a temporary mesh for the attack area
+                    const sectorGeo = new THREE.RingGeometry(0.5, range, 32, 1, -angleRad / 2, angleRad);
+                    // Rotate to lie flat (X=-PI/2) and then align with wing
+                    sectorGeo.rotateX(-Math.PI / 2);
 
-                const color = CONFIG.visuals.colors[p];
-                const sectorMat = new THREE.MeshBasicMaterial({ color: color, transparent: true, opacity: 0.4, side: THREE.DoubleSide });
-                const sectorMesh = new THREE.Mesh(sectorGeo, sectorMat);
+                    const color = CONFIG.visuals.colors[p];
+                    const sectorMat = new THREE.MeshBasicMaterial({ color: color, transparent: true, opacity: 0.4, side: THREE.DoubleSide });
+                    const sectorMesh = new THREE.Mesh(sectorGeo, sectorMat);
 
-                // Align to player + wing offset
-                sectorMesh.position.copy(this.mesh.position);
-                sectorMesh.position.y = 0.5 + (Math.random() * 0.1); // Random fix for Z-fighting
-                // Rotation: Player Rotation + Wing Base Angle
-                sectorMesh.rotation.y = this.mesh.rotation.y + this.wings[p].baseAngle;
+                    // Align to player + wing offset
+                    sectorMesh.position.copy(this.mesh.position);
+                    sectorMesh.position.y = 0.5 + (Math.random() * 0.1); // Random fix for Z-fighting
+                    // Rotation: Player Rotation + Wing Base Angle
+                    sectorMesh.rotation.y = this.mesh.rotation.y + this.wings[p].baseAngle;
 
-                scene.add(sectorMesh);
+                    scene.add(sectorMesh);
 
-                // Fade out and remove
-                state.particles.push({
-                    life: 0.3, maxLife: 0.3,
-                    mesh: sectorMesh,
-                    update: function (dt) {
-                        this.life -= dt;
-                        if (this.life <= 0) {
-                            scene.remove(this.mesh);
-                            this.mesh.geometry.dispose();
-                            this.mesh.material.dispose();
-                            return false;
+                    // Fade out and remove
+                    state.particles.push({
+                        life: 0.3, maxLife: 0.3,
+                        mesh: sectorMesh,
+                        update: function (dt) {
+                            this.life -= dt;
+                            if (this.life <= 0) {
+                                scene.remove(this.mesh);
+                                this.mesh.geometry.dispose();
+                                this.mesh.material.dispose();
+                                return false;
+                            }
+                            this.mesh.material.opacity = (this.life / this.maxLife) * 0.4;
+                            return true;
                         }
-                        this.mesh.material.opacity = (this.life / this.maxLife) * 0.4;
-                        return true;
-                    }
-                });
+                    });
+                }
 
 
                 // 2. Damage Logic
@@ -1710,10 +2015,11 @@
                         }
                     });
 
-                    // [New] Gain Wind Power on successful attack (at least one hit? Or per hit? Let's do ONCE per swing if hit anything? Or per swing?
+                    // [New] Gain Wind Power on successful attack
                     // Request: "When any player attacks, just like flapping wings, helps character gain wind power."
                     // -> So simply ATTACKING gives wind.
-                    this.windPower = Math.min(CONFIG.wind.max, this.windPower + CONFIG.wind.gainPerAttack);
+                    const wConfig = (state.mode === 'quad') ? CONFIG.wind.quad : CONFIG.wind.duo;
+                    this.windPower = Math.min(CONFIG.wind.max, this.windPower + wConfig.gainPerAttack);
 
                     // [New] Propulsion (Self Knockback)
                     // Move opposite to wingSwing direction? Or Player Forward?
@@ -1802,24 +2108,51 @@
 
             update(dt) {
                 // Wind Decay logic
+                const wConfig = (state.mode === 'quad') ? CONFIG.wind.quad : CONFIG.wind.duo;
+
                 if (this.windPower > 0) {
-                    this.windPower -= CONFIG.wind.decayRate * dt;
+                    this.windPower -= wConfig.decayRate * dt;
                     if (this.windPower < 0) this.windPower = 0;
                 }
 
-                // Flight Check
-                if (this.windPower > CONFIG.wind.threshold) {
-                    this.isFlying = true;
+                // --- Range-Based Flight Logic ---
+                // Range: [flightMin, flightMax] -> Ascend
+                // Out of Range -> Descend
+                const inRange = this.windPower >= wConfig.flightMin && this.windPower <= wConfig.flightMax;
+
+                // Transition Speed: 1.0 / transitionTime
+                const tSpeed = 1.0 / CONFIG.flight.transitionTime;
+
+                if (inRange) {
+                    this.flightBufferTimer = CONFIG.flight.bufferTime; // Reset buffer to Config Value
+                    this.flightProgress = Math.min(1.0, this.flightProgress + tSpeed * dt);
                 } else {
-                    this.isFlying = false;
+                    // Out of Range: Check Buffer
+                    if (this.flightBufferTimer > 0) {
+                        this.flightBufferTimer -= dt;
+                        // Do NOT descend yet
+                    } else {
+                        // Buffer expired, descend
+                        this.flightProgress = Math.max(0.0, this.flightProgress - tSpeed * dt);
+                    }
                 }
 
-                // Visual Height Smoothing
-                // [Fix] Only apply visual height smoothing if NOT in combo (Combo controls Y/height manually)
+                // Determine Flight State based on Progress (Airborne)
+                // Lift off if progress > 0
+                const wasFlying = this.isFlying;
+                this.isFlying = this.flightProgress > 0;
+
+                // [New] Landing Effect
+                if (wasFlying && !this.isFlying) {
+                    this.createLandingEffect();
+                }
+
+                // Apply Height
+                // [Fix] Only apply visual height smoothing if NOT in combo
                 if (!state.comboActive) {
-                    const targetH = this.isFlying ? CONFIG.flight.height : CONFIG.flight.heightGround;
-                    this.flightHeight = THREE.MathUtils.lerp(this.flightHeight, targetH, dt * CONFIG.flight.smoothSpeed);
-                    this.mesh.position.y = this.flightHeight;
+                    // Manual lerp based on progress
+                    const targetH = THREE.MathUtils.lerp(CONFIG.flight.heightGround, CONFIG.flight.height, this.flightProgress);
+                    this.mesh.position.y = targetH;
                 }
 
                 // Shadow Update
@@ -1867,16 +2200,33 @@
                     const container = document.getElementById('wind-container-central');
 
                     if (marker && container) {
-                        const pct = (CONFIG.wind.threshold / CONFIG.wind.max) * 100;
-                        marker.style.left = `${pct}%`;
+                        // Use wConfig for UI calculation
+                        const pctMin = (wConfig.flightMin / CONFIG.wind.max) * 100;
+                        const pctMax = (wConfig.flightMax / CONFIG.wind.max) * 100;
 
-                        // Dynamic Background Zone: Dark before threshold, Gold-tint after
-                        // linear-gradient(90deg, dark X%, gold X%)
-                        container.style.background = `linear-gradient(90deg, rgba(0,0,0,0.6) ${pct}%, rgba(100,80,0,0.5) ${pct}%)`;
+                        // Marker at Start of Range (40) and End of Range (60)
+                        marker.style.left = `${pctMin}%`;
+
+                        const markerMax = document.getElementById('wind-marker-max');
+                        if (markerMax) {
+                            markerMax.style.left = `${pctMax}%`;
+                        }
+
+                        // Dynamic Background Zone: Blue -> Yellow (Range) -> Blue
+                        container.style.background = `linear-gradient(90deg, 
+                            rgba(0,0,0,0.6) 0%, 
+                            rgba(0,0,0,0.6) ${pctMin}%, 
+                            rgba(255, 200, 0, 0.5) ${pctMin}%, 
+                            rgba(255, 200, 0, 0.5) ${pctMax}%, 
+                            rgba(0,0,0,0.6) ${pctMax}%, 
+                            rgba(0,0,0,0.6) 100%)`;
                     }
 
                     // Color Indication for Threshold
-                    if (this.windPower > CONFIG.wind.threshold) {
+                    const flightMin = wConfig.flightMin;
+                    const flightMax = wConfig.flightMax;
+
+                    if (this.windPower >= flightMin && this.windPower <= flightMax) {
                         windBar.style.background = 'linear-gradient(90deg, #ddffaa, #ffff00)'; // Gold/Yellow indicating Flight
                     } else {
                         windBar.style.background = 'linear-gradient(90deg, #88ccff, #ffffff)';
@@ -1909,17 +2259,61 @@
                         if (ws.timer > duration) {
                             ws.swinging = false;
                             ws.currentAngle = 0;
+                            // Reset Z rotation if used
+                            if (this.wings[p] && this.wings[p].pivot) {
+                                this.wings[p].pivot.rotation.z = 0;
+                            }
                         } else {
                             const progress = ws.timer / duration;
-                            // Simple Swing: 0 -> Max -> 0
-                            // Or Sweep? User said "Swing". 
-                            // Using sine wave for smooth back/forth or kick?
-                            // Let's do a sharp strike.
+
+                            // Horizontal Swing (Y-axis)
+                            // A sharp strike.
                             const kick = Math.sin(progress * Math.PI) * (Math.PI / 3);
                             ws.currentAngle = kick;
+
+                            // Vertical Flap (Z-axis) - ONLY IN FLIGHT
+                            if (this.isFlying && this.wings[p] && this.wings[p].pivot) {
+                                // Downward push visual: Rotate Z.
+                                // 0 -> Down (-Z or +Z dependent on side?) -> Up?
+                                // Let's try simple sine: 0 -> MaxDown -> 0
+                                // Needs to look like a "push"
+
+                                // Direction logic:
+                                // Left wings (p1, p3): Positive Z rotates tip Down? Check axis.
+                                // Right wings (p2, p4): Negative Z rotates tip Down?
+                                // P1 Base PI (Left), P2 Base 0 (Right).
+                                // P1 Pivot Z+: Tip goes UP. Z-: Tip goes DOWN.
+                                // P2 Pivot Z+: Tip goes DOWN. Z-: Tip goes UP.
+
+                                // Let's check base angles. 
+                                // P1 (Left) Y=PI. Local Z+ points BACK? Local X points RIGHT? 
+                                // Standard: Y Up. X Right. Z Forward.
+                                // Rot Y=PI -> X Left, Z Back. 
+                                // Local Z rotation... 
+
+                                // Heuristic: Try applying same sign relative to "outward" 
+                                // or just test one side. 
+                                // Let's assume absolute Z rotation needs to be opposite for L/R or tailored.
+
+                                // Simpler: Just rely on Visual Trial.
+                                // Assume Pivot Z rotation "Flaps".
+                                const flapAmt = Math.sin(progress * Math.PI) * (Math.PI / 4);
+
+                                // Determine Side based on name for now or base angle
+                                const isLeft = (p === 'p1' || p === 'p3');
+
+                                // P1 (Left): needs Z- to flap down? (Test)
+                                // P2 (Right): needs Z+ to flap down? (Test)
+                                const dir = -1; // Both down
+
+                                this.wings[p].pivot.rotation.z = flapAmt * dir * 1.5;
+                            }
                         }
                     } else {
                         ws.currentAngle = 0;
+                        if (this.wings[p] && this.wings[p].pivot) {
+                            this.wings[p].pivot.rotation.z = 0;
+                        }
                     }
                     if (this.wings[p] && this.wings[p].pivot) {
                         this.wings[p].pivot.rotation.y = this.wings[p].baseAngle + ws.currentAngle;
@@ -2145,6 +2539,7 @@
                     // --- Normal Movement (Velocity Based) ---
                     let totalInput = new THREE.Vector3();
                     let totalRotationInput = new THREE.Vector3();
+                    let activeInputs = []; // [New] For Co-op Boost Check
 
                     ['p1', 'p2', 'p3', 'p4'].forEach(p => {
                         // Input Filtering for Duo Mode
@@ -2166,6 +2561,9 @@
                             totalInput.add(v);
                             totalRotationInput.add(v);
 
+                            // [New] Collect active inputs for angle check
+                            activeInputs.push(v.clone().normalize());
+
                             this.arrows[p].visible = true;
                             // Push arrow out from center
                             const vNorm = v.clone().normalize();
@@ -2182,6 +2580,42 @@
 
                     // --- Physics Update ---
                     const moveStats = this.getMovementStats();
+                    let currentMaxSpeed = moveStats.maxSpeed;
+
+                    // [New] Co-op Speed Boost Logic
+                    if (activeInputs.length >= 2) {
+                        // 1. Calculate Average Direction
+                        const meanDir = new THREE.Vector3();
+                        activeInputs.forEach(v => meanDir.add(v));
+                        if (meanDir.lengthSq() > 0) meanDir.normalize();
+
+                        // 2. Check Deviation (Cone check: 45 deg range => +/- 22.5 deg from mean)
+                        // cos(22.5) ~= 0.9239
+                        const threshold = Math.cos(22.5 * Math.PI / 180);
+                        let allInCone = true;
+
+                        for (const input of activeInputs) {
+                            if (input.dot(meanDir) < threshold) {
+                                allInCone = false;
+                                break;
+                            }
+                        }
+
+                        // 3. Apply Multiplier
+                        // Failure Condition: If 3rd+ player input exists AND deviates, cancel boost.
+                        // Implied: "activeInputs" contains ALL active players. 
+                        // If one deviates, allInCone will be false. Boost Cancelled.
+                        if (allInCone) {
+                            currentMaxSpeed *= 1.4; // 40% Boost
+
+                            // [New] Speed Line Visual Effect
+                            // Flight: 0.3 density. Ground: 0.03 density (10%)
+                            const density = this.isFlying ? 0.3 : 0.03;
+                            if (Math.random() < density) {
+                                this.createSpeedLine(meanDir);
+                            }
+                        }
+                    }
 
                     // 1. Calculate Target Velocity from Input
                     // If multiple players press, length might be > 1. Normalize if needed? 
@@ -2191,7 +2625,7 @@
                     let targetVelocity = new THREE.Vector3();
                     if (totalInput.lengthSq() > 0.1) {
                         totalInput.normalize(); // Direction
-                        targetVelocity.copy(totalInput).multiplyScalar(moveStats.maxSpeed);
+                        targetVelocity.copy(totalInput).multiplyScalar(currentMaxSpeed);
                     }
 
                     // 2. Acceleration / Friction
