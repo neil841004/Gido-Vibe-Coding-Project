@@ -201,6 +201,11 @@
         import * as THREE from 'three';
 
         // --- Configuration (數值設定) ---
+
+        // [New] Dynamic Rhythm Constants
+        const BPM = 140;
+        const BEAT_TIME = 60 / BPM;
+
         const CONFIG = {
             // [New] General Stats
             stats: {
@@ -264,9 +269,9 @@
 
             // 戰鬥相關 (Combat)
             combat: {
-                preFireDelay: 0.428,     // 攻擊前搖時間 (1 Beat at 140 BPM)
-                duoWindow: 0.42,          // 雙人子彈合體判定窗口 (秒) - Expanded +0.1s each side
-                quadWindow: 0.42,         // [New] 四人容許窗口 (更寬鬆)
+                preFireDelay: BEAT_TIME,     // 攻擊前搖時間 (Synced to Beat)
+                duoWindow: BEAT_TIME,        // 雙人子彈合體判定窗口 (Synced to Beat)
+                quadWindow: BEAT_TIME,       // 四人容許窗口 (Synced to Beat)
                 cooldown: 0.33,           // 攻擊冷卻時間 (秒) - 發射後開始計算
                 bufferWindow: 0.15,       // 輸入預緩衝窗口 (秒)
                 recoilForce: 10,           // [New] Recoil Force base (scaled by bullet type)
@@ -314,7 +319,7 @@
                 },
                 ultraDuo: {
                     damage: 14,          // [四人-雙] 傷害 (Buffed from 14)
-                    size: 0.8,           // [四人-雙] 巨大
+                    size: 0.85,           // [四人-雙] 巨大
                     speed: 30,           // [四人-雙] 很快
                     life: 4.0,
                     gravity: 0,
@@ -330,15 +335,16 @@
                 },
                 trio: {
                     damage: 24,          // [三人] 傷害
-                    size: 1,
-                    speed: 32,
+                    size: 0.9,
+                    speed: 30,
                     life: 5.0,
                     gravity: 0,
                     penetration: 3,
-                    recoil: 1.6,
+                    recoil: 1.4,
                     knockback: 18,       // [New] Bullet Knockback
-                    burstCount: 2,       // [New] Burst Count (User Request)
-                    burstInterval: 0.15, // [New] Burst Interval
+                    burstCount: 3,       // [New] Burst Count (User Request)
+                    burstInterval: 0.12, // [New] Burst Interval
+                    spread: 0.4,         // [New] Random Spread (Similar to Quad)
                     shockwave: {
                         radius: 7,
                         angle: Math.PI / 0.5,
@@ -348,13 +354,13 @@
                 },
                 quad: {
                     damage: 20,          // [四人] 傷害
-                    size: 1.2,
+                    size: 1,
                     speed: 32,
                     life: 5.0,
                     gravity: 0,
-                    burstCount: 7,
-                    burstInterval: 0.08,
-                    burstAngles: [-0.6, -0.2, 0.2, 0.6, 0.4, 0, -0.4], // [New] Fan Angles (Radians) for 5 shots
+                    burstCount: 5,
+                    burstInterval: 0.1,
+                    spread: 0.8, // [New] Random Spread Angle (~30 degrees)
                     penetration: 10,
                     recoil: 1.6,
                     knockback: 18,       // [New] Bullet Knockback
@@ -413,9 +419,9 @@
 
             // 節奏相關 (Rhythm)
             rhythm: {
-                bpm: 140,
+                bpm: BPM,
                 beatsPerMeasure: 3,
-                beatInterval: 60 / 140 // Time per beat (approx 0.428s)
+                beatInterval: BEAT_TIME // Time per beat
             }
         };
 
@@ -2229,16 +2235,20 @@
                 const getDynamicDirection = () => this.getForwardVector();
 
                 // Helper to spawn one bullet
-                const spawnBullet = (bType, offsetTime = 0, useDynamicDir = false, recoilScale = 1.0, overrideDir = null) => {
+                const spawnBullet = (bType, offsetTime = 0, useDynamicDir = false, recoilScale = 1.0, angleOffset = 0) => {
                     setTimeout(() => {
                         // Recalculate spawn position DYNAMICALLY
                         const currentSpawnPos = new THREE.Vector3();
                         this.mouth.getWorldPosition(currentSpawnPos);
                         currentSpawnPos.add(this.getForwardVector().multiplyScalar(0.5));
 
-                        // Recalculate direction if dynamic (for Quad)
-                        // Priority: overrideDir > dynamic > static captured direction
-                        const finalDir = overrideDir ? overrideDir.clone() : (useDynamicDir ? getDynamicDirection() : direction);
+                        // Recalculate direction if dynamic (for Quad/Trio)
+                        const baseDir = useDynamicDir ? getDynamicDirection() : direction;
+                        let finalDir = baseDir.clone();
+
+                        if (angleOffset !== 0) {
+                            finalDir.applyAxisAngle(new THREE.Vector3(0, 1, 0), angleOffset);
+                        }
 
                         const bullet = new Bullet(bType, currentSpawnPos, finalDir, speed, life, gravity, size, stats);
                         state.bullets.push(bullet);
@@ -2370,26 +2380,16 @@
 
                     // Burst Fire (Fan Shape)
                     // Use burstAngles if available, otherwise default to straight
-                    const angles = config.burstAngles || [];
+                    const spread = config.spread || 0.52;
 
                     for (let i = 0; i < config.burstCount; i++) {
                         // Recoil Decay
                         const decay = Math.pow(0.5, i);
 
-                        // Calculate Direction based on Angle
-                        let dir = direction.clone();
-                        if (angles.length > 0) {
-                            // Cycle through angles if count > angles length
-                            const angle = angles[i % angles.length];
-                            dir.applyAxisAngle(new THREE.Vector3(0, 1, 0), angle);
-                        }
+                        // Random Angle
+                        const angle = (Math.random() - 0.5) * spread;
 
-                        // Pass specific direction to spawnBullet?
-                        // spawnBullet uses 'direction' variable from outer scope.
-                        // We need to modify it or pass it.
-                        // spawnBullet function takes arguments: (type, delay, isBurst, recoilScale, overrideDir)
-                        // Need to check spawnBullet signature.
-                        spawnBullet('quad', i * config.burstInterval, true, decay, dir);
+                        spawnBullet('quad', i * config.burstInterval, true, decay, angle);
                     }
                     // Shockwave x3
                     for (let i = 0; i < 1; i++) {
@@ -2404,12 +2404,19 @@
                     stats = { damage: config.damage, penetration: config.penetration, recoil: config.recoil, knockback: config.knockback };
                     direction = this.getForwardVector();
 
-                    // Burst Fire (Straight)
+                    // Burst Fire (Straight -> Dynamic Spread)
                     const count = config.burstCount || 1;
                     const interval = config.burstInterval || 0.15;
+                    const spread = config.spread || 0.5;
 
                     for (let i = 0; i < count; i++) {
-                        spawnBullet('trio', i * interval, true);
+                        // Recoil Decay
+                        const decay = Math.pow(0.5, i);
+
+                        // Random Angle
+                        const angle = (Math.random() - 0.5) * spread;
+
+                        spawnBullet('trio', i * interval, true, decay, angle);
                     }
 
                     spawnShockwave(config.shockwave, config.damage);
