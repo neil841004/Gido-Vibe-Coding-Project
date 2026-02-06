@@ -211,7 +211,7 @@
                 maxEnemies: 10,         // 最大同時存在敵人數
                 spawnRateDuo: 7.0,      // 雙人模式生成間隔 (秒)
                 spawnRateQuad: 2.6,     // 四人模式生成間隔 (秒)
-                waveInterval: 15.0,     // 波次間隔 (秒)
+                waveInterval: 10.0,     // 波次間隔 (秒)
 
                 // 敵人種類數值
                 melee: {
@@ -1785,7 +1785,7 @@
                 scene.add(shockwave);
 
                 // Animate
-                const duration = 0.6;
+                const duration = 0.9;
                 let timer = 0;
                 const animate = () => {
                     timer += 0.016;

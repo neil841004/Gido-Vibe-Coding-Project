@@ -57,20 +57,6 @@
             transition: width 0.1s linear;
         }
 
-        /* Rhythm Assist UI */
-        #rhythm-helper {
-            position: absolute;
-            bottom: 22%;
-            /* Moved up */
-            left: 50%;
-            transform: translateX(-50%);
-            width: 400px;
-            height: 60px;
-            pointer-events: none;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
 
         /* Pulse Meter - Moved to Center Bottom */
         #pulse-container-central {
@@ -109,73 +95,70 @@
             z-index: 10;
         }
 
+        /* ... previous styles ... */
 
-
-        .beat-line {
+        /* Rhythm Assist UI - 3 Box Layout */
+        #rhythm-helper {
             position: absolute;
-            width: 100%;
-            height: 2px;
-            background: rgba(255, 255, 255, 0.3);
+            bottom: 22%;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 600px;
+            /* Wider for 3 beats */
+            height: 80px;
+            pointer-events: none;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            /* Distributors boxes */
         }
 
-        .center-target {
-            position: absolute;
-            width: 30px;
-            height: 30px;
-            border: 2px solid white;
-            border-radius: 50%;
-            transform: scale(1);
-            transition: transform 0.1s;
+        .beat-box {
+            position: relative;
+            width: 32%;
+            /* 3 boxes with spacing */
+            height: 100%;
+            border: 2px solid rgba(255, 255, 255, 0.5);
+            box-sizing: border-box;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Beat 1 (Middle) - Highlighted differently? */
+        #beat-box-1 {
+            border-color: rgba(255, 255, 0, 0.5);
+            /* Yellow tint base */
+            z-index: 10;
         }
 
         .beat-cursor {
             position: absolute;
-            top: 10px;
-            bottom: 10px;
+            top: 0;
+            bottom: 0;
             width: 4px;
             background-color: white;
             left: 0%;
+            /* Will be animated 0 to 100% of container */
             box-shadow: 0 0 10px white;
+            z-index: 20;
         }
 
-        .input-indicator {
+        /* Stationary Attack Feedback */
+        .attack-feedback {
             position: absolute;
             width: 20px;
             height: 20px;
+            background-color: white;
+            /* Start white, maybe checks invalid later */
             border-radius: 50%;
-            transform: scale(0);
-            opacity: 0;
-            transition: transform 0.2s ease-out, opacity 0.3s ease-out;
-            box-sizing: border-box;
-            /* Ensure border doesn't increase size */
-        }
-
-        .indicator-p1 {
-            background-color: #ff4444;
-        }
-
-        .indicator-p2 {
-            background-color: #4444ff;
-        }
-
-        .indicator-p3 {
-            background-color: #ff69b4;
-        }
-
-        .indicator-p4 {
-            background-color: #00ffff;
-        }
-
-
-
-
-
-
-        .indicator-duo {
-            background-color: #ffff00;
-            width: 40px;
-            height: 40px;
-            z-index: 10;
+            transform: translate(-50%, -50%);
+            /* Center on position */
+            pointer-events: none;
+            z-index: 15;
+            opacity: 1;
+            transition: opacity 0.7s ease-out;
+            /* 0.7s Fade */
         }
     </style>
 </head>
@@ -192,9 +175,13 @@
             Spawn</button>
     </div>
 
+    <!-- 3/4 Time Rhythm UI: [Left:3] [Middle:1] [Right:2] -->
+    <!-- Order in DOM determines Flex layout: Left, Middle, Right -->
     <div id="rhythm-helper">
-        <div class="beat-line"></div>
-        <div class="center-target" id="rhythm-target"></div>
+        <div class="beat-box" id="beat-box-3"></div> <!-- Beat 3 (Left) -->
+        <div class="beat-box" id="beat-box-1"></div> <!-- Beat 1 (Middle) -->
+        <div class="beat-box" id="beat-box-2"></div> <!-- Beat 2 (Right) -->
+
         <div class="beat-cursor" id="rhythm-cursor"></div>
     </div>
 
@@ -277,10 +264,10 @@
 
             // 戰鬥相關 (Combat)
             combat: {
-                preFireDelay: 0.5,       // 攻擊前搖時間 (秒)
-                duoWindow: 0.26,          // 雙人子彈合體判定窗口 (秒)
-                quadWindow: 0.31,         // [New] 四人容許窗口 (更寬鬆)
-                cooldown: 0.3,           // 攻擊冷卻時間 (秒) - 發射後開始計算
+                preFireDelay: 0.428,     // 攻擊前搖時間 (1 Beat at 140 BPM)
+                duoWindow: 0.42,          // 雙人子彈合體判定窗口 (秒) - Expanded +0.1s each side
+                quadWindow: 0.42,         // [New] 四人容許窗口 (更寬鬆)
+                cooldown: 0.33,           // 攻擊冷卻時間 (秒) - 發射後開始計算
                 bufferWindow: 0.15,       // 輸入預緩衝窗口 (秒)
                 recoilForce: 10,           // [New] Recoil Force base (scaled by bullet type)
                 knockbackBase: 0.2         // [New] Enemy Knockback = Damage * kickbackBase
@@ -350,6 +337,8 @@
                     penetration: 3,
                     recoil: 1.6,
                     knockback: 18,       // [New] Bullet Knockback
+                    burstCount: 2,       // [New] Burst Count (User Request)
+                    burstInterval: 0.15, // [New] Burst Interval
                     shockwave: {
                         radius: 7,
                         angle: Math.PI / 0.5,
@@ -363,8 +352,9 @@
                     speed: 32,
                     life: 5.0,
                     gravity: 0,
-                    burstCount: 3,
-                    burstInterval: 0.17,
+                    burstCount: 7,
+                    burstInterval: 0.08,
+                    burstAngles: [-0.6, -0.2, 0.2, 0.6, 0.4, 0, -0.4], // [New] Fan Angles (Radians) for 5 shots
                     penetration: 10,
                     recoil: 1.6,
                     knockback: 18,       // [New] Bullet Knockback
@@ -416,14 +406,16 @@
                     body: 0x44aa44,   // 身體顏色 (綠)
                     head: 0x44aa44,   // 頭部顏色 (紫)
                     mouth: 0x00ffff,  // 嘴巴顏色 (黃)
-                    beam: 0xff00ff,   // 射線顏色
-                    indicatorSpacing: 3.5 // [New] Minimum % spacing between indicators to avoid overlap
-                }
+                    beam: 0xff00ff    // 射線顏色
+                },
+                minFeedbackDist: 1.3 // [New] Minimum % distance between off-beat circles to trigger offset
             },
 
             // 節奏相關 (Rhythm)
             rhythm: {
-                beatInterval: 1 // 每一拍的時間 (秒) - 獨立設定
+                bpm: 140,
+                beatsPerMeasure: 3,
+                beatInterval: 60 / 140 // Time per beat (approx 0.428s)
             }
         };
 
@@ -454,95 +446,60 @@
             pulseValue: 0, // 0 to 100
             comboActive: false,
             // Rhythm State
-            rhythmTime: 0, // 0 to 1
+            rhythmTime: 0, // 0 to 3.0 (Normalized Measure Time)
+            accumulatedTime: 0,
+            lastNormalizedTime: 0,
+            rhythmTime: 0, // 0 to 3.0 (Normalized Measure Time)
+            accumulatedTime: 0,
+            lastNormalizedTime: 0,
+            currentBeatFeedback: null, // { count, element, timer }
+            recentFeedbackPositions: [], // [New] { x: pct, time: ms } for collision avoidance
 
             // Input Feedback
-            showInputFeedback: (type, isPerfect, count) => { // 'p1', 'p2', 'duo'
+            showInputFeedback: (type) => { // 'p1', 'p2', 'duo'
                 const container = document.getElementById('rhythm-helper');
                 const el = document.createElement('div');
                 el.className = `input-indicator indicator-${type}`;
 
-                // Spawn at Current Cursor/Beat Position
-                let spawnTime = state.rhythmTime * 100;
-
-                // [New] Overlap Check & Separation
-                if (type !== 'duo') { // Don't shift Synergy indicators (they are centered merges)
-                    // Config spacing
-                    const spacing = CONFIG.visuals.indicatorSpacing || 2.0;
-
-                    // Filter old
-                    if (!state.recentVisuals) state.recentVisuals = [];
-                    const now = Date.now();
-                    state.recentVisuals = state.recentVisuals.filter(v => now - v.created < 1000); // Keep last 1s
-
-                    // Check collisions
-                    for (let v of state.recentVisuals) {
-                        // Check proximity in % (0-100)
-                        // Handle wrap-around? No, rhythmTime 0-1.
-                        const diff = Math.abs(spawnTime - v.pos);
-                        if (diff < spacing) {
-                            // Collision! Shift right? 
-                            // If we shift right, we might hit next one.
-                            // Simple: Add offset.
-                            spawnTime += spacing;
-                            // Recalculate diffs? Nested loop? 
-                            // Just one pass push is usually enough for 4 players.
-                        }
-                    }
-
-                    // Store new
-                    state.recentVisuals.push({ pos: spawnTime, created: now });
-                }
-
-                el.style.left = spawnTime + '%';
+                // Start Center
+                el.style.left = '50%';
                 el.style.top = '50%';
-
-                // Centering adjustment
                 el.style.marginTop = '-10px';
                 el.style.marginLeft = '-10px';
 
                 if (type === 'duo') {
-                    // Synergy Visuals
-                    let size = 40;
-                    if (count === 3) size = 50;
-                    if (count === 4) size = 60;
-
-                    el.style.width = size + 'px';
-                    el.style.height = size + 'px';
-                    el.style.marginTop = (-size / 2) + 'px';
-                    el.style.marginLeft = (-size / 2) + 'px';
-
-                    // Text Label
-                    if (count >= 2) {
-                        el.innerText = 'x' + count;
-                        el.style.display = 'flex';
-                        el.style.justifyContent = 'center';
-                        el.style.alignItems = 'center';
-                        el.style.color = '#000';
-                        el.style.fontWeight = 'bold';
-                        el.style.fontSize = (size * 0.4) + 'px';
-                    }
-                }
-
-                // Perfect Hit Visuals
-                if (isPerfect) {
-                    el.style.border = '3px solid #ffff00'; // Yellow Border
-                    el.style.boxShadow = '0 0 10px #ffff00'; // Glow
+                    el.style.width = '40px';
+                    el.style.height = '40px';
+                    el.style.marginTop = '-20px';
+                    el.style.marginLeft = '-20px';
                 }
 
                 container.appendChild(el);
 
-                // Static & Fade Out
-                el.style.opacity = '1';
-                el.style.transform = 'scale(1.2)';
+                // Calculate animation duration based on rhythm speed
+                // Pre-fire is 1 beat. Cooldown is 0.3s.
+                // This feedback dot logic might need adjustment for 3-box visual?
+                // Existing logic: Travels 50% to 100%?
+                // Let's keep existing logic but just center it for now as "Input Received"
+                const cycleTime = CONFIG.combat.preFireDelay + CONFIG.combat.cooldown;
+                // It travels 50% of the screen (50% -> 100%).
+                const travelDuration = cycleTime / 2;
 
-                setTimeout(() => {
-                    el.style.transition = 'opacity 0.7s ease-out, transform 0.7s ease-out';
-                    el.style.opacity = '0';
-                    el.style.transform = 'scale(1.5)';
+                // Animate
+                requestAnimationFrame(() => {
+                    // Move Right
+                    el.style.transition = `left ${travelDuration}s linear`;
+                    el.style.left = '100%';
+                    el.style.opacity = '1';
+                    el.style.transform = 'scale(1)';
 
-                    setTimeout(() => el.remove(), 700);
-                }, 50);
+                    // Fade out near end (at 80% of travel time)
+                    setTimeout(() => {
+                        el.style.transition = `left ${travelDuration}s linear, opacity 0.2s ease-out`;
+                        el.style.opacity = '0';
+                        setTimeout(() => el.remove(), 200);
+                    }, travelDuration * 1000 * 0.8);
+                });
 
                 return el;
             },
@@ -591,31 +548,60 @@
             },
             playHiHat: function () {
                 if (!this.ctx) return;
-                // White noise buffer
-                const bufferSize = this.ctx.sampleRate * 0.1; // 0.1s
+                // Closed Hi-Hat (Short, High pitch)
+                const bufferSize = this.ctx.sampleRate * 0.05;
                 const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
                 const data = buffer.getChannelData(0);
                 for (let i = 0; i < bufferSize; i++) {
                     data[i] = Math.random() * 2 - 1;
                 }
-
                 const noise = this.ctx.createBufferSource();
                 noise.buffer = buffer;
-
-                // Filter Highpass
                 const filter = this.ctx.createBiquadFilter();
                 filter.type = 'highpass';
-                filter.frequency.value = 5000;
-
+                filter.frequency.value = 8000;
                 const gain = this.ctx.createGain();
-                gain.gain.setValueAtTime(0.5, this.ctx.currentTime);
-                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.05);
-
+                gain.gain.setValueAtTime(0.3, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.05);
                 noise.connect(filter);
                 filter.connect(gain);
                 gain.connect(this.ctx.destination);
-
                 noise.start();
+            },
+            playSnare: function () {
+                if (!this.ctx) return;
+                // 1. Noise (Snap)
+                const bufferSize = this.ctx.sampleRate * 0.2;
+                const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+                const data = buffer.getChannelData(0);
+                for (let i = 0; i < bufferSize; i++) {
+                    data[i] = Math.random() * 2 - 1;
+                }
+                const noise = this.ctx.createBufferSource();
+                noise.buffer = buffer;
+                const noiseFilter = this.ctx.createBiquadFilter();
+                noiseFilter.type = 'highpass';
+                noiseFilter.frequency.value = 1000;
+                const noiseGain = this.ctx.createGain();
+                noiseGain.gain.setValueAtTime(1.0, this.ctx.currentTime);
+                noiseGain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.15);
+                noise.connect(noiseFilter);
+                noiseFilter.connect(noiseGain);
+                noiseGain.connect(this.ctx.destination);
+                noise.start();
+
+                // 2. Tone (Body) - Triangle gives it a hollow snare sound
+                const osc = this.ctx.createOscillator();
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(180, this.ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(100, this.ctx.currentTime + 0.1);
+                const oscGain = this.ctx.createGain();
+                oscGain.gain.setValueAtTime(0.5, this.ctx.currentTime);
+                oscGain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.1);
+                osc.connect(oscGain);
+                oscGain.connect(this.ctx.destination);
+                osc.start();
+                osc.stop(this.ctx.currentTime + 0.2); // Fix: Stop oscillator to prevent low freq drone
             }
         };
 
@@ -1962,8 +1948,6 @@
 
                 // Track active indicators for merging
                 this.activeIndicators = { p1: null, p2: null, p3: null, p4: null };
-                this.activeSynergyIndicator = null; // [New] Track Synergy Dot
-                state.recentVisuals = []; // [New] Track recent visuals for spacing check
 
                 // Duo Synergy State
                 this.pendingDuo = false; // True if a Duo Shot is queued to fire at end of windup
@@ -2245,7 +2229,7 @@
                 const getDynamicDirection = () => this.getForwardVector();
 
                 // Helper to spawn one bullet
-                const spawnBullet = (bType, offsetTime = 0, useDynamicDir = false, recoilScale = 1.0) => {
+                const spawnBullet = (bType, offsetTime = 0, useDynamicDir = false, recoilScale = 1.0, overrideDir = null) => {
                     setTimeout(() => {
                         // Recalculate spawn position DYNAMICALLY
                         const currentSpawnPos = new THREE.Vector3();
@@ -2253,7 +2237,8 @@
                         currentSpawnPos.add(this.getForwardVector().multiplyScalar(0.5));
 
                         // Recalculate direction if dynamic (for Quad)
-                        const finalDir = useDynamicDir ? getDynamicDirection() : direction;
+                        // Priority: overrideDir > dynamic > static captured direction
+                        const finalDir = overrideDir ? overrideDir.clone() : (useDynamicDir ? getDynamicDirection() : direction);
 
                         const bullet = new Bullet(bType, currentSpawnPos, finalDir, speed, life, gravity, size, stats);
                         state.bullets.push(bullet);
@@ -2383,11 +2368,28 @@
                     stats = { damage: config.damage, penetration: config.penetration, recoil: config.recoil, knockback: config.knockback };
                     direction = this.getForwardVector();
 
-                    // Burst Fire 
+                    // Burst Fire (Fan Shape)
+                    // Use burstAngles if available, otherwise default to straight
+                    const angles = config.burstAngles || [];
+
                     for (let i = 0; i < config.burstCount; i++) {
-                        // Recoil Decay: 100%, 50%, 25%...
+                        // Recoil Decay
                         const decay = Math.pow(0.5, i);
-                        spawnBullet('quad', i * config.burstInterval, true, decay);
+
+                        // Calculate Direction based on Angle
+                        let dir = direction.clone();
+                        if (angles.length > 0) {
+                            // Cycle through angles if count > angles length
+                            const angle = angles[i % angles.length];
+                            dir.applyAxisAngle(new THREE.Vector3(0, 1, 0), angle);
+                        }
+
+                        // Pass specific direction to spawnBullet?
+                        // spawnBullet uses 'direction' variable from outer scope.
+                        // We need to modify it or pass it.
+                        // spawnBullet function takes arguments: (type, delay, isBurst, recoilScale, overrideDir)
+                        // Need to check spawnBullet signature.
+                        spawnBullet('quad', i * config.burstInterval, true, decay, dir);
                     }
                     // Shockwave x3
                     for (let i = 0; i < 1; i++) {
@@ -2402,7 +2404,14 @@
                     stats = { damage: config.damage, penetration: config.penetration, recoil: config.recoil, knockback: config.knockback };
                     direction = this.getForwardVector();
 
-                    spawnBullet('trio');
+                    // Burst Fire (Straight)
+                    const count = config.burstCount || 1;
+                    const interval = config.burstInterval || 0.15;
+
+                    for (let i = 0; i < count; i++) {
+                        spawnBullet('trio', i * interval, true);
+                    }
+
                     spawnShockwave(config.shockwave, config.damage);
                 } else if (type === 'duo') {
                     // Check Mode
@@ -2617,60 +2626,133 @@
                 }
 
                 // --- Rhythm UI Update ---
-                const cycleTime = CONFIG.rhythm.beatInterval;
-                const prevRhythm = state.rhythmTime;
-                state.rhythmTime = (state.rhythmTime + (dt / cycleTime)) % 1.0;
+                const beatTime = CONFIG.rhythm.beatInterval;
+                const measureTime = beatTime * CONFIG.rhythm.beatsPerMeasure; // ~1.28s
 
-                // Sound Triggers
-                if (prevRhythm < 0.5 && state.rhythmTime >= 0.5) {
-                    SoundSystem.playOpenHiHat();
-                    // Character Bounce (Visual Beat)
-                    this.pulseScale = 1.15; // Jump to 1.15x
-                }
-                if (state.rhythmTime < prevRhythm) SoundSystem.playHiHat();
+                // Update Timer
+                if (!state.accumulatedTime) state.accumulatedTime = 0;
+                state.accumulatedTime += dt;
 
+                // Keep accumulatedTime in a reasonable modulus to avoid float precision issues over hours?
+                // Just mod by measureTime
+                const currentMeasurePos = state.accumulatedTime % measureTime;
+
+                // Normalized Measure Position (0.0 to 3.0)
+                // We want standard visual flow:
+                // T=0..1 (Box 3, Beat 3)
+                // T=1..2 (Box 1, Beat 1) -> SNARE
+                // T=2..3 (Box 2, Beat 2)
+
+                // Let's align "Beat 1" (Snare) exactly at T=1.5 (Middle of Box 1)
+                // So at T=1.5 (Normalized), we are at Center of Middle Box.
+
+                // Normalized Time (0 to 3)
+                const normalizedTime = (state.accumulatedTime / beatTime) % 3.0;
+                state.rhythmTime = normalizedTime; // Save for logic
+
+                // 1. Audio and Beat Triggers
+                // We use integer crossings or exact moments?
+                // Use 'lastTime' checks.
+                if (!state.lastNormalizedTime) state.lastNormalizedTime = 0;
+
+                const prev = state.lastNormalizedTime;
+                const curr = normalizedTime;
+
+                // Check Wrapped Transition (3 -> 0)
+                // If curr < prev, we wrapped.
+
+                // Triggers at 0.5 (Beat 3), 1.5 (Beat 1), 2.5 (Beat 2)
+                const checkTrigger = (target, callback) => {
+                    if ((prev < target && curr >= target) || (curr < prev && (prev < target || curr >= target) === false && target == 0.0)) {
+                        // Wrap logic complicated inside shorthand.
+                        // Easier: Checks range
+                    }
+                };
+
+                // Robust Trigger Logic:
+                const triggers = [
+                    { t: 0.5, action: 'hihat', box: 'beat-box-3' }, // Beat 3 (Left)
+                    { t: 1.5, action: 'snare', box: 'beat-box-1' }, // Beat 1 (Middle)
+                    { t: 2.5, action: 'hihat', box: 'beat-box-2' }  // Beat 2 (Right)
+                ];
+
+                triggers.forEach(trig => {
+                    // Check if we crossed 't'
+                    let crossed = false;
+                    if (curr >= trig.t && prev < trig.t) crossed = true;
+                    // Wrap case: prev=2.9, curr=0.1. (Doesn't cross these specific midpoints, but good to know)
+
+                    if (crossed) {
+                        if (trig.action === 'snare') {
+                            SoundSystem.playSnare();
+                            // Visual Pulse on Beat 1
+                            this.pulseScale = 1.15;
+                            // Highlight Middle Box
+                            const box = document.getElementById(trig.box);
+                            box.style.backgroundColor = 'rgba(255, 255, 0, 0.3)';
+                            box.style.transform = 'scale(1.1)';
+                            setTimeout(() => {
+                                box.style.backgroundColor = 'transparent';
+                                box.style.transform = 'scale(1)';
+                            }, 150);
+                        } else {
+                            SoundSystem.playHiHat();
+                            // Highlight Side Boxes
+                            const box = document.getElementById(trig.box);
+                            box.style.backgroundColor = 'rgba(255, 255, 255, 0.2)';
+                            setTimeout(() => box.style.backgroundColor = 'transparent', 100);
+                        }
+                    }
+                });
+                state.lastNormalizedTime = curr;
+
+                // 2. Cursor Update
+                // Cursor moves 0% to 100% of container over 0..3 normalized time
                 const cursor = document.getElementById('rhythm-cursor');
-                const target = document.getElementById('rhythm-target');
-                cursor.style.left = (state.rhythmTime * 100) + '%';
+                cursor.style.left = (normalizedTime / 3 * 100) + '%';
 
-                // Dynamic Target Size based on Window
-                const currentWindow = (state.mode === 'quad') ? CONFIG.combat.quadWindow : CONFIG.combat.duoWindow;
-                const windowFraction = currentWindow / cycleTime; // e.g. 0.35 / 2.0 = 0.175
+                // Color Feedback for Player Logic
+                // If in Middle Box (Beat 1, 1.0 to 2.0), show Valid?
+                // Precise Window: Center is 1.5. Window is duoWindow.
+                // normalized valid range: [1.5 - w_n/2, 1.5 + w_n/2]
+                // where w_n = duoWindow / beatTime.
 
-                // Visual Circle Size:
-                // Range is +/- window/2. Total width = window.
-                // Circle Diameter should represent the full window width relative to the timeline?
-                // User said: "Circle intersection points = tolerance range". 
-                // Line is 0..1. Center 0.5. Tolerance +/- w/2.
-                // Intersection points are (0.5 - w/2) and (0.5 + w/2).
-                // Distance between them is w.
-                // So Circle Width should be w.
-                const percentWidth = windowFraction * 100;
-                target.style.width = percentWidth + '%';
-                // Keep aspect ratio 1:1 using calculated pixel width relative to container or just use aspect-ratio css if supported
-                // Since container is 500px, height needs to match.
-                // Let's just use CSS 'aspect-ratio: 1'.
-                // Update: Inline style for width, ensure CSS has aspect-ratio or handle height.
-                // Simple hack: set height to 'auto' and use aspect-ratio in CSS, or calculate px.
-                // Let's rely on CSS update in next step for aspect-ratio, or set height here if possible? 
-                // Easier: target.style.height/width in px.
-                const containerWidth = document.getElementById('rhythm-helper').clientWidth;
-                // Visual Circle Size Adjustment (0.7x to match strict feel)
-                const visualScale = 0.7;
-                const pxSize = containerWidth * windowFraction * visualScale;
-                target.style.width = pxSize + 'px';
-                target.style.height = pxSize + 'px';
+                const validWindowSec = (state.mode === 'quad') ? CONFIG.combat.quadWindow : CONFIG.combat.duoWindow;
+                const windowNormalized = validWindowSec / beatTime;
 
-                // Color Feedback (Visual Only - Matches Visual Size)
-                const distToCenter = Math.abs(state.rhythmTime - 0.5) * cycleTime;
-                if (distToCenter <= (currentWindow * visualScale) / 2) {
-                    target.style.border = '2px solid #ffff00'; // Yellow when in zone
-                    target.style.transform = 'scale(1.1)';
+                const distToBeat1 = Math.abs(normalizedTime - 1.5);
+                const isValid = distToBeat1 < (windowNormalized / 2);
+
+                // Middle Box Continuous Feedback (Valid Window)
+                const midBox = document.getElementById('beat-box-1');
+                if (isValid) {
                     cursor.style.backgroundColor = '#ffff00';
+                    cursor.style.boxShadow = '0 0 15px #ffff00';
+
+                    midBox.style.borderColor = '#ffff00';
+                    midBox.style.boxShadow = '0 0 10px rgba(255, 255, 0, 0.3)';
+                    midBox.style.transform = 'scale(1.05)';
                 } else {
-                    target.style.border = '2px solid white';
-                    target.style.transform = 'scale(1)';
                     cursor.style.backgroundColor = 'white';
+                    cursor.style.boxShadow = '0 0 10px white';
+
+                    // Reset Middle Box (unless hit trigger animation is active? 
+                    // Trigger animation sets style directly. We should be careful not to override continuously.
+                    // But Trigger uses setTimeout to clear. 
+                    // If we override here every frame, the setTimeout clear might not matter, 
+                    // OR this might override the Trigger's scale(1.1).
+                    // Trigger uses scale 1.1. Valid window uses 1.05.
+                    // This seems fine. The Trigger will "pop" it slightly larger.
+
+                    midBox.style.borderColor = 'rgba(255, 255, 0, 0.5)';
+                    midBox.style.boxShadow = 'none';
+                    // Only reset transform if not in pulse?
+                    // Let's just reset to 1.0. The pulse 1.1 will override this for one frame? 
+                    // No, CSS style setting in JS is persistent until changed.
+                    // If we set it here 60fps, we override the Trigger set.
+                    // We should let Trigger Pulse take precedence or integrate it.
+                    // Since Trigger is instantaneous event, maybe just this is enough?
+                    midBox.style.transform = 'scale(1)';
                 }
 
                 // --- Combat Logic Updates ---
@@ -2688,28 +2770,29 @@
 
                     // Trigger Check
                     const checkTrigger = () => {
-                        // 1. Buffered Input (Early Press)
+                        // Priority 1: Buffered Input
                         if (this.bufferedInput[p] && this.cooldowns[p] <= 0) {
                             this.bufferedInput[p] = false;
                             return true;
                         }
 
-                        const isHeld = state.input[p].attack;
-
-                        // 2. Fresh Press (Buffer if cooldown active)
-                        if (isPress) {
+                        // Priority 2: Hold Input (Auto-fire logic)
+                        // If holding attack AND cooldown ready, Fire!
+                        if (state.input[p].attack) {
                             if (this.cooldowns[p] <= 0) return true;
-                            else if (this.cooldowns[p] <= CONFIG.combat.bufferWindow) {
+                            // Buffer logic (only on fresh press? or just late hold?)
+                            // Original buffer logic relied on isPress. 
+                            // If we are holding and cooldown is 0.1s left, do we buffer?
+                            // Yes, if it's a fresh press. If it's a long hold, we probably just wait for next frame.
+                            // Let's keep buffer for 'isPress' only to avoid weirdness.
+                        }
+
+                        if (isPress) {
+                            if (this.cooldowns[p] <= CONFIG.combat.bufferWindow && this.cooldowns[p] > 0) {
                                 this.bufferedInput[p] = true;
                                 return false;
                             }
                         }
-
-                        // 3. Auto-Fire (Held Button)
-                        if (isHeld && this.cooldowns[p] <= 0) {
-                            return true;
-                        }
-
                         return false;
                     };
 
@@ -2718,15 +2801,165 @@
                         this.windupTimer[p] = CONFIG.combat.preFireDelay;
 
                         // Rhythm Check
-                        const timeDiff = Math.abs(state.rhythmTime - 0.5) * cycleTime;
-                        const validWindow = (state.mode === 'quad') ? CONFIG.combat.quadWindow : CONFIG.combat.duoWindow;
-                        this.rhythmBonus[p] = timeDiff <= (validWindow / 2);
+                        // Valid only on Beat 1 (Middle Box, T=1.5)
+                        const beatTime = CONFIG.rhythm.beatInterval;
+                        const distToBeat1 = Math.abs(state.rhythmTime - 1.5);
+                        // Multiply by beatTime to get seconds
+                        const diffSeconds = distToBeat1 * beatTime;
 
-                        console.log(`${p.toUpperCase()} Rhythm: ${this.rhythmBonus[p]}`);
+                        const validWindow = (state.mode === 'quad') ? CONFIG.combat.quadWindow : CONFIG.combat.duoWindow;
+                        this.rhythmBonus[p] = diffSeconds <= (validWindow / 2);
+
+                        // Visual Feedback: Stationary Circle at Current Cursor Position
+                        // We need the visual position of the cursor bar.
+                        // Cursor left % = (state.rhythmTime / 3 * 100)
+                        const cursorLeftPct = (state.rhythmTime / 3 * 100);
+
+                        const container = document.getElementById('rhythm-helper');
+
+                        // User Request: Merged Visual Feedback for Beat 1 Valid Hits
+                        if (this.rhythmBonus[p]) {
+                            // Valid Hit Logic (Merge Candidates)
+
+                            // Initialize feedback object if beat window changed? 
+                            // We need a robust way to know if this is the "Same" beat window.
+                            // We can check if state.currentBeatFeedback exists and if time is close?
+                            // Or just rely on the fact that if we get here, we are in valid window.
+                            // Reset logic should happen elsewhere (e.g., when rhythmTime leaves window), 
+                            // BUT simpler: Check if existing element is still on screen (not removed).
+
+                            if (!state.currentBeatFeedback) state.currentBeatFeedback = { count: 0, element: null, timer: null };
+
+                            // Check if current feedback element is valid/active
+                            if (state.currentBeatFeedback.element && !state.currentBeatFeedback.element.isConnected) {
+                                // Element was removed (timeout), reset
+                                state.currentBeatFeedback = { count: 0, element: null, timer: null };
+                            }
+
+                            state.currentBeatFeedback.count++;
+                            const count = state.currentBeatFeedback.count;
+
+                            // Remove previous element if exists
+                            if (state.currentBeatFeedback.element) {
+                                state.currentBeatFeedback.element.remove();
+                                if (state.currentBeatFeedback.timer) clearTimeout(state.currentBeatFeedback.timer);
+                            }
+
+                            // Create NEW merged element
+                            const circle = document.createElement('div');
+                            circle.className = 'attack-feedback';
+                            circle.style.left = cursorLeftPct + '%';
+                            circle.style.top = '50%';
+
+                            // Style based on count
+                            // Count 1: Standard Player Color + Yellow Border
+                            // Count > 1: Yellow Fill + Text "x{Count}"
+
+                            if (count === 1) {
+                                // Standard First Hit
+                                const colorHex = CONFIG.visuals.colors[p];
+                                const colorStr = '#' + (colorHex ? colorHex.toString(16).padStart(6, '0') : 'ffffff');
+                                circle.style.backgroundColor = colorStr;
+                                circle.style.border = '3px solid #ffff00';
+                                circle.style.boxShadow = `0 0 10px ${colorStr}, 0 0 15px #ffff00`;
+                                circle.style.zIndex = '30';
+                                circle.style.opacity = '1';
+                            } else {
+                                // Merged Hit (x2, x3, x4)
+                                circle.style.backgroundColor = '#ffff00'; // Yellow Fill
+                                circle.style.border = '3px solid #ffffff'; // White Border
+                                circle.style.boxShadow = `0 0 20px #ffff00, 0 0 10px white`;
+                                circle.style.zIndex = '40';
+                                circle.style.opacity = '1';
+                                circle.style.color = 'black';
+                                circle.style.fontWeight = 'bold';
+                                circle.style.display = 'flex';
+                                circle.style.alignItems = 'center';
+                                circle.style.justifyContent = 'center';
+                                circle.style.fontSize = (12 + count * 2) + 'px'; // Grow font
+                                circle.innerText = `x${count}`;
+
+                                // Size increase
+                                const size = 20 + (count - 1) * 10; // 30, 40, 50...
+                                circle.style.width = size + 'px';
+                                circle.style.height = size + 'px';
+                            }
+
+                            container.appendChild(circle);
+                            state.currentBeatFeedback.element = circle;
+
+                            // Animate Fade (Delayed or immediate?)
+                            requestAnimationFrame(() => {
+                                // Pop effect
+                                circle.style.transform = 'translate(-50%, -50%) scale(1.3)'; // Start popped
+                                // Then fade
+                                setTimeout(() => {
+                                    circle.style.transition = 'opacity 0.5s ease-out, transform 0.5s ease-out';
+                                    circle.style.opacity = '0';
+                                    circle.style.transform = 'translate(-50%, -50%) scale(1.6)';
+                                }, 100); // Wait bit before fading?
+                            });
+
+                            // Auto Remove
+                            state.currentBeatFeedback.timer = setTimeout(() => {
+                                if (circle && circle.isConnected) circle.remove();
+                                // Don't reset state here fully, just let it expire naturally or be overwritten
+                            }, 700);
+
+                        } else {
+                            // Invalid Hit (Beat 2/3) - No Merging, just individual feedback
+
+                            // --- Visual Separation Logic ---
+                            let finalLeft = cursorLeftPct;
+                            const now = Date.now();
+                            const timeWindow = 500; // ms to consider for collision
+                            const minDist = CONFIG.visuals.minFeedbackDist; // %
+
+                            // Prune old positions
+                            state.recentFeedbackPositions = state.recentFeedbackPositions.filter(pos => now - pos.time < timeWindow);
+
+                            // Check collision
+                            // Simple heuristic: If too close to any recent, push RIGHT. 
+                            // If pushing right hits another, keep pushing? 
+                            // Simpler: Just check once and offset if needed.
+                            for (let pos of state.recentFeedbackPositions) {
+                                if (Math.abs(finalLeft - pos.x) < minDist) {
+                                    // Collision!
+                                    // Move Right by minDist (or Left? Let's assume flow is left-to-right, so maybe stack backwards? no, stack forward)
+                                    // Let's alternate or just push +minDist.
+                                    finalLeft += minDist;
+                                }
+                            }
+
+                            // Store new position
+                            state.recentFeedbackPositions.push({ x: finalLeft, time: now });
+
+                            const circle = document.createElement('div');
+                            circle.className = 'attack-feedback';
+                            circle.style.left = finalLeft + '%'; // Use adjusted position
+                            circle.style.top = '50%';
+
+                            const colorHex = CONFIG.visuals.colors[p];
+                            const colorStr = '#' + (colorHex ? colorHex.toString(16).padStart(6, '0') : 'ffffff');
+                            circle.style.backgroundColor = colorStr;
+
+                            // User Request: No white border on Beats 2 & 3 (Invalid Rhythm)
+                            circle.style.border = 'none'; // REMOVED white border
+                            circle.style.boxShadow = `0 0 5px ${colorStr}`;
+                            circle.style.opacity = '0.7';
+
+                            container.appendChild(circle);
+
+                            requestAnimationFrame(() => {
+                                circle.style.opacity = '0';
+                                circle.style.transform = 'translate(-50%, -50%) scale(1.5)';
+                            });
+                            setTimeout(() => circle.remove(), 700);
+                        }
 
                         // Spawn Feedback Dot
                         if (this.activeIndicators[p]) this.activeIndicators[p].remove();
-                        this.activeIndicators[p] = state.showInputFeedback(p, this.rhythmBonus[p]);
+                        this.activeIndicators[p] = state.showInputFeedback(p);
                     }
                 });
 
@@ -2766,15 +2999,7 @@
                         // We might want to clear previous synergy dot if we upgraded (e.g. Duo -> Trio)
                         // But `showInputFeedback` just spawns a new one. 
                         // Let's just spawn the new one.
-
-                        // [Fixed] Remove previous synergy indicator if exists
-                        if (this.activeSynergyIndicator) {
-                            this.activeSynergyIndicator.remove();
-                            this.activeSynergyIndicator = null;
-                        }
-
-                        this.activeSynergyIndicator = state.showInputFeedback('duo', true, synergyLevel); // Pass Synergy Level for visuals
-
+                        state.showInputFeedback('duo'); // Re-use 'duo' style or make new ones?
                         // Task says "reuse Duo bullet values" but for UI? 
                         // Let's allow 'duo' style for all synergies in UI for now, maybe scale it?
                     }
