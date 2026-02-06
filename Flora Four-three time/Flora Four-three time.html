@@ -344,7 +344,7 @@
                     knockback: 18,       // [New] Bullet Knockback
                     burstCount: 3,       // [New] Burst Count (User Request)
                     burstInterval: 0.12, // [New] Burst Interval
-                    spread: 0.4,         // [New] Random Spread (Similar to Quad)
+                    customAngles: [-0.3, 0, 0.3],         // [New] Custom Angles (Center, Right, Left)
                     shockwave: {
                         radius: 7,
                         angle: Math.PI / 0.5,
@@ -358,9 +358,9 @@
                     speed: 32,
                     life: 5.0,
                     gravity: 0,
-                    burstCount: 5,
-                    burstInterval: 0.1,
-                    spread: 0.8, // [New] Random Spread Angle (~30 degrees)
+                    burstCount: 7,
+                    burstInterval: 0.09,
+                    customAngles: [-0.6, -0.2, 0.2, 0.6, 0.4, 0, -0.4], // [New] Custom Angles (Fan)
                     penetration: 10,
                     recoil: 1.6,
                     knockback: 18,       // [New] Bullet Knockback
@@ -1969,6 +1969,9 @@
                 this.buildModel();
                 this.buildIndicators();
 
+                // [New] Burst Rotation Lock
+                this.burstLockTimer = 0;
+
                 // Save original materials for color restoration
                 this.baseColorP1 = new THREE.Color(CONFIG.visuals.colors.p1);
                 this.baseColorP2 = new THREE.Color(CONFIG.visuals.colors.p2);
@@ -2247,6 +2250,7 @@
                         let finalDir = baseDir.clone();
 
                         if (angleOffset !== 0) {
+                            // Apply rotation around Y axis (vertical)
                             finalDir.applyAxisAngle(new THREE.Vector3(0, 1, 0), angleOffset);
                         }
 
@@ -2379,18 +2383,28 @@
                     direction = this.getForwardVector();
 
                     // Burst Fire (Fan Shape)
-                    // Use burstAngles if available, otherwise default to straight
-                    const spread = config.spread || 0.52;
+                    // Burst Fire (Dynamic Custom Spread)
+                    // Use customAngles if available
+                    const angles = config.customAngles || [0];
+                    const count = angles.length;
+                    const interval = config.burstInterval || 0.1;
 
-                    for (let i = 0; i < config.burstCount; i++) {
+                    for (let i = 0; i < count; i++) {
                         // Recoil Decay
                         const decay = Math.pow(0.5, i);
 
-                        // Random Angle
-                        const angle = (Math.random() - 0.5) * spread;
+                        // Custom Angle
+                        const angle = angles[i % angles.length];
 
-                        spawnBullet('quad', i * config.burstInterval, true, decay, angle);
+                        spawnBullet('quad', i * interval, true, decay, angle);
                     }
+
+                    // [New] Lock Rotation for duration of burst
+                    // Last shot happens at (count-1) * interval
+                    // Unlock a bit after? Or exactly after?
+                    // Let's add a small buffer (0.1s)
+                    this.burstLockTimer = (count - 1) * interval + 0.2;
+
                     // Shockwave x3
                     for (let i = 0; i < 1; i++) {
                         setTimeout(() => spawnShockwave(config.shockwave, config.damage), i * config.burstInterval * 1000);
@@ -2404,20 +2418,23 @@
                     stats = { damage: config.damage, penetration: config.penetration, recoil: config.recoil, knockback: config.knockback };
                     direction = this.getForwardVector();
 
-                    // Burst Fire (Straight -> Dynamic Spread)
-                    const count = config.burstCount || 1;
+                    // Burst Fire (Dynamic Custom Spread)
+                    const angles = config.customAngles || [0];
+                    const count = angles.length;
                     const interval = config.burstInterval || 0.15;
-                    const spread = config.spread || 0.5;
 
                     for (let i = 0; i < count; i++) {
                         // Recoil Decay
                         const decay = Math.pow(0.5, i);
 
-                        // Random Angle
-                        const angle = (Math.random() - 0.5) * spread;
+                        // Custom Angle
+                        const angle = angles[i % angles.length];
 
                         spawnBullet('trio', i * interval, true, decay, angle);
                     }
+
+                    // [New] Lock Rotation for duration of burst
+                    this.burstLockTimer = (count - 1) * interval + 0.2;
 
                     spawnShockwave(config.shockwave, config.damage);
                 } else if (type === 'duo') {
@@ -2494,6 +2511,11 @@
             update(dt) {
                 // HP Bar
                 if (this.hpBar) this.hpBar.update(this.mesh.position, this.hp, this.maxHP);
+
+                // [New] Update Burst Lock Timer
+                if (this.burstLockTimer > 0) {
+                    this.burstLockTimer -= dt;
+                }
 
                 // Damage Flash
                 if (this.damageFlashTimer > 0) {
@@ -3233,16 +3255,19 @@
 
                 // Rotation - FIXED
                 // Rotate towards INPUT Direction (totalRotationInput), ignore recoil velocity
-                // If no input, keep current rotation
-                if (totalRotationInput.lengthSq() > 0.01) {
-                    const targetAngle = Math.atan2(totalRotationInput.x, totalRotationInput.z);
-                    const currentAngle = this.mesh.rotation.y;
-                    let deltaAngle = targetAngle - currentAngle;
-                    while (deltaAngle > Math.PI) deltaAngle -= Math.PI * 2;
-                    while (deltaAngle < -Math.PI) deltaAngle += Math.PI * 2;
-                    const rotStep = CONFIG.movement.rotationSpeed * dt;
-                    if (Math.abs(deltaAngle) < rotStep) this.mesh.rotation.y = targetAngle;
-                    else this.mesh.rotation.y += Math.sign(deltaAngle) * rotStep;
+                // Rotation (Only if moving and NOT locked)
+                // [New] Burst Lock Check
+                if (this.burstLockTimer <= 0) {
+                    if (totalRotationInput.lengthSq() > 0.01) {
+                        const targetAngle = Math.atan2(totalRotationInput.x, totalRotationInput.z);
+                        const currentAngle = this.mesh.rotation.y;
+                        let deltaAngle = targetAngle - currentAngle;
+                        while (deltaAngle > Math.PI) deltaAngle -= Math.PI * 2;
+                        while (deltaAngle < -Math.PI) deltaAngle += Math.PI * 2;
+                        const rotStep = CONFIG.movement.rotationSpeed * dt;
+                        if (Math.abs(deltaAngle) < rotStep) this.mesh.rotation.y = targetAngle;
+                        else this.mesh.rotation.y += Math.sign(deltaAngle) * rotStep;
+                    }
                 }
 
                 // Camera & Follow
