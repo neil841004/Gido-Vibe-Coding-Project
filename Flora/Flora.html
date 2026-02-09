@@ -186,6 +186,18 @@
         <p>1P (Red): WASD to Move, Click to Attack, R-Click to Charge</p>
         <p>2P (Blue): Gamepad / Arrows to Move, Enter/East to Attack, Shift/RT to Charge</p>
         <div id="debug"></div>
+        <div style="margin-top:10px; pointer-events:auto;">
+            <label for="bpm-slider" style="color: white; font-weight: bold;">BPM: <span
+                    id="bpm-value">120</span></label><br>
+            <input type="range" id="bpm-slider" min="30" max="180" value="60" step="1"
+                style="width: 200px; margin-top: 5px;">
+        </div>
+        <div style="margin-top:10px; pointer-events:auto;">
+            <label style="color: white; font-weight: bold;">
+                <input type="checkbox" id="quarter-hihat-toggle">
+                8 beats
+            </label>
+        </div>
         <button id="mode-toggle" style="margin-top:10px; pointer-events:auto;">Switch to 2P Mode</button>
         <button id="spawner-toggle"
             style="margin-top:10px; pointer-events:auto; background-color: #44aa44; color: white;">Start Enemy
@@ -279,7 +291,7 @@
             combat: {
                 preFireDelay: 0.5,       // 攻擊前搖時間 (秒)
                 duoWindow: 0.26,          // 雙人子彈合體判定窗口 (秒)
-                quadWindow: 0.31,         // [New] 四人容許窗口 (更寬鬆)
+                quadWindow: 0.33,         // [New] 四人容許窗口 (更寬鬆)
                 cooldown: 0.3,           // 攻擊冷卻時間 (秒) - 發射後開始計算
                 bufferWindow: 0.15,       // 輸入預緩衝窗口 (秒)
                 recoilForce: 10,           // [New] Recoil Force base (scaled by bullet type)
@@ -348,7 +360,12 @@
                     life: 5.0,
                     gravity: 0,
                     penetration: 3,
-                    recoil: 1.6,
+                    recoil: 1.4,
+                    // [New] Burst & Fan Settings
+                    burstCount: 3,       // 連發數量
+                    burstInterval: 0.12, // 連發間隔
+                    // fanAngle: Math.PI / 4, // [Deprecated]
+                    angles: [-0.3, 0, 0.3], // [New] Manual Angles (Radians)
                     knockback: 18,       // [New] Bullet Knockback
                     shockwave: {
                         radius: 7,
@@ -363,8 +380,10 @@
                     speed: 32,
                     life: 5.0,
                     gravity: 0,
-                    burstCount: 3,
-                    burstInterval: 0.17,
+                    burstCount: 7,
+                    burstInterval: 0.09,
+                    // fanAngle: Math.PI / 3, // [Deprecated]
+                    angles: [-0.6, -0.2, 0.2, 0.6, 0.4, 0, -0.4], // [New] Manual Angles
                     penetration: 10,
                     recoil: 1.6,
                     knockback: 18,       // [New] Bullet Knockback
@@ -423,16 +442,23 @@
 
             // 節奏相關 (Rhythm)
             rhythm: {
-                beatInterval: 1 // 每一拍的時間 (秒) - 獨立設定
+                beatInterval: 1.0, // Will be overwritten by bpm
+                bpm: 60 // [New] Global BPM Control (60 BPM = 1 sec interval)
             }
         };
 
+        // Recalculate beatInterval from BPM
+        CONFIG.rhythm.beatInterval = 60 / CONFIG.rhythm.bpm;
+
         // --- Game State ---
         const state = {
+            rhythmTime: 0, // [New] 0.0 to 1.0 cycle
+            beatCount: 0, // [New] Track total beats for sequencer
             comboCooldown: 0, // [New] Cooldown timer
             comboCooldownMax: 30.0, // 30 Seconds
             pulse: 0,
             maxPulse: 100,
+            quarterHiHat: false, // [New] Enable quarter-note hi-hat (1/4, 3/4)
             mode: 'quad', // 'duo' or 'quad'
             playerCount: 4,
 
@@ -616,7 +642,138 @@
                 gain.connect(this.ctx.destination);
 
                 noise.start();
-            }
+            },
+            // [New] Kick Drum Synthesizer
+            playKick: function () {
+                if (!this.ctx) return;
+
+                const t = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+
+                // Pitch sweep for kick drum thump
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(150, t);
+                osc.frequency.exponentialRampToValueAtTime(40, t + 0.1);
+
+                // Amp envelope
+                gain.gain.setValueAtTime(1.0, t);
+                gain.gain.exponentialRampToValueAtTime(0.01, t + 0.4);
+
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+
+                osc.start(t);
+                osc.stop(t + 0.5);
+
+                // [New] Click/Beater Sound (High Frequency)
+                const clickOsc = this.ctx.createOscillator();
+                const clickGain = this.ctx.createGain();
+                clickOsc.type = 'square';
+                clickOsc.frequency.setValueAtTime(3000, t);
+                clickOsc.frequency.exponentialRampToValueAtTime(100, t + 0.02);
+                clickGain.gain.setValueAtTime(0.5, t);
+                clickGain.gain.exponentialRampToValueAtTime(0.01, t + 0.05);
+
+                const clickFilter = this.ctx.createBiquadFilter();
+                clickFilter.type = 'highpass';
+                clickFilter.frequency.value = 1000;
+
+                clickOsc.connect(clickFilter);
+                clickFilter.connect(clickGain);
+                clickGain.connect(this.ctx.destination);
+
+                clickOsc.start(t);
+                clickOsc.stop(t + 0.05);
+            },
+            // [New] Bullet Shoot SFX
+            playShoot: function (type) {
+                if (!this.ctx) return;
+                const t = this.ctx.currentTime;
+
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+
+                if (type === 'single') {
+                    // [Swap] Single now uses Duo's Square wave, made quieter
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(400, t);
+                    osc.frequency.exponentialRampToValueAtTime(100, t + 0.15);
+                    gain.gain.setValueAtTime(0.2, t);
+                    gain.gain.exponentialRampToValueAtTime(0.01, t + 0.05);
+                } else if (type === 'ultraSingle') {
+                    // Stronger Single
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(800, t);
+                    osc.frequency.exponentialRampToValueAtTime(200, t + 0.05);
+                    gain.gain.setValueAtTime(0.55, t); // Louder (was 0.25)
+                    gain.gain.exponentialRampToValueAtTime(0.01, t + 0.05);
+                } else if (type === 'duo') {
+                    // [Swap] Duo now uses Single's Triangle wave, made louder
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(600, t);
+                    osc.frequency.exponentialRampToValueAtTime(100, t + 0.1);
+                    gain.gain.setValueAtTime(0.2, t); // Stronger Triangle
+                    gain.gain.exponentialRampToValueAtTime(0.01, t + 0.1);
+                } else if (type === 'ultraDuo') {
+                    // Ultra Duo - Heavier
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(800, t);
+                    osc.frequency.exponentialRampToValueAtTime(200, t + 0.05);
+                    gain.gain.setValueAtTime(0.55, t); // Louder (was 0.25)
+                    gain.gain.exponentialRampToValueAtTime(0.01, t + 0.05);
+                } else if (type === 'trio' || type === 'quad') {
+                    // Burst Shots - Louder
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(800, t);
+                    osc.frequency.exponentialRampToValueAtTime(200, t + 0.05);
+                    gain.gain.setValueAtTime(0.55, t); // Louder (was 0.25)
+                    gain.gain.exponentialRampToValueAtTime(0.01, t + 0.05);
+                } else {
+                    // Fallback
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(400, t);
+                    gain.gain.setValueAtTime(0.25, t);
+                    gain.gain.exponentialRampToValueAtTime(0.01, t + 0.15);
+                }
+
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start(t);
+                osc.stop(t + 0.3);
+            },
+            // [New] Bass Line Synthesizer
+            // playBass: function (semitone) {
+            //     if (!this.ctx) return;
+
+            //     const t = this.ctx.currentTime;
+            //     const osc = this.ctx.createOscillator();
+            //     const gain = this.ctx.createGain();
+
+            //     // Base Frequency (Low A = 55Hz)
+            //     const baseFreq = 55;
+            //     const freq = baseFreq * Math.pow(2, semitone / 12);
+
+            //     osc.type = 'sawtooth'; // Punchy bass
+            //     osc.frequency.setValueAtTime(freq, t);
+
+            //     // Lowpass Filter for warmth
+            //     const filter = this.ctx.createBiquadFilter();
+            //     filter.type = 'lowpass';
+            //     filter.frequency.setValueAtTime(400, t);
+            //     filter.frequency.exponentialRampToValueAtTime(100, t + 0.2); // Filter envelope
+
+            //     // Amp Envelope
+            //     gain.gain.setValueAtTime(0.8, t);
+            //     gain.gain.exponentialRampToValueAtTime(0.01, t + 0.4);
+
+            //     osc.connect(filter);
+            //     filter.connect(gain);
+            //     gain.connect(this.ctx.destination);
+
+            //     osc.start(t);
+            //     osc.stop(t + 0.5);
+            // }
         };
 
         // --- Scene Setup ---
@@ -1965,6 +2122,9 @@
                 this.activeSynergyIndicator = null; // [New] Track Synergy Dot
                 state.recentVisuals = []; // [New] Track recent visuals for spacing check
 
+                // [New] Track Last Shot Type for Input Recovery
+                this.lastShotType = { p1: null, p2: null, p3: null, p4: null };
+
                 // Duo Synergy State
                 this.pendingDuo = false; // True if a Duo Shot is queued to fire at end of windup
 
@@ -1974,7 +2134,18 @@
 
                 // Speed Lines State
                 this.speedLines = [];
+                // Speed Lines State
+                this.speedLines = [];
                 this.isBoosting = false;
+
+                this.isBoosting = false;
+
+                // [New] Burst Lock State
+                this.isBursting = false;
+                this.burstTimer = 0;
+
+                // [New] Synergy Count State (for timing reset)
+                this.lastReadyCount = 0;
 
                 this.buildModel();
                 this.buildIndicators();
@@ -2239,6 +2410,25 @@
 
             shoot(type) {
                 let speed, life, gravity, direction, size, config;
+
+                // [New] Track Last Shot Type
+                // If type is a player ID (p1..p4), it's Single or UltraSingle
+                // If type is synergy (duo..quad), we need another way to track participants?
+                // Actually, shoot() is called per player for Single, or once for Synergy.
+                // For Synergy, the update loop calls shoot(synergyType).
+                // But shoot() itself doesn't know WHO participated easily unless passed.
+                // However, input blocking checks individual players.
+                // Let's rely on the Update loop to set lastShotType for synergy participants,
+                // and set it here for Single defaults.
+
+                if (['p1', 'p2', 'p3', 'p4'].includes(type)) {
+                    if (state.mode === 'quad') {
+                        this.lastShotType[type] = 'ultraSingle';
+                    } else {
+                        this.lastShotType[type] = 'single';
+                    }
+                }
+
                 let stats = {};
 
                 // Direction capturing helper
@@ -2264,7 +2454,10 @@
                         const force = stats.recoil * CONFIG.combat.recoilForce * recoilScale;
                         const recoilVec = finalDir.clone().normalize().multiplyScalar(-force);
                         // Add to velocity directly
-                        this.velocity.add(recoilVec);
+                        this.velocity.add(recoilVec); // Apply recoil to velocity
+
+                        // [New] Bullet Sound
+                        if (SoundSystem.playShoot) SoundSystem.playShoot(bType);
 
                     }, offsetTime * 1000);
                 };
@@ -2381,18 +2574,83 @@
                     gravity = config.gravity;
                     size = config.size;
                     stats = { damage: config.damage, penetration: config.penetration, recoil: config.recoil, knockback: config.knockback };
-                    direction = this.getForwardVector();
+
+                    // Lock Rotation
+                    this.isBursting = true;
+                    // Reset lock after last shot
+                    setTimeout(() => { this.isBursting = false; }, config.burstCount * config.burstInterval * 1000 + 50);
 
                     // Burst Fire 
                     for (let i = 0; i < config.burstCount; i++) {
                         // Recoil Decay: 100%, 50%, 25%...
                         const decay = Math.pow(0.5, i);
-                        spawnBullet('quad', i * config.burstInterval, true, decay);
+
+                        // Angle Logic (Array)
+                        let angleOffset = 0;
+                        if (config.angles && config.angles.length > 0) {
+                            // Cycle through angles if burstCount > angle count
+                            angleOffset = config.angles[i % config.angles.length];
+                        }
+
+                        // Negate for Left->Right check? 
+                        // In previous fan logic we used -angle.
+                        // If user provides [ -0.2, 0, 0.2 ], they likely expect Left, Center, Right in screen space.
+                        // Rotating normal Vector(0,0,1) by +0.2 around Y (0,1,0) gives +X (Left).
+                        // Wait, standard rotation:
+                        // +Y rotation of (0,0,1) is sin(a), 0, cos(a).
+                        // x = sin(positive) is positive X.
+                        // In Three.js/WebGL usually Right is +X.
+                        // (0,0,1) is Forward (out of screen?).
+                        // If we look -Z.
+                        // Let's assume standard math.
+                        // To clear confusion: just apply the angle. If user wants left, they put positive/negative.
+                        // I will apply -angle to match previous logic or just angle? 
+                        // Previous logic: -angle.
+                        // Let's just apply `angleOffset`. If user says Left is negative, they put negative.
+
+                        const spawnWithFan = (time, decayVal, angle) => {
+                            setTimeout(() => {
+                                // Manual Direction Calculation with Fan Offset
+                                const baseDir = this.getForwardVector();
+                                // Apply Angle Rotation (Around Y axis)
+                                // Note: We use -angle in previous implementation to map loop index to scan direction.
+                                // Here we just use the raw value from array.
+                                const fanDir = baseDir.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), angle);
+
+                                // Override internal spawnBullet logic? 
+                                // spawnBullet uses 'direction' variable or getForwardVector.
+                                // Let's modify spawnBullet signature to accept explicit direction override or angle offset?
+                                // Actually, let's just inline the logic here or make a better helper.
+                                // Re-using spawnBullet is tricky with the closure.
+
+                                // Simplified Inline Spawn for Burst:
+                                const currentSpawnPos = new THREE.Vector3();
+                                this.mouth.getWorldPosition(currentSpawnPos);
+                                currentSpawnPos.add(this.getForwardVector().multiplyScalar(0.5));
+
+                                const bullet = new Bullet('quad', currentSpawnPos, fanDir, speed, life, gravity, size, stats);
+                                state.bullets.push(bullet);
+
+                                // Recoil
+                                const force = stats.recoil * CONFIG.combat.recoilForce * decayVal;
+                                const recoilVec = fanDir.clone().normalize().multiplyScalar(-force);
+                                this.velocity.add(recoilVec);
+
+                                // [New] Bullet Sound (Quad)
+                                if (SoundSystem.playShoot) SoundSystem.playShoot('quad');
+
+                            }, time * 1000);
+                        };
+
+                        spawnWithFan(i * config.burstInterval, decay, angleOffset);
                     }
-                    // Shockwave x3
-                    for (let i = 0; i < 1; i++) {
-                        setTimeout(() => spawnShockwave(config.shockwave, config.damage), i * config.burstInterval * 1000);
-                    }
+
+                    // Shockwave x3 (Optional: Keep it simple one shockwave? Task didn't specify multiple shockwaves for Trio/Quad updates, assuming Quad keeps existing behavior)
+                    // Original code: loop 1 time?
+                    // Assumed original intention was 1 shockwave or sync with burst? 
+                    // Let's keep 1 shockwave at start.
+                    spawnShockwave(config.shockwave, config.damage);
+
                 } else if (type === 'trio') {
                     config = CONFIG.bullet.trio;
                     speed = config.speed;
@@ -2400,16 +2658,54 @@
                     gravity = config.gravity;
                     size = config.size;
                     stats = { damage: config.damage, penetration: config.penetration, recoil: config.recoil, knockback: config.knockback };
-                    direction = this.getForwardVector();
 
-                    spawnBullet('trio');
+                    // [New] Burst Logic for Trio (Copied/Adapted from Quad)
+                    this.isBursting = true;
+                    setTimeout(() => { this.isBursting = false; }, config.burstCount * config.burstInterval * 1000 + 50);
+
+                    for (let i = 0; i < config.burstCount; i++) {
+                        const decay = Math.pow(0.5, i); // Recoil Decay (100%, 50%, 25%...)
+
+                        // Angle Logic (Array)
+                        let angleOffset = 0;
+                        if (config.angles && config.angles.length > 0) {
+                            angleOffset = config.angles[i % config.angles.length];
+                        }
+
+                        const spawnWithFan = (time, decayVal, angle) => {
+                            setTimeout(() => {
+                                const baseDir = this.getForwardVector();
+                                const fanDir = baseDir.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), angle);
+
+                                const currentSpawnPos = new THREE.Vector3();
+                                this.mouth.getWorldPosition(currentSpawnPos);
+                                currentSpawnPos.add(this.getForwardVector().multiplyScalar(0.5));
+
+                                const bullet = new Bullet('trio', currentSpawnPos, fanDir, speed, life, gravity, size, stats);
+                                state.bullets.push(bullet);
+
+                                // Recoil
+                                const force = stats.recoil * CONFIG.combat.recoilForce * decayVal;
+                                const recoilVec = fanDir.clone().normalize().multiplyScalar(-force);
+                                this.velocity.add(recoilVec);
+
+                                // [New] Bullet Sound (Trio)
+                                if (SoundSystem.playShoot) SoundSystem.playShoot('trio');
+
+                            }, time * 1000);
+                        };
+
+                        spawnWithFan(i * config.burstInterval, decay, angleOffset);
+                    }
                     spawnShockwave(config.shockwave, config.damage);
                 } else if (type === 'duo') {
                     // Check Mode
                     if (state.mode === 'quad') {
                         config = CONFIG.bullet.ultraDuo; // Stronger
+                        spawnBullet('ultraDuo');
                     } else {
                         config = CONFIG.bullet.duo;
+                        spawnBullet('duo');
                     }
                     speed = config.speed;
                     life = config.life;
@@ -2417,12 +2713,13 @@
                     size = config.size;
                     stats = { damage: config.damage, penetration: config.penetration, recoil: config.recoil, knockback: config.knockback };
                     direction = this.getForwardVector();
-                    spawnBullet('duo');
                     if (config.shockwave) spawnShockwave(config.shockwave, config.damage);
                 } else {
                     // Single
+                    let bType = 'single';
                     if (state.mode === 'quad') {
                         config = CONFIG.bullet.ultraSingle; // Stronger
+                        bType = 'ultraSingle';
                     } else {
                         config = CONFIG.bullet.single;
                     }
@@ -2437,7 +2734,7 @@
                     const spread = (Math.random() - 0.5) * config.spread;
                     direction = this.getForwardVector().applyAxisAngle(new THREE.Vector3(0, 1, 0), spread);
 
-                    spawnBullet(type);
+                    spawnBullet(bType);
                 }
             }
 
@@ -2623,12 +2920,32 @@
 
                 // Sound Triggers
                 if (prevRhythm < 0.5 && state.rhythmTime >= 0.5) {
-                    SoundSystem.playOpenHiHat();
+                    SoundSystem.playKick(); // [Swap] Open Hi-Hat -> Kick
                     // Character Bounce (Visual Beat)
                     this.pulseScale = 1.15; // Jump to 1.15x
-                }
-                if (state.rhythmTime < prevRhythm) SoundSystem.playHiHat();
 
+                    // [New] Bass Line Trigger (Corrected to Downbeat)
+                    // Sequence: 1, 3b, 4, 5, 4#, 4, 3b, 7b (Low)
+                    // Relative Semitones: 0, 3, 5, 7, 6, 5, 3, -2
+                    if (state.beatCount === undefined) state.beatCount = 0;
+                    state.beatCount++;
+
+                    const bassSequence = [0, 3, 5, 7, 6, 5, 3, -2];
+                    const bassNote = bassSequence[(state.beatCount - 1) % bassSequence.length];
+                    if (SoundSystem.playBass) SoundSystem.playBass(bassNote);
+                }
+
+                // [New] Quarter-Note Hi-Hat (1/4 and 3/4)
+                if (state.quarterHiHat) {
+                    if (prevRhythm < 0.25 && state.rhythmTime >= 0.25) {
+                        SoundSystem.playHiHat();
+                    }
+                    if (prevRhythm < 0.75 && state.rhythmTime >= 0.75) {
+                        SoundSystem.playHiHat();
+                    }
+                }
+
+                if (state.rhythmTime < prevRhythm) SoundSystem.playOpenHiHat(); // [Swap] Kick -> Open Hi-Hat
                 const cursor = document.getElementById('rhythm-cursor');
                 const target = document.getElementById('rhythm-target');
                 cursor.style.left = (state.rhythmTime * 100) + '%';
@@ -2746,13 +3063,33 @@
                 else if (readyPlayers.length === 2) { synergyLevel = 2; synergyName = 'duo'; }
 
                 if (synergyLevel > 0) {
-                    // Sync Timers: All ready players sync to the smallest timer (closest to fire)
-                    const minTimer = Math.min(...readyPlayers.map(p => this.windupTimer[p]));
-                    readyPlayers.forEach(p => this.windupTimer[p] = minTimer);
+                    // Sync Timers: 
+                    // [New] "Start from 2nd player instant" Logic
+                    // If we just transitioned from <2 to >=2 ready players, we reset everyone's timer to FULL.
+                    // This effectively delays P1 to sync with P2's start time.
+
+                    if (!this.lastReadyCount) this.lastReadyCount = 0;
+
+                    // Check if this is the moment the group formed (became valid synergy)
+                    if (this.lastReadyCount < 2 && readyPlayers.length >= 2) {
+                        // Reset All to Full Duration
+                        readyPlayers.forEach(p => this.windupTimer[p] = CONFIG.combat.preFireDelay);
+                    }
+                    else {
+                        // Standard Sync: If already established, sync to the fastest timer (catch up logic for P3/P4 or just drift correction)
+                        // Actually, if we want strict "Second Player" rule, maybe we shouldn't speed up P3? 
+                        // But usually P3 should join the existing group. The group is defined by P2's deadline.
+                        // So existing logic (minTimer) is correct for P3/P4 joining P1+P2.
+
+                        const minTimer = Math.min(...readyPlayers.map(p => this.windupTimer[p]));
+                        readyPlayers.forEach(p => this.windupTimer[p] = minTimer);
+                    }
 
                     // Mark as Synergy Pending (to prevent single fire)
                     this.synergyPending = synergyLevel;
                     this.synergyType = synergyName;
+
+                    // ... (rest of visual update logic)
 
                     // Update Visuals: Remove individual dots and show Synergy Dot
                     // Naive approach: Just remove all and show one big one if not already shown?
@@ -2780,6 +3117,7 @@
                     }
                 }
                 this.lastSynergyLevel = synergyLevel;
+                this.lastReadyCount = readyPlayers.length; // [New] Update state for next frame
 
                 // 4. Visuals & Logic Loop
                 players.forEach(p => {
@@ -2881,8 +3219,9 @@
                         // 1. Rotation: Always allowed if not charging
                         totalRotationInput.add(inputVec);
 
-                        // 2. Movement: Allowed only if NOT Attacking
-                        if (!isAttacking) {
+                        // 2. Movement: Allowed only if NOT Attacking OR (Recovery & Single/UltraSingle)
+                        // User: "When Single/UltraSingle bullet enters attack recovery, player movement input is restored"
+                        if (!this.isWindup[p] && (this.cooldowns[p] <= 0.05 || (this.lastShotType[p] === 'single' || this.lastShotType[p] === 'ultraSingle'))) {
                             totalInput.add(inputVec);
                             activeDirs.push(dir); // Store for check
                         }
@@ -3002,7 +3341,8 @@
                 // Rotation - FIXED
                 // Rotate towards INPUT Direction (totalRotationInput), ignore recoil velocity
                 // If no input, keep current rotation
-                if (totalRotationInput.lengthSq() > 0.01) {
+                // [New] Rotation Lock during Burst ("發射trio或quad子彈時，從第一發至最後一發射出期間不能轉向")
+                if (totalRotationInput.lengthSq() > 0.01 && !this.isBursting) {
                     const targetAngle = Math.atan2(totalRotationInput.x, totalRotationInput.z);
                     const currentAngle = this.mesh.rotation.y;
                     let deltaAngle = targetAngle - currentAngle;
@@ -3199,6 +3539,22 @@
             if (!state.spawnerEnabled) {
                 if (state.enemyManager) state.enemyManager.killAll();
             }
+        });
+
+        // BPM Slider
+        const bpmSlider = document.getElementById('bpm-slider');
+        const bpmValue = document.getElementById('bpm-value');
+        bpmSlider.addEventListener('input', (e) => {
+            const newBPM = parseInt(e.target.value);
+            bpmValue.textContent = newBPM * 2; // Display quarter-note tempo (x2)
+            CONFIG.rhythm.bpm = newBPM;
+            CONFIG.rhythm.beatInterval = 60 / newBPM;
+        });
+
+        // Quarter Hi-Hat Toggle
+        const quarterHiHatToggle = document.getElementById('quarter-hihat-toggle');
+        quarterHiHatToggle.addEventListener('change', (e) => {
+            state.quarterHiHat = e.target.checked;
         });
 
         // Dummy Toggle (Moved to Info Container)
