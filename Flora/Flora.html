@@ -687,61 +687,36 @@
                 clickOsc.stop(t + 0.05);
             },
             // [New] Bullet Shoot SFX
-            playShoot: function (type) {
-                if (!this.ctx) return;
-                const t = this.ctx.currentTime;
+            // playShoot: function (type) {
+            //     if (!this.ctx) return;
+            //     const t = this.ctx.currentTime;
 
-                const osc = this.ctx.createOscillator();
-                const gain = this.ctx.createGain();
+            //     const osc = this.ctx.createOscillator();
+            //     const gain = this.ctx.createGain();
 
-                if (type === 'single') {
-                    // [Swap] Single now uses Duo's Square wave, made quieter
-                    osc.type = 'sawtooth';
-                    osc.frequency.setValueAtTime(400, t);
-                    osc.frequency.exponentialRampToValueAtTime(100, t + 0.15);
-                    gain.gain.setValueAtTime(0.2, t);
-                    gain.gain.exponentialRampToValueAtTime(0.01, t + 0.05);
-                } else if (type === 'ultraSingle') {
-                    // Stronger Single
-                    osc.type = 'sawtooth';
-                    osc.frequency.setValueAtTime(800, t);
-                    osc.frequency.exponentialRampToValueAtTime(200, t + 0.05);
-                    gain.gain.setValueAtTime(0.55, t); // Louder (was 0.25)
-                    gain.gain.exponentialRampToValueAtTime(0.01, t + 0.05);
-                } else if (type === 'duo') {
-                    // [Swap] Duo now uses Single's Triangle wave, made louder
-                    osc.type = 'triangle';
-                    osc.frequency.setValueAtTime(600, t);
-                    osc.frequency.exponentialRampToValueAtTime(100, t + 0.1);
-                    gain.gain.setValueAtTime(0.2, t); // Stronger Triangle
-                    gain.gain.exponentialRampToValueAtTime(0.01, t + 0.1);
-                } else if (type === 'ultraDuo') {
-                    // Ultra Duo - Heavier
-                    osc.type = 'sawtooth';
-                    osc.frequency.setValueAtTime(800, t);
-                    osc.frequency.exponentialRampToValueAtTime(200, t + 0.05);
-                    gain.gain.setValueAtTime(0.55, t); // Louder (was 0.25)
-                    gain.gain.exponentialRampToValueAtTime(0.01, t + 0.05);
-                } else if (type === 'trio' || type === 'quad') {
-                    // Burst Shots - Louder
-                    osc.type = 'sawtooth';
-                    osc.frequency.setValueAtTime(800, t);
-                    osc.frequency.exponentialRampToValueAtTime(200, t + 0.05);
-                    gain.gain.setValueAtTime(0.55, t); // Louder (was 0.25)
-                    gain.gain.exponentialRampToValueAtTime(0.01, t + 0.05);
-                } else {
-                    // Fallback
-                    osc.type = 'sawtooth';
-                    osc.frequency.setValueAtTime(400, t);
-                    gain.gain.setValueAtTime(0.25, t);
-                    gain.gain.exponentialRampToValueAtTime(0.01, t + 0.15);
-                }
+            //     if (type === 'single') {
+            //         // Weak, quiet sound
+            //         osc.type = 'triangle';
+            //         osc.frequency.setValueAtTime(600, t);
+            //         osc.frequency.exponentialRampToValueAtTime(100, t + 0.1);
+            //         gain.gain.setValueAtTime(0.1, t); // Quiet
+            //         gain.gain.exponentialRampToValueAtTime(0.01, t + 0.1);
+            //     } else {
+            //         // Standard/Beefy sound
+            //         osc.type = 'sawtooth';
+            //         osc.frequency.setValueAtTime(800, t);
+            //         osc.frequency.exponentialRampToValueAtTime(100, t + 0.2);
+            //         gain.gain.setValueAtTime(0.3, t);
+            //         gain.gain.exponentialRampToValueAtTime(0.01, t + 0.2);
 
-                osc.connect(gain);
-                gain.connect(this.ctx.destination);
-                osc.start(t);
-                osc.stop(t + 0.3);
-            },
+            //         // Add some noise for punch?
+            //     }
+
+            //     osc.connect(gain);
+            //     gain.connect(this.ctx.destination);
+            //     osc.start(t);
+            //     osc.stop(t + 0.3);
+            // },
             // [New] Bass Line Synthesizer
             // playBass: function (semitone) {
             //     if (!this.ctx) return;
@@ -2636,9 +2611,6 @@
                                 const recoilVec = fanDir.clone().normalize().multiplyScalar(-force);
                                 this.velocity.add(recoilVec);
 
-                                // [New] Bullet Sound (Quad)
-                                if (SoundSystem.playShoot) SoundSystem.playShoot('quad');
-
                             }, time * 1000);
                         };
 
@@ -2689,9 +2661,6 @@
                                 const recoilVec = fanDir.clone().normalize().multiplyScalar(-force);
                                 this.velocity.add(recoilVec);
 
-                                // [New] Bullet Sound (Trio)
-                                if (SoundSystem.playShoot) SoundSystem.playShoot('trio');
-
                             }, time * 1000);
                         };
 
@@ -2702,10 +2671,8 @@
                     // Check Mode
                     if (state.mode === 'quad') {
                         config = CONFIG.bullet.ultraDuo; // Stronger
-                        spawnBullet('ultraDuo');
                     } else {
                         config = CONFIG.bullet.duo;
-                        spawnBullet('duo');
                     }
                     speed = config.speed;
                     life = config.life;
@@ -2713,13 +2680,12 @@
                     size = config.size;
                     stats = { damage: config.damage, penetration: config.penetration, recoil: config.recoil, knockback: config.knockback };
                     direction = this.getForwardVector();
+                    spawnBullet('duo');
                     if (config.shockwave) spawnShockwave(config.shockwave, config.damage);
                 } else {
                     // Single
-                    let bType = 'single';
                     if (state.mode === 'quad') {
                         config = CONFIG.bullet.ultraSingle; // Stronger
-                        bType = 'ultraSingle';
                     } else {
                         config = CONFIG.bullet.single;
                     }
@@ -2734,7 +2700,7 @@
                     const spread = (Math.random() - 0.5) * config.spread;
                     direction = this.getForwardVector().applyAxisAngle(new THREE.Vector3(0, 1, 0), spread);
 
-                    spawnBullet(bType);
+                    spawnBullet(type);
                 }
             }
 
@@ -3173,8 +3139,23 @@
                                     // Reset ALL ready players cooldowns
                                     readyPlayers.forEach(rp => {
                                         this.isWindup[rp] = false;
-                                        this.cooldowns[rp] = CONFIG.combat.cooldown;
-                                        // Slight extra delay for Quad? No, use standard.
+
+                                        // [New] Dynamic Cooldown for Burst (Trio/Quad)
+                                        // Movement restored only after last shot finishes + buffer
+                                        let burstDuration = 0;
+                                        if (type === 'trio' && CONFIG.bullet.trio.burstCount > 1) {
+                                            burstDuration = (CONFIG.bullet.trio.burstCount - 1) * CONFIG.bullet.trio.burstInterval;
+                                        } else if (type === 'quad' && CONFIG.bullet.quad.burstCount > 1) {
+                                            burstDuration = (CONFIG.bullet.quad.burstCount - 1) * CONFIG.bullet.quad.burstInterval;
+                                        }
+
+                                        // Set Cooldown
+                                        // Ensure we wait for burst to finish.
+                                        const requiredTime = Math.max(CONFIG.combat.cooldown, burstDuration + 0.1);
+                                        this.cooldowns[rp] = requiredTime;
+
+                                        // Set Type for Input Blocking Logic
+                                        this.lastShotType[rp] = type;
                                     });
                                 }
                             } else {
