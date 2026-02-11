@@ -1,0 +1,82 @@
+{
+  "added": [
+    {
+      "from": 35,
+      "to": 61,
+      "type": "manual",
+      "label": "Manual"
+    },
+    {
+      "from": 26,
+      "to": 19,
+      "type": "manual",
+      "label": "Manual"
+    },
+    {
+      "from": 62,
+      "to": 39,
+      "type": "manual",
+      "label": "Manual"
+    },
+    {
+      "from": 57,
+      "to": 13,
+      "type": "manual",
+      "label": "Manual"
+    },
+    {
+      "from": 55,
+      "to": 33,
+      "type": "manual",
+      "label": "Manual"
+    },
+    {
+      "from": 55,
+      "to": 27,
+      "type": "manual",
+      "label": "Manual"
+    }
+  ],
+  "removed": [
+    {
+      "from": 35,
+      "to": 54
+    },
+    {
+      "from": 15,
+      "to": 18
+    },
+    {
+      "from": 22,
+      "to": 24
+    },
+    {
+      "from": 15,
+      "to": 4
+    },
+    {
+      "from": 38,
+      "to": 54
+    },
+    {
+      "from": 13,
+      "to": 47
+    },
+    {
+      "from": 34,
+      "to": 41
+    },
+    {
+      "from": 58,
+      "to": 53
+    },
+    {
+      "from": 62,
+      "to": 14
+    },
+    {
+      "from": 14,
+      "to": 62
+    }
+  ]
+}

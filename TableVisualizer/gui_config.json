@@ -1,0 +1,426 @@
+{
+  "working_directory": "/Users/halaa/Desktop/Unity Project/ProjectGidora/GidoraCommon/Table/ExcelFiles",
+  "node_positions": {
+    "Airdrop.Airdrop_Pattern": [
+      715.5,
+      687.5
+    ],
+    "Airdrop.Airdrop_Thereafter": [
+      926.5,
+      687.5
+    ],
+    "Broadcast.Broadcast": [
+      63.5,
+      852.5
+    ],
+    "Broadcast.Broadcast_c": [
+      223.5,
+      852.5
+    ],
+    "Building.Building": [
+      1189.5,
+      457.5
+    ],
+    "Building.Building_Turret": [
+      1413.5,
+      457.5
+    ],
+    "Building.Building_MainTurret": [
+      1189.5,
+      522.5
+    ],
+    "Building.Building_Fountain": [
+      1413.5,
+      522.5
+    ],
+    "Common.Common": [
+      1405.2425,
+      700.7250000000001
+    ],
+    "Damage.Damage": [
+      1189.5,
+      687.5
+    ],
+    "DropObject.DropObject": [
+      1630.9524999999999,
+      689.7574999999999
+    ],
+    "Effect.Effect": [
+      2128.5,
+      457.5
+    ],
+    "Entity.Entity": [
+      2109.5,
+      687.5
+    ],
+    "Item.Item_Usage": [
+      687.5,
+      852.5
+    ],
+    "Kaiju.Kaiju_Solo": [
+      71.5,
+      457.5
+    ],
+    "Kaiju.Kaiju_Solo_c": [
+      251.5,
+      457.5
+    ],
+    "Kaiju.Kaiju_Fused": [
+      71.5,
+      522.5
+    ],
+    "Kaiju.Kaiju_Fullness": [
+      251.5,
+      522.5
+    ],
+    "Language.Language_c": [
+      1879.5,
+      687.5
+    ],
+    "Loot.Loot": [
+      62.5,
+      687.5
+    ],
+    "Melee.Melee_Solo": [
+      292.5,
+      687.5
+    ],
+    "Melee.Melee_Fused": [
+      456.5,
+      687.5
+    ],
+    "NeutralUnits.NeutralUnits": [
+      584.5218749999999,
+      410.35287500000004
+    ],
+    "NeutralUnits.NeutralUnits_Tank": [
+      880.12625,
+      422.519875
+    ],
+    "NeutralUnits.NeutralUnits_Human_AI": [
+      549.5417499999999,
+      540.7505000000001
+    ],
+    "NeutralUnits.NeutralUnits_Human_FearBehavior": [
+      849.7087499999999,
+      540.7505
+    ],
+    "Resource.Resource": [
+      2353.5,
+      457.5
+    ],
+    "Skill.Skill_Shooter": [
+      91.5,
+      32.5
+    ],
+    "Skill.Skill_Trait_Shooter": [
+      323.5,
+      32.5
+    ],
+    "Skill.Skill_Stainer": [
+      587.5,
+      32.5
+    ],
+    "Skill.Skill_Trait_Stainer": [
+      847.5,
+      32.5
+    ],
+    "Skill.Skill_Defender": [
+      1055.728625,
+      29.45825
+    ],
+    "Skill.Skill_Trait_Defender": [
+      1299.5,
+      32.5
+    ],
+    "Skill.Skill_Runner": [
+      91.5,
+      97.5
+    ],
+    "Skill.Skill_Trait_Runner": [
+      321.75099375,
+      97.50000000000001
+    ],
+    "Skill.Skill_Bomber": [
+      590.5417500000001,
+      97.50000000000001
+    ],
+    "Skill.Skill_Trait_Bomber": [
+      847.5,
+      97.5
+    ],
+    "Skill.Skill_Boomberry": [
+      1075.5,
+      97.5
+    ],
+    "Skill.Skill_Slicer": [
+      1299.5,
+      97.5
+    ],
+    "Skill.Skill_SlicerLeaf": [
+      91.5,
+      162.5
+    ],
+    "Skill.Skill_Trait_Slicer": [
+      325.02087500000005,
+      160.97912499999995
+    ],
+    "Skill.Skill_VenomPuddle": [
+      588.3695652173914,
+      162.49999999999997
+    ],
+    "Skill.Skill_Turret": [
+      847.5,
+      162.5
+    ],
+    "Skill.Skill_MainTurret": [
+      1075.5,
+      162.5
+    ],
+    "Skill.Skill_Tank": [
+      1299.5,
+      162.5
+    ],
+    "Skill.Skill_Fused_Step": [
+      91.5,
+      227.5
+    ],
+    "Skill.Skill_Dino": [
+      323.5,
+      227.5
+    ],
+    "Skill.Skill_Item_HomingMissile": [
+      587.5,
+      227.5
+    ],
+    "Skill.Skill_Item_MiniTurret": [
+      847.5,
+      227.5
+    ],
+    "Skill.Skill_Item_Bomb": [
+      1075.5,
+      227.5
+    ],
+    "Skill.Skill_Item_DecoyDoll": [
+      1299.5,
+      227.5
+    ],
+    "Skill.Skill_FrostBomb": [
+      91.5,
+      292.5
+    ],
+    "Skill.Skill_Item_MeteorSmash": [
+      323.5,
+      292.5
+    ],
+    "Skill.Skill_Item_ThornTrap": [
+      587.5,
+      292.5
+    ],
+    "SpawnedObject.SpawnedObject": [
+      1650.5,
+      32.5
+    ],
+    "SpawnedObject.SpawnedObject_AirDropBox": [
+      1958.5,
+      32.5
+    ],
+    "SpawnedObject.SpawnedObject_Item_PortalPad": [
+      2262.5,
+      32.5
+    ],
+    "SpawnedObject.SpawnedObject_Item_MiniTurret": [
+      1627.686875,
+      97.5
+    ],
+    "SpawnedObject.SpawnedObject_Item_ThornTrap": [
+      1958.5,
+      97.5
+    ],
+    "SpawnedObject.SpawnedObject_HealPack": [
+      2262.5,
+      97.5
+    ],
+    "SpawnedObject.SpawnedObject_VenomPuddle": [
+      1650.5,
+      162.5
+    ],
+    "SpawnedObject.SpawnedObject_Boomberry": [
+      1958.5,
+      162.5
+    ],
+    "SpawnedObject.SpawnedObject_SlicerLeaf": [
+      2262.5,
+      162.5
+    ],
+    "Spawner.Spawner": [
+      457.5,
+      852.5
+    ],
+    "Stage.Stage": [
+      1671.5,
+      457.5
+    ],
+    "Stage.Stage_Stage002_Rule": [
+      1862.5,
+      457.5
+    ]
+  },
+  "table_colors": {
+    "Airdrop": "#5a9e00",
+    "Broadcast": "#9e9100",
+    "Building": "#9e3830",
+    "Common": "#33c9f3",
+    "Damage": "#ff0202",
+    "DropObject": "#691e9e",
+    "Effect": "#02919e",
+    "Entity": "#3a509e",
+    "Item": "#00e2da",
+    "Kaiju": "#009e0d",
+    "Language": "#5b9842",
+    "Loot": "#9e0091",
+    "Melee": "#4134d4",
+    "NeutralUnits": "#5f359e",
+    "Resource": "#9e248a",
+    "Skill": "#479e85",
+    "SpawnedObject": "#9e946b",
+    "Spawner": "#9e629e",
+    "Stage": "#9e5555"
+  },
+  "sheet_settings": {
+    "Item.Item_Usage": {
+      "param_row": 5
+    },
+    "Damage.Damage": {
+      "param_row": 5,
+      "hidden_fields": [
+        "驗證用1",
+        "驗證用2",
+        "驗證用3"
+      ]
+    },
+    "Effect.Effect": {
+      "param_row": 6,
+      "custom_display": {
+        "use_custom": true,
+        "transpose": false,
+        "field_indices": [
+          0
+        ],
+        "value_indices": [
+          5
+        ]
+      }
+    },
+    "Airdrop.Airdrop_Pattern": {
+      "param_row": 5
+    },
+    "SpawnedObject.SpawnedObject": {
+      "param_row": 4
+    },
+    "Airdrop.Airdrop_Thereafter": {
+      "param_row": 5
+    },
+    "Skill.Skill_Trait_Defender": {
+      "hidden_fields": []
+    },
+    "NeutralUnits.NeutralUnits": {
+      "param_row": 5
+    },
+    "SpawnedObject.SpawnedObject_AirDropBox": {
+      "custom_display": {
+        "use_custom": true,
+        "transpose": false,
+        "field_indices": [
+          0
+        ],
+        "value_indices": [
+          3
+        ]
+      }
+    },
+    "Loot.Loot": {
+      "custom_display": {
+        "use_custom": true,
+        "transpose": true,
+        "field_indices": [
+          1
+        ],
+        "value_indices": [
+          6,
+          7
+        ]
+      }
+    },
+    "Kaiju.Kaiju_Solo": {
+      "custom_display": {
+        "use_custom": true,
+        "transpose": false,
+        "field_indices": [
+          0
+        ],
+        "value_indices": [
+          3,
+          4,
+          5,
+          6,
+          7,
+          8
+        ]
+      }
+    },
+    "Common.Common": {
+      "custom_display": {
+        "use_custom": true,
+        "transpose": true,
+        "field_indices": [
+          2
+        ],
+        "value_indices": [
+          1
+        ]
+      }
+    }
+  },
+  "layout_settings": {
+    "h_splitter": [
+      1906,
+      623
+    ],
+    "v_splitter": [
+      864,
+      362
+    ]
+  },
+  "window_state": {
+    "width": 2560,
+    "height": 1308,
+    "maximized": true
+  },
+  "global_settings": {
+    "font_size": 14
+  },
+  "view_settings": {
+    "main_view_transform": [
+      0.6575162324319884,
+      0.0,
+      0.0,
+      0.0,
+      0.6575162324319884,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+    ],
+    "center_on": [
+      1230.3878749999994,
+      310.25849999999986
+    ]
+  },
+  "last_view": {
+    "scale": 1.0,
+    "center_x": 0,
+    "center_y": 0
+  },
+  "show_arrows": false
+}
