@@ -246,8 +246,50 @@ class ExcelHandler:
                 return False, f"COM Error: {e}"
             finally:
                 pythoncom.CoUninitialize()
+
+        elif sys.platform == 'darwin':
+            # macOS implementation using AppleScript (Safe for complex .xlsm)
+            try:
+                abs_path = str(file_path.absolute())
+                safe_path = abs_path.replace('"', '\\"')
+                safe_sheetname = sheet_name.replace('"', '\\"')
+                
+                # Format value for AppleScript
+                val_repr = ""
+                if isinstance(converted_value, bool):
+                    val_repr = "true" if converted_value else "false"
+                elif isinstance(converted_value, (int, float)):
+                    val_repr = str(converted_value)
+                else:
+                    # Escape double quotes and backslashes for AppleScript
+                    # AppleScript string escaping is tricky, usually backslash escapes double quote
+                    safe_val_str = str(converted_value).replace('\\', '\\\\').replace('"', '\\"')
+                    val_repr = f'"{safe_val_str}"'
+
+                script = f'''
+                tell application "Microsoft Excel"
+                    set targetWorkbook to open workbook workbook file name "{safe_path}"
+                    
+                    tell worksheet "{safe_sheetname}" of targetWorkbook
+                        set value of cell {col_idx} of row {row_idx} to {val_repr}
+                    end tell
+                    
+                    save targetWorkbook
+                end tell
+                '''
+                
+                result = subprocess.run(['osascript', '-e', script], capture_output=True, text=True)
+                
+                if result.returncode != 0:
+                    return False, f"AppleScript Error: {result.stderr}"
+                    
+                return True, "Success"
+                
+            except Exception as e:
+                return False, f"Write Error (AppleScript): {e}"
+
         else:
-            # macOS / Linux implementation using OpenPyXL
+            # Linux / Fallback implementation using OpenPyXL
             try:
                 # keep_vba=True is crucial for .xlsm
                 wb = openpyxl.load_workbook(file_path, keep_vba=True)
