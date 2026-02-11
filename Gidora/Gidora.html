@@ -39,181 +39,21 @@
             border-radius: 5px;
             min-width: 300px;
         }
-
-        #pulse-bar-container {
-            width: 100%;
-            height: 20px;
-            background-color: #444;
-            margin-top: 10px;
-            border-radius: 10px;
-            overflow: hidden;
-            border: 1px solid #777;
-        }
-
-        #pulse-bar {
-            width: 0%;
-            height: 100%;
-            background: linear-gradient(90deg, #ff00ff, #00ffff);
-            transition: width 0.1s linear;
-        }
-
-        /* Rhythm Assist UI */
-        #rhythm-helper {
-            position: absolute;
-            bottom: 22%;
-            /* Moved up */
-            left: 50%;
-            transform: translateX(-50%);
-            width: 400px;
-            height: 60px;
-            pointer-events: none;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        /* Pulse Meter - Moved to Center Bottom */
-        #pulse-container-central {
-            position: absolute;
-            bottom: 10%;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 500px;
-            height: 30px;
-            background: #222;
-            border: 2px solid #555;
-            border-radius: 15px;
-            overflow: hidden;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        #pulse-bar {
-            width: 0%;
-            height: 100%;
-            background: linear-gradient(90deg, #ff00ff, #00ffff);
-            transition: width 0.1s linear;
-        }
-
-        .pulse-locked {
-            filter: grayscale(100%);
-            background: #444 !important;
-        }
-
-        #pulse-text {
-            position: absolute;
-            color: white;
-            font-weight: bold;
-            text-shadow: 1px 1px 2px black;
-            z-index: 10;
-        }
-
-
-
-        .beat-line {
-            position: absolute;
-            width: 100%;
-            height: 2px;
-            background: rgba(255, 255, 255, 0.3);
-        }
-
-        .center-target {
-            position: absolute;
-            width: 30px;
-            height: 30px;
-            border: 2px solid white;
-            border-radius: 50%;
-            transform: scale(1);
-            transition: transform 0.1s;
-        }
-
-        .beat-cursor {
-            position: absolute;
-            top: 10px;
-            bottom: 10px;
-            width: 4px;
-            background-color: white;
-            left: 0%;
-            box-shadow: 0 0 10px white;
-        }
-
-        .input-indicator {
-            position: absolute;
-            width: 20px;
-            height: 20px;
-            border-radius: 50%;
-            transform: scale(0);
-            opacity: 0;
-            transition: transform 0.2s ease-out, opacity 0.3s ease-out;
-            box-sizing: border-box;
-            /* Ensure border doesn't increase size */
-        }
-
-        .indicator-p1 {
-            background-color: #ff4444;
-        }
-
-        .indicator-p2 {
-            background-color: #4444ff;
-        }
-
-        .indicator-p3 {
-            background-color: #ff69b4;
-        }
-
-        .indicator-p4 {
-            background-color: #00ffff;
-        }
-
-
-
-
-
-
-        .indicator-duo {
-            background-color: #ffff00;
-            width: 40px;
-            height: 40px;
-            z-index: 10;
-        }
     </style>
 </head>
 
 <body>
     <div id="info">
-        <h3>Gidora Duo Prototype</h3>
-        <p>1P (Red): WASD to Move, Click to Attack, R-Click to Charge</p>
-        <p>2P (Blue): Gamepad / Arrows to Move, Enter/East to Attack, Shift/RT to Charge</p>
+        <h3>Gidora Dragon Prototype</h3>
+        <p>1P (Red): WASD + Click (Headbutt)</p>
+        <p>2P (Blue): Arrows + Enter (Headbutt)</p>
+        <p>3P (Pink): IJKL + Space (Headbutt)</p>
+        <p>4P (Cyan): TFGH + V (Tail Attack)</p>
         <div id="debug"></div>
-        <div style="margin-top:10px; pointer-events:auto;">
-            <label for="bpm-slider" style="color: white; font-weight: bold;">BPM: <span
-                    id="bpm-value">120</span></label><br>
-            <input type="range" id="bpm-slider" min="30" max="180" value="60" step="1"
-                style="width: 200px; margin-top: 5px;">
-        </div>
-        <div style="margin-top:10px; pointer-events:auto;">
-            <label style="color: white; font-weight: bold;">
-                <input type="checkbox" id="quarter-hihat-toggle">
-                8 beats
-            </label>
-        </div>
         <button id="mode-toggle" style="margin-top:10px; pointer-events:auto;">Switch to 2P Mode</button>
         <button id="spawner-toggle"
             style="margin-top:10px; pointer-events:auto; background-color: #44aa44; color: white;">Start Enemy
             Spawn</button>
-    </div>
-
-    <div id="rhythm-helper">
-        <div class="beat-line"></div>
-        <div class="center-target" id="rhythm-target"></div>
-        <div class="beat-cursor" id="rhythm-cursor"></div>
-    </div>
-
-    <!-- New Location for Pulse Meter -->
-    <div id="pulse-container-central">
-        <div id="pulse-bar"></div>
-        <div id="pulse-text">PULSE</div>
     </div>
     <script type="importmap">
         {
@@ -275,31 +115,47 @@
                     attackRange: 4.0,
                     spawnDelay: 0,    // [New] 按下開始後延遲 10秒 出現
                     projectileSpeed: 18, // [New] Boss Bullet Speed
+                    projectileKnockback: 42, // [New] Boss Bullet Knockback (擊退力)
                     color: 0x8800ff
                 }
             },
 
-            // 移動相關 (Movement)
+            // 移動相關 (Movement) - Separate for Duo/Quad
             movement: {
-                maxSpeed: 6,      // 最大合力速度 (World units per second)
-                acceleration: 5,  // 起步加速度
-                friction: 10,      // 停止時的摩擦力 (慣性減速)
-                traction: 10,       // 抓地力 (轉向時改變前進方向的速度) - 高=軌道車, 低=甩尾
-                rotationSpeed: 4,  // 轉身速度
+                duo: {
+                    maxSpeed: 6,         // 最大合力速度 (World units per second)
+                    acceleration: 7,     // 起步加速度
+                    friction: 8,        // 停止時的摩擦力 (慣性減速)
+                    traction: 100,       // 抓地力 (轉向時改變前進方向的速度) - 高=軌道車, 低=甩尾
+                    rotationSpeed: 3   // 轉身速度
+                },
+                quad: {
+                    maxSpeed: 7,         // 最大合力速度 (World units per second)
+                    acceleration: 7,     // 起步加速度
+                    friction: 10,        // 停止時的摩擦力 (慣性減速)
+                    traction: 100,       // 抓地力 (轉向時改變前進方向的速度) - 高=軌道車, 低=甩尾
+                    rotationSpeed: 2.5   // 轉身速度
+                }
             },
 
             // 戰鬥相關 (Combat)
             combat: {
-                preFireDelay: 0.5,       // 攻擊前搖時間 (秒)
-                duoWindow: 0.26,          // 雙人子彈合體判定窗口 (秒)
-                quadWindow: 0.33,         // [New] 四人容許窗口 (更寬鬆)
-                cooldown: 0.3,           // 攻擊冷卻時間 (秒) - 發射後開始計算
-                bufferWindow: 0.15,       // 輸入預緩衝窗口 (秒)
-                recoilForce: 10,           // [New] Recoil Force base (scaled by bullet type)
-                knockbackBase: 0.2         // [New] Enemy Knockback = Damage * kickbackBase
+                meleeDamage: 25,
+                attackRange: 2.5,
+                windupTime: 0.2,   // 前搖 (Head pulls back)
+                recoveryTime: 0.4,  // 後搖 (Head smashes down & returns)
+                cooldown: 0.6,       // Total internal cooldown
+
+                // Legacy / Unused logic params (kept if needed by other systems)
+                preFireDelay: 0.5,
+                duoWindow: 0.26,
+                quadWindow: 0.33,
+                bufferWindow: 0.15,
+                recoilForce: 10,
+                knockbackBase: 0.2
             },
 
-            // 子彈參數 (Bullets)
+            // 子彈參數 (Bullets) - Keeping simplified for now
             bullet: {
                 single: {
                     damage: 6,           // [單人] 傷害
@@ -323,82 +179,12 @@
                     penetration: 1,      // [New] 穿透人數
                     recoil: 1.5,
                     knockback: 14         // [New] Bullet Knockback
-                },
-                // [New] 四人獸專用強化版 (Stronger Single/Duo)
-                ultraSingle: {
-                    damage: 6,          // [四人-單] 傷害 (Buffed from 6)
-                    size: 0.55,           // [四人-單] 稍大
-                    speedMin: 20,        // [四人-單] 更快
-                    speedMax: 24,
-                    lifeMin: 2.1,
-                    lifeMax: 2.5,
-                    spread: 0.4,         // [四人-單] 更準
-                    gravity: 25,         // [四人-單] 較輕
-                    penetration: 0,      // [四人-單] 穿透1人!
-                    recoil: 0,
-                    knockback: 6         // [New] Bullet Knockback
-                },
-                ultraDuo: {
-                    damage: 14,          // [四人-雙] 傷害 (Buffed from 14)
-                    size: 0.8,           // [四人-雙] 巨大
-                    speed: 30,           // [四人-雙] 很快
-                    life: 4.0,
-                    gravity: 0,
-                    penetration: 2,      // [四人-雙] 穿透2人!
-                    recoil: 1.5,
-                    knockback: 14,        // [New] Bullet Knockback
-                    shockwave: {
-                        radius: 6,
-                        angle: Math.PI / 0.5,
-                        damage: 6,
-                        knockback: 35    // [New] Shockwave Knockback
-                    }
-                },
-                trio: {
-                    damage: 24,          // [三人] 傷害
-                    size: 1,
-                    speed: 32,
-                    life: 5.0,
-                    gravity: 0,
-                    penetration: 3,
-                    recoil: 1.4,
-                    // [New] Burst & Fan Settings
-                    burstCount: 3,       // 連發數量
-                    burstInterval: 0.12, // 連發間隔
-                    // fanAngle: Math.PI / 4, // [Deprecated]
-                    angles: [-0.3, 0, 0.3], // [New] Manual Angles (Radians)
-                    knockback: 18,       // [New] Bullet Knockback
-                    shockwave: {
-                        radius: 7,
-                        angle: Math.PI / 0.5,
-                        damage: 6,
-                        knockback: 40    // [New] Shockwave Knockback
-                    }
-                },
-                quad: {
-                    damage: 20,          // [四人] 傷害
-                    size: 1.2,
-                    speed: 32,
-                    life: 5.0,
-                    gravity: 0,
-                    burstCount: 7,
-                    burstInterval: 0.09,
-                    // fanAngle: Math.PI / 3, // [Deprecated]
-                    angles: [-0.6, -0.2, 0.2, 0.6, 0.4, 0, -0.4], // [New] Manual Angles
-                    penetration: 10,
-                    recoil: 1.6,
-                    knockback: 18,       // [New] Bullet Knockback
-                    shockwave: {
-                        radius: 8,
-                        angle: Math.PI / 0.5,
-                        damage: 6,
-                        knockback: 45    // [New] Shockwave Knockback
-                    }
                 }
             },
 
             // 合體技相關 (Combo / Charge)
             combo: {
+                minCharge: 40,
                 chargeRateIndividual: 40, // 單人蓄力時脈衝增加速度 (每秒)
                 chargeRateDuo: 110,        // 雙人蓄力時脈衝增加速度 (每秒) - 鼓勵合作
                 decayRate: 30,            // 沒人蓄力時脈衝消退速度 (每秒)
@@ -439,27 +225,13 @@
                     beam: 0xff00ff,   // 射線顏色
                     indicatorSpacing: 3.5 // [New] Minimum % spacing between indicators to avoid overlap
                 }
-            },
-
-            // 節奏相關 (Rhythm)
-            rhythm: {
-                beatInterval: 1.0, // Will be overwritten by bpm
-                bpm: 60 // [New] Global BPM Control (60 BPM = 1 sec interval)
             }
         };
 
-        // Recalculate beatInterval from BPM
-        CONFIG.rhythm.beatInterval = 60 / CONFIG.rhythm.bpm;
-
         // --- Game State ---
         const state = {
-            rhythmTime: 0, // [New] 0.0 to 1.0 cycle
-            beatCount: 0, // [New] Track total beats for sequencer
             comboCooldown: 0, // [New] Cooldown timer
             comboCooldownMax: 30.0, // 30 Seconds
-            pulse: 0,
-            maxPulse: 100,
-            quarterHiHat: false, // [New] Enable quarter-note hi-hat (1/4, 3/4)
             mode: 'quad', // 'duo' or 'quad'
             playerCount: 4,
 
@@ -478,101 +250,7 @@
             },
             bullets: [],
             particles: [], // Array for simple particles
-            pulseValue: 0, // 0 to 100
             comboActive: false,
-            // Rhythm State
-            rhythmTime: 0, // 0 to 1
-
-            // Input Feedback
-            showInputFeedback: (type, isPerfect, count) => { // 'p1', 'p2', 'duo'
-                const container = document.getElementById('rhythm-helper');
-                const el = document.createElement('div');
-                el.className = `input-indicator indicator-${type}`;
-
-                // Spawn at Current Cursor/Beat Position
-                let spawnTime = state.rhythmTime * 100;
-
-                // [New] Overlap Check & Separation
-                if (type !== 'duo') { // Don't shift Synergy indicators (they are centered merges)
-                    // Config spacing
-                    const spacing = CONFIG.visuals.indicatorSpacing || 2.0;
-
-                    // Filter old
-                    if (!state.recentVisuals) state.recentVisuals = [];
-                    const now = Date.now();
-                    state.recentVisuals = state.recentVisuals.filter(v => now - v.created < 1000); // Keep last 1s
-
-                    // Check collisions
-                    for (let v of state.recentVisuals) {
-                        // Check proximity in % (0-100)
-                        // Handle wrap-around? No, rhythmTime 0-1.
-                        const diff = Math.abs(spawnTime - v.pos);
-                        if (diff < spacing) {
-                            // Collision! Shift right? 
-                            // If we shift right, we might hit next one.
-                            // Simple: Add offset.
-                            spawnTime += spacing;
-                            // Recalculate diffs? Nested loop? 
-                            // Just one pass push is usually enough for 4 players.
-                        }
-                    }
-
-                    // Store new
-                    state.recentVisuals.push({ pos: spawnTime, created: now });
-                }
-
-                el.style.left = spawnTime + '%';
-                el.style.top = '50%';
-
-                // Centering adjustment
-                el.style.marginTop = '-10px';
-                el.style.marginLeft = '-10px';
-
-                if (type === 'duo') {
-                    // Synergy Visuals
-                    let size = 40;
-                    if (count === 3) size = 50;
-                    if (count === 4) size = 60;
-
-                    el.style.width = size + 'px';
-                    el.style.height = size + 'px';
-                    el.style.marginTop = (-size / 2) + 'px';
-                    el.style.marginLeft = (-size / 2) + 'px';
-
-                    // Text Label
-                    if (count >= 2) {
-                        el.innerText = 'x' + count;
-                        el.style.display = 'flex';
-                        el.style.justifyContent = 'center';
-                        el.style.alignItems = 'center';
-                        el.style.color = '#000';
-                        el.style.fontWeight = 'bold';
-                        el.style.fontSize = (size * 0.4) + 'px';
-                    }
-                }
-
-                // Perfect Hit Visuals
-                if (isPerfect) {
-                    el.style.border = '3px solid #ffff00'; // Yellow Border
-                    el.style.boxShadow = '0 0 10px #ffff00'; // Glow
-                }
-
-                container.appendChild(el);
-
-                // Static & Fade Out
-                el.style.opacity = '1';
-                el.style.transform = 'scale(1.2)';
-
-                setTimeout(() => {
-                    el.style.transition = 'opacity 0.7s ease-out, transform 0.7s ease-out';
-                    el.style.opacity = '0';
-                    el.style.transform = 'scale(1.5)';
-
-                    setTimeout(() => el.remove(), 700);
-                }, 50);
-
-                return el;
-            },
 
             lastTime: 0
         };
@@ -587,6 +265,7 @@
                     this.ctx.resume();
                 }
             },
+
             playOpenHiHat: function () {
                 if (!this.ctx) return;
                 // White noise buffer (Longer for Open HH)
@@ -643,49 +322,6 @@
                 gain.connect(this.ctx.destination);
 
                 noise.start();
-            },
-            // [New] Kick Drum Synthesizer
-            playKick: function () {
-                if (!this.ctx) return;
-
-                const t = this.ctx.currentTime;
-                const osc = this.ctx.createOscillator();
-                const gain = this.ctx.createGain();
-
-                // Pitch sweep for kick drum thump
-                osc.type = 'sine';
-                osc.frequency.setValueAtTime(150, t);
-                osc.frequency.exponentialRampToValueAtTime(40, t + 0.1);
-
-                // Amp envelope
-                gain.gain.setValueAtTime(1.0, t);
-                gain.gain.exponentialRampToValueAtTime(0.01, t + 0.4);
-
-                osc.connect(gain);
-                gain.connect(this.ctx.destination);
-
-                osc.start(t);
-                osc.stop(t + 0.5);
-
-                // [New] Click/Beater Sound (High Frequency)
-                const clickOsc = this.ctx.createOscillator();
-                const clickGain = this.ctx.createGain();
-                clickOsc.type = 'square';
-                clickOsc.frequency.setValueAtTime(3000, t);
-                clickOsc.frequency.exponentialRampToValueAtTime(100, t + 0.02);
-                clickGain.gain.setValueAtTime(0.5, t);
-                clickGain.gain.exponentialRampToValueAtTime(0.01, t + 0.05);
-
-                const clickFilter = this.ctx.createBiquadFilter();
-                clickFilter.type = 'highpass';
-                clickFilter.frequency.value = 1000;
-
-                clickOsc.connect(clickFilter);
-                clickFilter.connect(clickGain);
-                clickGain.connect(this.ctx.destination);
-
-                clickOsc.start(t);
-                clickOsc.stop(t + 0.05);
             },
             // [New] Bullet Shoot SFX
             playShoot: function (type) {
@@ -807,7 +443,14 @@
                 this.hitEntities = new Set(); // Track unique entity IDs or objects to avoid hitting same target twice if frames overlap? 
                 // Actually simpler: cooldown per target? Or just hit once.
                 // For penetration, we MUST NOT hit the same entity every frame.
+                this.hitEntities = new Set(); // Track unique entity IDs or objects to avoid hitting same target twice if frames overlap? 
+                // Actually simpler: cooldown per target? Or just hit once.
+                // For penetration, we MUST NOT hit the same entity every frame.
 
+                // [New] Homing
+                this.isHoming = stats.isHoming || false;
+                this.homingTarget = stats.target || null;
+                this.homingStrength = stats.homingStrength || 5.0; // Default strength
 
                 // Color Logic
                 let color;
@@ -1852,7 +1495,8 @@
                         color: 0x8800ff, // [Fixed] User requested Violet/Purple
                         isHoming: true,
                         target: window.gidoraInstance.mesh,
-                        homingStrength: 5.0 // Turn speed
+                        homingStrength: 2.0, // Turn speed (Reduced from 5.0)
+                        knockback: CONFIG.enemy.boss.projectileKnockback // [New] Boss Knockback
                     }
                 );
                 // Initial Velocity towards player to start
@@ -2081,10 +1725,12 @@
                 this.cooldowns = { p1: 0, p2: 0, p3: 0, p4: 0 };
 
                 // New Combat State Machine
+                this.attackStates = { p1: 'idle', p2: 'idle', p3: 'idle', p4: 'idle' };
                 this.windupTimer = { p1: 0, p2: 0, p3: 0, p4: 0 };
                 this.isWindup = { p1: false, p2: false, p3: false, p4: false };
 
                 // Input tracking for "Fresh Press"
+                this.attackTimers = { p1: 0, p2: 0, p3: 0, p4: 0 };
                 this.lastAttackInput = { p1: false, p2: false, p3: false, p4: false };
 
                 // Input Buffer
@@ -2123,6 +1769,16 @@
                 // [New] Synergy Count State (for timing reset)
                 this.lastReadyCount = 0;
 
+                // [New] Leg Animation Phase (防止速度變化時的相位跳動)
+                this.legPhase = 0;
+
+                // [New] Movement Smoothing
+                this.lastRotationY = 0;
+                this.angularVelocity = 0;
+
+                // [New] Knockback for Gidora (like enemies)
+                this.knockbackVel = new THREE.Vector3();
+
                 this.buildModel();
                 this.buildIndicators();
 
@@ -2139,10 +1795,18 @@
                 scene.add(this.mesh);
             }
 
-            takeDamage(amount) {
+            takeDamage(amount, sourcePos, knockbackForce) {
                 if (this.isDead) return;
                 this.hp -= amount;
                 this.damageFlashTimer = 0.2;
+
+                // Knockback Logic (like enemies)
+                if (sourcePos && this.mesh.position) {
+                    const dir = this.mesh.position.clone().sub(sourcePos).normalize();
+                    dir.y = 0; // Only horizontal knockback
+                    const force = (knockbackForce !== undefined) ? knockbackForce : amount * 0.2;
+                    this.knockbackVel.add(dir.multiplyScalar(force));
+                }
 
                 if (this.hp <= 0) {
                     this.die();
@@ -2159,137 +1823,364 @@
             checkCollisions(bullets) {
                 if (this.isDead) return;
 
-                const pPos = this.mesh.position;
-                const hitRadius = 0.8;
+                // Fix: Collision check against Body Center, not feet (Y=0)
+                const pPos = this.mesh.position.clone();
+                pPos.y += 1.2; // Approximate Center of Mass (Body Height)
+
+                // Adjust for Mode-Specific Body Offset & Size
+                let hitRadius = 1.5;
+                if (state.mode === 'duo') {
+                    pPos.z += 0; // The mesh is rotated, so we can't just add Z locally unless we apply rotation?
+                    // Wait, this.mesh is the Player Group. It rotates. 
+                    // this.body is a child. 
+                    // If this.body.position.z is 0.8, that's in Local Space.
+                    // We need World Space position of the body center.
+                    const bodyWorldPos = new THREE.Vector3();
+                    this.body.getWorldPosition(bodyWorldPos);
+                    pPos.copy(bodyWorldPos); // Use actual body position!
+
+                    hitRadius = 1.1; // Smaller radius for Duo
+                } else {
+                    // Quad Mode - Body is centered at 0 local (mostly), but lets use world pos to be safe
+                    // actually just use pPos as base is fine, but body might be slightly off? 
+                    // Quad body z=0. So pPos (with y adjustment) is correct if rotation is ignored.
+                    // But using getWorldPosition is always safer if body moves!
+                    if (this.body) {
+                        const bodyWorldPos = new THREE.Vector3();
+                        this.body.getWorldPosition(bodyWorldPos);
+                        pPos.copy(bodyWorldPos);
+                    }
+                }
 
                 bullets.forEach(b => {
                     if (b.markedForDeletion || !b.isEnemy) return; // Only Enemy bullets hurt player
 
                     if (b.mesh.position.distanceTo(pPos) < hitRadius) {
                         b.markedForDeletion = true;
-                        this.takeDamage(b.damage || 10);
+                        this.takeDamage(b.damage || 10, b.mesh.position, b.knockback);
                     }
                 });
             }
 
             buildModel() {
-                // Main Group is center logic
+                // Materials
+                // We create unique material instances per part-type but shared per player?
+                // Actually, if we want to Flash specific parts independently (e.g. P1 head flashes, but P1 neck doesn't?), 
+                // we should probably NOT share materials if we are changing the material property directly.
+                // However, the current logic updates the material color. 
+                // If P1 Head and P1 Neck share 'p1Mat', changing p1Mat.color changes BOTH.
+                // This is desired ("Neck and Head should correspond to player color").
+                const bodyMat = new THREE.MeshLambertMaterial({ color: CONFIG.visuals.colors.body }); // Green
+                const p1Mat = new THREE.MeshLambertMaterial({ color: CONFIG.visuals.colors.p1 }); // Red
+                const p2Mat = new THREE.MeshLambertMaterial({ color: CONFIG.visuals.colors.p2 }); // Blue
+                const p3Mat = new THREE.MeshLambertMaterial({ color: CONFIG.visuals.colors.p3 }); // Pink
+                const p4Mat = new THREE.MeshLambertMaterial({ color: CONFIG.visuals.colors.p4 }); // Cyan
 
-                // 1. Stem/Body (Green) - Center, slightly raised
-                const stemGeo = new THREE.BoxGeometry(1, 1.5, 1);
-                const stemMat = new THREE.MeshLambertMaterial({ color: CONFIG.visuals.colors.body });
-                this.stem = new THREE.Mesh(stemGeo, stemMat);
-                this.stem.position.y = 0.75;
-                this.stem.castShadow = true;
-                this.mesh.add(this.stem);
+                // 1. Main Body (Oval) - Different scales for Duo vs Quad
+                const bodyGeo = new THREE.SphereGeometry(1.5, 16, 16);
+                // Will be scaled via mesh.scale in updateVisibility based on mode
+                this.body = new THREE.Mesh(bodyGeo, bodyMat);
+                this.body.position.y = 1.2;
+                this.body.castShadow = true;
+                this.mesh.add(this.body);
 
-                // 2. Head (Purple) - On top of stem
-                const headGeo = new THREE.BoxGeometry(1.2, 1, 1.4);
-                const headMat = new THREE.MeshLambertMaterial({ color: CONFIG.visuals.colors.head });
-                this.head = new THREE.Mesh(headGeo, headMat);
-                this.head.position.y = 1.5 + 0.5; // Stem height + half head
-                this.head.castShadow = true;
-                this.mesh.add(this.head);
+                // Legs (4) - [Refined] - Back legs hidden in Duo mode
+                this.legs = [];
+                const legConfigs = [
+                    { id: 'fl', x: -0.9, z: 0.8, mat: bodyMat, isFront: true },
+                    { id: 'fr', x: 0.9, z: 0.8, mat: bodyMat, isFront: true },
+                    { id: 'bl', x: -0.9, z: -0.8, mat: bodyMat, isFront: false },
+                    { id: 'br', x: 0.9, z: -0.8, mat: bodyMat, isFront: false }
+                ];
+                legConfigs.forEach(cfg => {
+                    const legGroup = new THREE.Group();
+                    legGroup.position.set(cfg.x, 0.8, cfg.z);
 
-                // Mouth (Yellow) - Front of head
-                // Mouth (Yellow) - Front of head - Directional (Cone)
-                const mouthGeo = new THREE.ConeGeometry(0.5, 0.8, 4); // 4-sided pyramid pointing up
-                const mouthMat = new THREE.MeshBasicMaterial({ color: CONFIG.visuals.colors.mouth });
-                this.mouth = new THREE.Mesh(mouthGeo, mouthMat);
+                    // Thicker legs
+                    const legGeo = new THREE.CylinderGeometry(0.35, 0.25, 1.0, 8);
+                    const leg = new THREE.Mesh(legGeo, cfg.mat);
+                    leg.position.y = -0.5; // Pivot at top
+                    leg.castShadow = true;
 
-                // Align cone point to Forward (+Z)
-                // Default Cone points UP (+Y). We want it to point +Z.
-                this.mouth.rotation.x = Math.PI / 2;
+                    legGroup.add(leg);
+                    this.mesh.add(legGroup);
+                    this.legs.push({ group: legGroup, id: cfg.id, isFront: cfg.isFront });
+                });
 
-                this.mouth.position.set(0, 0, 0.9); // Forward Z
-                this.head.add(this.mouth);
+                // 2. Necks & Heads Structure
+                this.necks = [];
 
-                // 3. P1 Base/Leg (Red) - Left Side (-X)
-                const p1Geo = new THREE.BoxGeometry(0.8, 0.5, 1.2);
-                const p1Mat = new THREE.MeshLambertMaterial({ color: CONFIG.visuals.colors.p1 });
-                this.p1Part = new THREE.Mesh(p1Geo, p1Mat);
-                this.p1Part.position.set(-0.7, 0.25, 0);
-                this.p1Part.castShadow = true;
-                this.mesh.add(this.p1Part);
+                // P1 (Left), P2 (Right), P3 (Center)
+                const neckConfigs = [
+                    { id: 'p1', angle: 0.5, mat: p1Mat, x: -0.7, z: 1.1 },
+                    { id: 'p2', angle: -0.5, mat: p2Mat, x: 0.7, z: 1.1 },
+                    { id: 'p3', angle: 0, mat: p3Mat, x: 0, z: 1.0 }
+                ];
 
-                // 4. P2 Base/Leg (Blue) - Right Side (+X)
-                const p2Geo = new THREE.BoxGeometry(0.8, 0.5, 1.2);
-                const p2Mat = new THREE.MeshLambertMaterial({ color: CONFIG.visuals.colors.p2 });
-                this.p2Part = new THREE.Mesh(p2Geo, p2Mat);
-                this.p2Part.position.set(0.7, 0.25, 0);
-                this.p2Part.castShadow = true;
-                this.mesh.add(this.p2Part);
+                neckConfigs.forEach(cfg => {
+                    const neckGroup = new THREE.Group();
+                    neckGroup.position.set(cfg.x, 1.5, cfg.z);
+                    neckGroup.rotation.y = cfg.angle; // Face outward slightly
 
-                // 4A. P3 Base/Leg (Orange) - Back (-Z)
-                const p3GeoRot = new THREE.BoxGeometry(1.2, 0.5, 0.8);
-                const p3Mat = new THREE.MeshLambertMaterial({ color: CONFIG.visuals.colors.p3 });
-                this.p3Part = new THREE.Mesh(p3GeoRot, p3Mat);
-                this.p3Part.position.set(0, 0.25, -0.7);
-                this.p3Part.castShadow = true;
-                this.mesh.add(this.p3Part);
+                    // Neck: Simple Cylinder
+                    const neckLen = 2.2;
+                    const leanAngle = -0.3; // Less steep lean for stability look
 
-                // 4B. P4 Base/Leg (Cyan) - Front (+Z)
-                const p4Mat = new THREE.MeshLambertMaterial({ color: CONFIG.visuals.colors.p4 });
-                this.p4Part = new THREE.Mesh(p3GeoRot, p4Mat); // Reuse geometry
-                this.p4Part.position.set(0, 0.25, 0.7);
-                this.p4Part.castShadow = true;
-                this.mesh.add(this.p4Part);
+                    const neckGeo = new THREE.CylinderGeometry(0.3, 0.45, neckLen, 8);
+                    const neckMesh = new THREE.Mesh(neckGeo, cfg.mat);
+                    // Cylinder center at (0,0,0). We want base at (0,0,0) of group.
+                    // So Center at y = neckLen/2.
+                    // But we rotate it by leanAngle around X.
+                    // To make base pivot correctly, we move it up THEN rotate? 
+                    // No, rotate then move? 
+                    // Easiest: Pivot Group.
+                    // But we used neckGroup for Y-rotation (facing).
+                    // Let's add an inner pivot for the lean.
 
+                    const pivotGroup = new THREE.Group();
+                    pivotGroup.rotation.x = leanAngle;
 
+                    neckMesh.position.y = neckLen / 2;
+                    pivotGroup.add(neckMesh);
 
-                // 6. Head Indicators (P1/P2)
-                // P1 Head Part (Red) - Left Side
-                const p1HeadGeo = new THREE.BoxGeometry(0.3, 0.3, 0.3);
-                const p1HeadMat = new THREE.MeshLambertMaterial({ color: CONFIG.visuals.colors.p1 });
-                this.p1HeadPart = new THREE.Mesh(p1HeadGeo, p1HeadMat);
-                this.p1HeadPart.position.set(-0.6, 0.5, 0); // Left, Top
-                this.head.add(this.p1HeadPart);
+                    neckGroup.add(pivotGroup);
 
-                // P2 Head Part (Blue) - Right Side
-                const p2HeadGeo = new THREE.BoxGeometry(0.3, 0.3, 0.3);
-                const p2HeadMat = new THREE.MeshLambertMaterial({ color: CONFIG.visuals.colors.p2 });
-                this.p2HeadPart = new THREE.Mesh(p2HeadGeo, p2HeadMat);
-                this.p2HeadPart.position.set(0.6, 0.5, 0); // Right, Top
-                this.head.add(this.p2HeadPart);
+                    // Head
+                    // Attach Head to PivotGroup so it moves with neck lean
+                    // Position at Top of Neck Cylinder
+                    const headGeo = new THREE.BoxGeometry(0.65, 0.65, 0.85);
+                    const headMesh = new THREE.Mesh(headGeo, cfg.mat);
 
-                // P3 Head Part (Orange) - Back
-                const p3HeadMat = new THREE.MeshLambertMaterial({ color: CONFIG.visuals.colors.p3 });
-                this.p3HeadPart = new THREE.Mesh(p1HeadGeo, p3HeadMat);
-                this.p3HeadPart.position.set(0, 0.5, -0.6); // Back, Top
-                this.head.add(this.p3HeadPart);
+                    headMesh.position.y = neckLen; // Top of cylinder
+                    headMesh.position.z = 0.2; // Slight forward offset visually
+                    headMesh.rotation.x = 0.3; // Counter-rotate slightly to look forward?
 
-                // P4 Head Part (Cyan) - Front
-                const p4HeadMat = new THREE.MeshLambertMaterial({ color: CONFIG.visuals.colors.p4 });
-                this.p4HeadPart = new THREE.Mesh(p1HeadGeo, p4HeadMat);
-                this.p4HeadPart.position.set(0, 0.5, 0.6); // Front, Top
-                this.head.add(this.p4HeadPart);
+                    headMesh.castShadow = true;
 
+                    // Eyes
+                    const eyeGeo = new THREE.SphereGeometry(0.12, 8, 8);
+                    const eyeMat = new THREE.MeshBasicMaterial({ color: 0xffff00 });
+                    const eyeL = new THREE.Mesh(eyeGeo, eyeMat); eyeL.position.set(-0.22, 0.1, 0.35); headMesh.add(eyeL);
+                    const eyeR = new THREE.Mesh(eyeGeo, eyeMat); eyeR.position.set(0.22, 0.1, 0.35); headMesh.add(eyeR);
 
+                    pivotGroup.add(headMesh);
 
-                // --- 5. Combo Visuals (New) ---
+                    this.mesh.add(neckGroup);
+
+                    // Store ref for animation
+                    // We animate 'pivotGroup.rotation.x' for smash
+                    this.necks.push({ group: neckGroup, pivot: pivotGroup, head: headMesh, id: cfg.id, baseLean: leanAngle });
+
+                    if (cfg.id === 'p1') { this.p1Part = neckGroup; this.p1HeadPart = headMesh; }
+                    if (cfg.id === 'p2') { this.p2Part = neckGroup; this.p2HeadPart = headMesh; }
+                    if (cfg.id === 'p3') { this.p3Part = neckGroup; this.p3HeadPart = headMesh; }
+                });
+
+                // 3. Tail (P4)
+                this.tailGroup = new THREE.Group();
+                this.tailGroup.position.set(0, 1.2, -1.2);
+
+                // Tail Base
+                const tailGeo = new THREE.ConeGeometry(0.6, 2.5, 8);
+                tailGeo.rotateX(-Math.PI / 2);
+                this.tailBase = new THREE.Mesh(tailGeo, p4Mat);
+                this.tailGroup.add(this.tailBase);
+
+                // Tail Tip
+                const tipGeo = new THREE.CylinderGeometry(0.0, 0.6, 1.2, 8);
+                tipGeo.rotateX(-Math.PI / 2);
+                this.tailTip = new THREE.Mesh(tipGeo, p4Mat);
+                this.tailTip.position.z = -1.5;
+                this.tailGroup.add(this.tailTip);
+
+                this.mesh.add(this.tailGroup);
+                this.p4Part = this.tailGroup;
+                this.p4HeadPart = this.tailTip;
+
+                // 4. Combo Visuals
                 this.comboGroup = new THREE.Group();
-                scene.add(this.comboGroup); // Attached to Scene (World Space)
+                scene.add(this.comboGroup);
 
-                // A. Radius Indicator (Ring)
-                // A. Radius Indicator (Ring)
-                // We will create a default one here, but update it dynamically in activateCombo
-                const r = CONFIG.combo.quad.radius; // Default to Max
+                const r = CONFIG.combo.quad.radius;
                 const ringGeo = new THREE.RingGeometry(r - 0.2, r, 64);
                 ringGeo.rotateX(-Math.PI / 2);
-                const ringMat = new THREE.MeshBasicMaterial({
-                    color: 0xff0000,
-                    side: THREE.DoubleSide,
-                    transparent: true,
-                    opacity: 0.0
-                });
+                const ringMat = new THREE.MeshBasicMaterial({ color: 0xff0000, side: THREE.DoubleSide, transparent: true, opacity: 0.0 });
                 this.comboRing = new THREE.Mesh(ringGeo, ringMat);
                 this.comboRing.position.y = 0.1;
                 this.comboGroup.add(this.comboRing);
 
-                // B. Vines
-                // B. Vines
                 this.vines = [];
-                // Vines are now created dynamically in activateCombo logic
+            }
+
+
+
+            updateDragon(dt) {
+                const t = Date.now() * 0.002;
+
+                // 1. Walk Cycle (Legs)
+                if (this.legs && this.legs.length > 0) {
+                    const speedSq = this.velocity.lengthSq();
+                    const isMoving = speedSq > 0.001;
+
+                    if (isMoving) {
+                        const speed = Math.sqrt(speedSq);
+
+                        // [Chinese Config Guide]
+                        // walkFreq (步頻): 控制腳步的快慢。數值越高，腳步越快。
+                        // 目前設定：基礎 5 + 速度 * 3.5。這表示移動越快，腳步越快。
+                        const walkFreq = Math.max(4, speed * 2);
+
+                        // [Chinese Config Guide]
+                        // walkAmp (步幅): 控制腳步抬起的高度/幅度。數值越高，腳抬得越高。
+                        const walkAmp = 0.8;
+
+                        // 累積相位 (Cumulative Phase) - 解決速度變化時的瞬跳問題
+                        if (!this.legPhase) this.legPhase = 0;
+                        this.legPhase += dt * walkFreq;
+
+                        this.legs.forEach((l, i) => {
+                            const offset = (i === 0 || i === 3) ? 0 : Math.PI;
+                            // 使用 this.legPhase 替代 t * freq
+                            l.group.rotation.x = Math.sin(this.legPhase + offset) * walkAmp;
+                        });
+                    } else {
+                        this.legs.forEach(l => {
+                            l.group.rotation.x *= (1.0 - dt * 10);
+                        });
+                        // Reset phase slightly or keep it naturally? 
+                        // Keeping it allows resuming walk from same foot position, which is natural.
+
+                        // Stand still bobbing?
+                        this.mesh.position.y = THREE.MathUtils.lerp(this.mesh.position.y, 0, dt * 5);
+                    }
+
+                    // 1.5 Body Mechanics (Banking & Bobbing)
+                    // A. Banking (Lean into turns)
+                    const currentRotY = this.mesh.rotation.y;
+                    let deltaRot = currentRotY - this.lastRotationY;
+                    // Handle wrap-around (PI to -PI)
+                    if (deltaRot > Math.PI) deltaRot -= Math.PI * 2;
+                    if (deltaRot < -Math.PI) deltaRot += Math.PI * 2;
+
+                    const angVel = deltaRot / dt;
+                    this.angularVelocity = THREE.MathUtils.lerp(this.angularVelocity, angVel, dt * 10); // Smooth it
+                    this.lastRotationY = currentRotY;
+
+                    // Lean: Max lean 0.3 rad
+                    // [Refined] Duo mode should lean less
+                    const bankFactor = (state.mode === 'duo') ? 0.03 : 0.15;
+                    const maxBank = (state.mode === 'duo') ? 0.15 : 0.3;
+
+                    const targetLean = THREE.MathUtils.clamp(-this.angularVelocity * bankFactor, -maxBank, maxBank);
+                    this.mesh.rotation.z = THREE.MathUtils.lerp(this.mesh.rotation.z, targetLean, dt * 5);
+
+                    // B. Bobbing (Up/Down)
+                    if (isMoving) {
+                        // Bounce freq = walkFreq * 2 (Two steps per cycle?)
+                        // If walkFreq is ~10, bounce is ~20
+                        const bounce = Math.abs(Math.sin(this.legPhase)) * 0.15;
+                        this.mesh.position.y = bounce;
+                    }
+                }
+
+                // 2. Necks P1-P3 Logic
+                if (this.necks) {
+                    ['p1', 'p2', 'p3'].forEach(p => {
+                        const n = this.necks.find(x => x.id === p);
+                        if (!n) return;
+
+                        // Ensure state exists
+                        if (!this.attackStates) this.attackStates = { p1: 'idle', p2: 'idle', p3: 'idle', p4: 'idle' };
+                        if (!this.attackTimers) this.attackTimers = { p1: 0, p2: 0, p3: 0, p4: 0 };
+
+                        const currentState = this.attackStates[p] || 'idle';
+
+                        if (currentState === 'windup') {
+                            this.attackTimers[p] -= dt;
+                            const progress = 1 - (this.attackTimers[p] / CONFIG.combat.windupTime);
+                            const ease = progress * (2 - progress); // Ease Out
+                            // REVERSED: Lean BACK (Negative for this model setup? Or Positive?)
+                            // Original: base + ease.
+                            // User says: "Currently Forward then Back".
+                            // So "base + ease" was Forward.
+                            // We want Back first. So "base - ease".
+                            n.pivot.rotation.x = n.baseLean - (ease * 1.0);
+
+                            if (this.attackTimers[p] <= 0) {
+                                this.triggerAttackImpact(p);
+                                this.attackStates[p] = 'recovery';
+                                this.attackTimers[p] = CONFIG.combat.recoveryTime;
+                            }
+                        } else if (currentState === 'recovery') {
+                            this.attackTimers[p] -= dt;
+                            const progress = 1 - (this.attackTimers[p] / CONFIG.combat.recoveryTime);
+
+                            let targetLean = n.baseLean;
+                            // Smash Phase: Go DOWN (Forward, i.e. Positive)
+                            if (progress < 0.2) {
+                                const p2 = progress / 0.2;
+                                // From Back (base-1.0) to Forward/Down (base+1.5)
+                                targetLean = (n.baseLean - 1.0) * (1 - p2) + (n.baseLean + 1.5) * p2;
+                            } else {
+                                // Return Phase
+                                const p2 = (progress - 0.2) / 0.8;
+                                const ease = p2 * p2 * (3 - 2 * p2);
+                                targetLean = (n.baseLean + 1.5) * (1 - ease) + (n.baseLean) * ease;
+                            }
+                            n.pivot.rotation.x = targetLean;
+
+                            if (this.attackTimers[p] <= 0) this.attackStates[p] = 'idle';
+                        } else {
+                            // Idle with Lag
+                            // Head Lag Logic:
+                            // If angularVelocity is positive (turning left), heads should lag right (negative rot).
+                            const lag = -this.angularVelocity * 0.1;
+
+                            n.group.rotation.z = Math.sin(t * 5 + (p === 'p2' ? 1 : (p === 'p3' ? 2 : 0))) * 0.05 + lag;
+                            n.pivot.rotation.x = n.baseLean + Math.sin(t * 8) * 0.05;
+                            n.group.position.z = (p === 'p3' ? 1.0 : 1.1);
+                        }
+                    });
+                }
+
+                // 3. Tail P4 Logic
+                if (this.tailGroup) {
+                    const p = 'p4';
+                    // Ensure state exists
+                    if (!this.attackStates) this.attackStates = { p1: 'idle', p2: 'idle', p3: 'idle', p4: 'idle' };
+                    const currentState = this.attackStates[p] || 'idle';
+
+                    if (currentState === 'windup') {
+                        this.attackTimers[p] -= dt;
+                        const progress = 1 - (this.attackTimers[p] / CONFIG.combat.windupTime);
+                        // Windup: Swing LEFT (prepare)
+                        this.tailGroup.rotation.y = Math.sin(progress * Math.PI * 0.5) * 1.2;
+
+                        if (this.attackTimers[p] <= 0) {
+                            this.triggerAttackImpact(p);
+                            this.attackStates[p] = 'recovery';
+                            this.attackTimers[p] = CONFIG.combat.recoveryTime;
+                        }
+                    } else if (currentState === 'recovery') {
+                        this.attackTimers[p] -= dt;
+                        const progress = 1 - (this.attackTimers[p] / CONFIG.combat.recoveryTime);
+
+                        // Whip RIGHT (Attack) then Return
+                        if (progress < 0.3) {
+                            const p2 = progress / 0.3;
+                            // From Left (+1.2) to Right (-1.5)
+                            this.tailGroup.rotation.y = 1.2 * (1 - p2) + (-1.5) * p2;
+                        } else {
+                            // Return to Center
+                            const p2 = (progress - 0.3) / 0.7;
+                            const ease = p2 * p2;
+                            this.tailGroup.rotation.y = -1.5 * (1 - ease);
+                        }
+                        if (this.attackTimers[p] <= 0) this.attackStates[p] = 'idle';
+                    } else {
+                        this.tailGroup.rotation.y = Math.sin(t * 2.0) * 0.1;
+                    }
+                }
             }
 
             updateSpeedLines(dt) {
@@ -2312,37 +2203,27 @@
 
                 // 2. Spawn Logic
                 if (this.isBoosting) {
-                    // Spawn rate - Reduced by 50% as requested
                     if (Math.random() > 0.5) return;
 
-                    const spawnCount = 1; // Per frame check
-                    // Random chance based on dt to regulate density? 
-                    // Let's just spawn one every few frames? 
-                    // Simple: Always spawn 1 per frame, short life.
-
                     const geo = new THREE.BoxGeometry(0.05, 0.05, 3.0);
-                    const mat = new THREE.MeshBasicMaterial({ color: 0x00ffff, transparent: true, opacity: 0.0 }); // Start invisible/fade in?
+                    const mat = new THREE.MeshBasicMaterial({ color: 0x00ffff, transparent: true, opacity: 0.0 });
                     const mesh = new THREE.Mesh(geo, mat);
 
-                    // Random Position around player (Cylinder volume)
                     const angle = Math.random() * Math.PI * 2;
-                    const radius = 1.2 + Math.random() * 1.3; // Tighter Radius (1.2 to 2.5)
+                    const radius = 1.2 + Math.random() * 1.3;
                     const height = 0.5 + Math.random() * 2.0;
 
                     const offset = new THREE.Vector3(Math.cos(angle) * radius, height, Math.sin(angle) * radius);
                     mesh.position.copy(this.mesh.position).add(offset);
 
-                    // Direction: Opposite to Player Velocity
                     const moveDir = (this.velocity.lengthSq() > 0.1) ? this.velocity.clone().normalize().negate() : this.getForwardVector().negate();
 
-                    // Look at direction
                     mesh.lookAt(mesh.position.clone().add(moveDir));
-
-                    scene.add(mesh); // Add to world scene
+                    scene.add(mesh);
 
                     this.speedLines.push({
                         mesh: mesh,
-                        velocity: moveDir.multiplyScalar(15 + Math.random() * 10), // Fast speed (15-25)
+                        velocity: moveDir.multiplyScalar(15 + Math.random() * 10),
                         life: 0.3,
                         maxLife: 0.3
                     });
@@ -2350,13 +2231,11 @@
             }
 
             buildIndicators() {
-                // Arrows to show input directions relative to world
-                // Added to SCENE to avoid inheriting character rotation
                 this.p1Arrow = new THREE.ArrowHelper(new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 2, 0), CONFIG.visuals.arrowLength, CONFIG.visuals.colors.p1);
-                scene.add(this.p1Arrow); // Add to scene, not this.mesh
+                scene.add(this.p1Arrow);
 
                 this.p2Arrow = new THREE.ArrowHelper(new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 2, 0), CONFIG.visuals.arrowLength, CONFIG.visuals.colors.p2);
-                scene.add(this.p2Arrow); // Add to scene, not this.mesh
+                scene.add(this.p2Arrow);
 
                 this.p3Arrow = new THREE.ArrowHelper(new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 2, 0), CONFIG.visuals.arrowLength, CONFIG.visuals.colors.p3);
                 scene.add(this.p3Arrow);
@@ -2373,342 +2252,159 @@
 
             updateVisibility() {
                 const isQuad = state.mode === 'quad';
-                this.p3Part.visible = isQuad;
-                this.p4Part.visible = isQuad;
-                this.p3HeadPart.visible = isQuad;
-                this.p4HeadPart.visible = isQuad;
-                this.p3Arrow.visible = isQuad; // Will be overwritten by update loop but good to init
-                this.p4Arrow.visible = isQuad;
 
-                // Indicators in UI should be cleared/reset?
-                // existing indicators will expire on their own.
+                if (this.p3Part) this.p3Part.visible = isQuad;
+                if (this.p4Part) this.p4Part.visible = isQuad;
+
+                if (this.p3Arrow) this.p3Arrow.visible = isQuad;
+                if (this.p4Arrow) this.p4Arrow.visible = isQuad;
+
+                // Toggle back legs (only visible in Quad mode)
+                if (this.legs) {
+                    this.legs.forEach(leg => {
+                        if (!leg.isFront) {
+                            leg.group.visible = isQuad;
+                        }
+                    });
+                }
+
+                // Rescale body based on mode (use mesh.scale, not geometry.scale to avoid cumulative scaling)
+                if (this.body) {
+                    if (isQuad) {
+                        // Quad mode: larger body (1, 0.8, 1.5)
+                        this.body.scale.set(1, 0.8, 1.5);
+                        this.body.position.z = 0; // Centered
+                    } else {
+                        // Duo mode: smaller body (1, 0.8, 0.9)
+                        this.body.scale.set(0.8, 0.1, 0.9);
+                        this.body.position.z = 0.8; // Move forward
+                    }
+                }
             }
 
-            shoot(type) {
-                let speed, life, gravity, direction, size, config;
+            attack(playerIndex) {
+                if (!this.attackStates) this.attackStates = { p1: 'idle', p2: 'idle', p3: 'idle', p4: 'idle' };
+                if (this.attackStates[playerIndex] !== 'idle') return;
 
-                // [New] Track Last Shot Type
-                // If type is a player ID (p1..p4), it's Single or UltraSingle
-                // If type is synergy (duo..quad), we need another way to track participants?
-                // Actually, shoot() is called per player for Single, or once for Synergy.
-                // For Synergy, the update loop calls shoot(synergyType).
-                // But shoot() itself doesn't know WHO participated easily unless passed.
-                // However, input blocking checks individual players.
-                // Let's rely on the Update loop to set lastShotType for synergy participants,
-                // and set it here for Single defaults.
+                this.attackStates[playerIndex] = 'windup';
+                this.attackTimers[playerIndex] = CONFIG.combat.windupTime;
+            }
 
-                if (['p1', 'p2', 'p3', 'p4'].includes(type)) {
-                    if (state.mode === 'quad') {
-                        this.lastShotType[type] = 'ultraSingle';
-                    } else {
-                        this.lastShotType[type] = 'single';
-                    }
+            triggerAttackImpact(playerIndex) {
+                let isTail = (playerIndex === 'p4');
+                let damage = CONFIG.combat.meleeDamage;
+                let radius = CONFIG.combat.attackRange;
+                let color = CONFIG.visuals.colors[playerIndex];
+
+                const forward = this.getForwardVector();
+                const spawnPos = this.mesh.position.clone();
+                spawnPos.y = 0.5;
+
+                if (isTail) {
+                    spawnPos.add(forward.clone().negate().multiplyScalar(3.0));
+                } else {
+                    // Refinement: Swapped P1/P2 positions (Left vs Right)
+                    if (playerIndex === 'p1') spawnPos.add(forward.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), -0.6).multiplyScalar(3.0));
+                    if (playerIndex === 'p2') spawnPos.add(forward.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), 0.6).multiplyScalar(3.0));
+                    if (playerIndex === 'p3') spawnPos.add(forward.multiplyScalar(3.2));
                 }
 
-                let stats = {};
+                this.createHitbox(spawnPos, radius, damage, 0.2, isTail, color);
+            }
 
-                // Direction capturing helper
-                const getDynamicDirection = () => this.getForwardVector();
+            createHitbox(pos, radius, damage, duration, isTail, color) {
+                // Visuals: Ring + Sparks
+                const ringGeo = new THREE.RingGeometry(0.5, radius, 32);
+                ringGeo.rotateX(-Math.PI / 2);
+                const ringMat = new THREE.MeshBasicMaterial({ color: color, side: THREE.DoubleSide, transparent: true, opacity: 0.8 });
+                const ring = new THREE.Mesh(ringGeo, ringMat);
+                ring.position.copy(pos);
+                ring.position.y = 0.1; // Slightly above ground
+                scene.add(ring);
 
-                // Helper to spawn one bullet
-                const spawnBullet = (bType, offsetTime = 0, useDynamicDir = false, recoilScale = 1.0) => {
-                    setTimeout(() => {
-                        // Recalculate spawn position DYNAMICALLY
-                        const currentSpawnPos = new THREE.Vector3();
-                        this.mouth.getWorldPosition(currentSpawnPos);
-                        currentSpawnPos.add(this.getForwardVector().multiplyScalar(0.5));
+                // 2. Sparks (Particles)
+                for (let i = 0; i < 8; i++) {
+                    const pPos = pos.clone().add(new THREE.Vector3((Math.random() - 0.5) * radius, Math.random() * 2, (Math.random() - 0.5) * radius));
+                    state.particles.push(new Particle(pPos, color));
+                }
 
-                        // Recalculate direction if dynamic (for Quad)
-                        const finalDir = useDynamicDir ? getDynamicDirection() : direction;
+                // Hitbox Logic
+                state.particles.push({
+                    ring: ring,
+                    life: duration,
+                    maxLife: duration,
+                    hitList: new Set(),
+                    update: function (dt) {
+                        this.life -= dt;
+                        const progress = 1 - (this.life / this.maxLife);
 
-                        const bullet = new Bullet(bType, currentSpawnPos, finalDir, speed, life, gravity, size, stats);
-                        state.bullets.push(bullet);
+                        // Fade
+                        this.ring.material.opacity = 0.8 * (1 - progress);
 
-                        // Recoil Application (Apply once per shot call? Or per bullet? Typically per shot event)
-                        // If burst, maybe small recoil each? Let's apply recoil here for each bullet fired.
-                        // Recoil Force
-                        const force = stats.recoil * CONFIG.combat.recoilForce * recoilScale;
-                        const recoilVec = finalDir.clone().normalize().multiplyScalar(-force);
-                        // Add to velocity directly
-                        this.velocity.add(recoilVec); // Apply recoil to velocity
+                        // Expand Ring
+                        const s = 1 + progress * 0.5;
+                        this.ring.scale.set(s, s, s);
 
-                        // [New] Bullet Sound
-                        if (SoundSystem.playShoot) SoundSystem.playShoot(bType);
-
-                    }, offsetTime * 1000);
-                };
-
-                // Spawn Shockwave Helper
-                const spawnShockwave = (waveConfig, damage) => {
-                    // Shockwave Particles
-                    const count = 20;
-                    const angle = waveConfig.angle;
-                    const baseDir = this.getForwardVector();
-
-                    // Recalculate spawn position DYNAMICALLY - FROM FLOOR/CENTER
-                    const currentSpawnPos = this.mesh.position.clone();
-                    currentSpawnPos.y = 0.1; // Near floor
-                    // currentSpawnPos.add(this.getForwardVector().multiplyScalar(0.5)); // Optional forward offset?
-                    // User said "Character Center", so maybe no offset or slight forward?
-                    // "角色中心的靠近地板位置". Center is fine. Let's keep it centered or slightly forward to not clip self visually?
-                    // Particles move fast, center is safe.
-
-                    const waveSpeed = 20;
-                    const waveLife = waveConfig.radius / waveSpeed;
-
-                    // Visuals
-                    // Visuals: Expanding Ring
-                    const ringGeo = new THREE.RingGeometry(0.8, 1.0, 32); // Thick ring
-                    const ringMat = new THREE.MeshBasicMaterial({
-                        color: 0xffff00,
-                        side: THREE.DoubleSide,
-                        transparent: true,
-                        opacity: 0.8
-                    });
-                    const waveMesh = new THREE.Mesh(ringGeo, ringMat);
-                    waveMesh.position.copy(currentSpawnPos);
-                    waveMesh.rotation.x = -Math.PI / 2; // Flat
-                    scene.add(waveMesh);
-
-                    state.particles.push({
-                        mesh: waveMesh,
-                        life: 0.3,
-                        maxLife: 0.3,
-                        targetScale: waveConfig.radius, // Base radius is 1.0 (outer), so scale to target
-                        update: function (dt) {
-                            this.life -= dt;
-                            if (this.life <= 0) {
-                                scene.remove(this.mesh);
-                                this.mesh.geometry.dispose();
-                                this.mesh.material.dispose();
-                                return false;
-                            }
-                            const p = 1 - (this.life / this.maxLife);
-                            const currentScale = 0.5 + (this.targetScale - 0.5) * p; // Start at 0.5 radius
-                            this.mesh.scale.set(currentScale, currentScale, currentScale);
-                            this.mesh.material.opacity = 0.8 * (1 - p);
-                            return true;
+                        if (this.life <= 0) {
+                            scene.remove(this.ring);
+                            this.ring.geometry.dispose();
+                            return false;
                         }
-                    });
 
-                    // Damage Logic (Instant Cone Check)
-                    // We check for enemies within radius and angle
-                    if (state.enemyManager) {
-                        state.enemyManager.enemies.forEach(e => {
-                            if (e.isDead) return;
+                        // Collision Check
+                        if (state.enemyManager) {
+                            state.enemyManager.enemies.forEach(e => {
+                                if (e.isDead || this.hitList.has(e)) return;
+                                if (e.mesh.position.distanceTo(ring.position) < radius + 0.5) { // Check dist to Center
+                                    // HIT
+                                    e.takeDamage(damage, window.gidoraInstance.mesh.position, isTail ? 15 : 10);
+                                    this.hitList.add(e);
 
-                            // Distance Check
-                            const dx = e.mesh.position.x - currentSpawnPos.x;
-                            const dz = e.mesh.position.z - currentSpawnPos.z;
-                            const distSq = dx * dx + dz * dz;
-
-                            if (distSq < waveConfig.radius * waveConfig.radius) {
-                                // Angle Check
-                                const toEnemy = new THREE.Vector3(dx, 0, dz).normalize();
-                                const dot = toEnemy.dot(baseDir); // Dot Product
-                                const threshold = Math.cos(angle / 2); // Threshold for half-angle
-
-                                if (dot > threshold) {
-                                    // Shockwave Damage + Knockback (from spawn center)
-                                    // Use configured damage
-                                    // Use configured damage and knockback
-                                    e.takeDamage(waveConfig.damage || damage, currentSpawnPos, waveConfig.knockback);
-                                }
-                            }
-                        });
-                    }
-
-                    // Damage Logic for Blocks (Optional: low damage to blocks? Or full?)
-                    // Let's apply damage to blocks too for consistency
-                    if (state.levelManager) {
-                        state.levelManager.blocks.forEach(b => {
-                            if (b.isDead) return;
-                            const dx = b.mesh.position.x - currentSpawnPos.x;
-                            const dz = b.mesh.position.z - currentSpawnPos.z;
-                            const distSq = dx * dx + dz * dz;
-                            if (distSq < waveConfig.radius * waveConfig.radius) {
-                                const toBlock = new THREE.Vector3(dx, 0, dz).normalize();
-                                const dot = toBlock.dot(baseDir);
-                                if (dot > Math.cos(angle / 2)) {
-                                    b.hp -= damage;
-                                    b.flashTimer = 0.1;
-                                    if (b.hp <= 0) {
-                                        b.isDead = true;
-                                        scene.remove(b.mesh);
-                                        b.mesh.geometry.dispose(); b.mesh.material.dispose();
+                                    // [New] Attack Recoil: Apply opposite knockback to Gidora
+                                    if (!isTail) {
+                                        const recoilDir = window.gidoraInstance.mesh.position.clone().sub(e.mesh.position).normalize();
+                                        recoilDir.y = 0;
+                                        window.gidoraInstance.knockbackVel.add(recoilDir.multiplyScalar(4)); // Recoil force
                                     }
                                 }
-                            }
-                        });
-                    }
-                };
-
-                if (type === 'quad') {
-                    config = CONFIG.bullet.quad;
-                    speed = config.speed;
-                    life = config.life;
-                    gravity = config.gravity;
-                    size = config.size;
-                    stats = { damage: config.damage, penetration: config.penetration, recoil: config.recoil, knockback: config.knockback };
-
-                    // Lock Rotation
-                    this.isBursting = true;
-                    // Reset lock after last shot
-                    setTimeout(() => { this.isBursting = false; }, config.burstCount * config.burstInterval * 1000 + 50);
-
-                    // Burst Fire 
-                    for (let i = 0; i < config.burstCount; i++) {
-                        // Recoil Decay: 100%, 50%, 25%...
-                        const decay = Math.pow(0.5, i);
-
-                        // Angle Logic (Array)
-                        let angleOffset = 0;
-                        if (config.angles && config.angles.length > 0) {
-                            // Cycle through angles if burstCount > angle count
-                            angleOffset = config.angles[i % config.angles.length];
+                            });
                         }
 
-                        // Negate for Left->Right check? 
-                        // In previous fan logic we used -angle.
-                        // If user provides [ -0.2, 0, 0.2 ], they likely expect Left, Center, Right in screen space.
-                        // Rotating normal Vector(0,0,1) by +0.2 around Y (0,1,0) gives +X (Left).
-                        // Wait, standard rotation:
-                        // +Y rotation of (0,0,1) is sin(a), 0, cos(a).
-                        // x = sin(positive) is positive X.
-                        // In Three.js/WebGL usually Right is +X.
-                        // (0,0,1) is Forward (out of screen?).
-                        // If we look -Z.
-                        // Let's assume standard math.
-                        // To clear confusion: just apply the angle. If user wants left, they put positive/negative.
-                        // I will apply -angle to match previous logic or just angle? 
-                        // Previous logic: -angle.
-                        // Let's just apply `angleOffset`. If user says Left is negative, they put negative.
+                        // [New] Building Destruction
+                        if (state.levelManager && state.levelManager.blocks) {
+                            state.levelManager.blocks.forEach((block, idx) => {
+                                if (block.isDead || this.hitList.has(block)) return;
+                                if (block.mesh.position.distanceTo(ring.position) < radius + 2.5) {
+                                    // HIT - Buildings have larger hitbox (5x5 blocks)
+                                    block.hp -= damage;
+                                    block.flashTimer = 0.1;
+                                    this.hitList.add(block);
 
-                        const spawnWithFan = (time, decayVal, angle) => {
-                            setTimeout(() => {
-                                // Manual Direction Calculation with Fan Offset
-                                const baseDir = this.getForwardVector();
-                                // Apply Angle Rotation (Around Y axis)
-                                // Note: We use -angle in previous implementation to map loop index to scan direction.
-                                // Here we just use the raw value from array.
-                                const fanDir = baseDir.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), angle);
+                                    if (block.hp <= 0) {
+                                        block.isDead = true;
+                                        scene.remove(block.mesh);
+                                        block.mesh.geometry.dispose();
+                                        block.mesh.material.dispose();
+                                    }
 
-                                // Override internal spawnBullet logic? 
-                                // spawnBullet uses 'direction' variable or getForwardVector.
-                                // Let's modify spawnBullet signature to accept explicit direction override or angle offset?
-                                // Actually, let's just inline the logic here or make a better helper.
-                                // Re-using spawnBullet is tricky with the closure.
-
-                                // Simplified Inline Spawn for Burst:
-                                const currentSpawnPos = new THREE.Vector3();
-                                this.mouth.getWorldPosition(currentSpawnPos);
-                                currentSpawnPos.add(this.getForwardVector().multiplyScalar(0.5));
-
-                                const bullet = new Bullet('quad', currentSpawnPos, fanDir, speed, life, gravity, size, stats);
-                                state.bullets.push(bullet);
-
-                                // Recoil
-                                const force = stats.recoil * CONFIG.combat.recoilForce * decayVal;
-                                const recoilVec = fanDir.clone().normalize().multiplyScalar(-force);
-                                this.velocity.add(recoilVec);
-
-                            }, time * 1000);
-                        };
-
-                        spawnWithFan(i * config.burstInterval, decay, angleOffset);
-                    }
-
-                    // Shockwave x3 (Optional: Keep it simple one shockwave? Task didn't specify multiple shockwaves for Trio/Quad updates, assuming Quad keeps existing behavior)
-                    // Original code: loop 1 time?
-                    // Assumed original intention was 1 shockwave or sync with burst? 
-                    // Let's keep 1 shockwave at start.
-                    spawnShockwave(config.shockwave, config.damage);
-
-                } else if (type === 'trio') {
-                    config = CONFIG.bullet.trio;
-                    speed = config.speed;
-                    life = config.life;
-                    gravity = config.gravity;
-                    size = config.size;
-                    stats = { damage: config.damage, penetration: config.penetration, recoil: config.recoil, knockback: config.knockback };
-
-                    // [New] Burst Logic for Trio (Copied/Adapted from Quad)
-                    this.isBursting = true;
-                    setTimeout(() => { this.isBursting = false; }, config.burstCount * config.burstInterval * 1000 + 50);
-
-                    for (let i = 0; i < config.burstCount; i++) {
-                        const decay = Math.pow(0.5, i); // Recoil Decay (100%, 50%, 25%...)
-
-                        // Angle Logic (Array)
-                        let angleOffset = 0;
-                        if (config.angles && config.angles.length > 0) {
-                            angleOffset = config.angles[i % config.angles.length];
+                                    // Building recoil (stronger than enemy)
+                                    if (!isTail) {
+                                        const recoilDir = window.gidoraInstance.mesh.position.clone().sub(block.mesh.position).normalize();
+                                        recoilDir.y = 0;
+                                        window.gidoraInstance.knockbackVel.add(recoilDir.multiplyScalar(5)); // Stronger recoil for buildings
+                                    }
+                                }
+                            });
                         }
 
-                        const spawnWithFan = (time, decayVal, angle) => {
-                            setTimeout(() => {
-                                const baseDir = this.getForwardVector();
-                                const fanDir = baseDir.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), angle);
-
-                                const currentSpawnPos = new THREE.Vector3();
-                                this.mouth.getWorldPosition(currentSpawnPos);
-                                currentSpawnPos.add(this.getForwardVector().multiplyScalar(0.5));
-
-                                const bullet = new Bullet('trio', currentSpawnPos, fanDir, speed, life, gravity, size, stats);
-                                state.bullets.push(bullet);
-
-                                // Recoil
-                                const force = stats.recoil * CONFIG.combat.recoilForce * decayVal;
-                                const recoilVec = fanDir.clone().normalize().multiplyScalar(-force);
-                                this.velocity.add(recoilVec);
-
-                            }, time * 1000);
-                        };
-
-                        spawnWithFan(i * config.burstInterval, decay, angleOffset);
+                        return true;
                     }
-                    spawnShockwave(config.shockwave, config.damage);
-                } else if (type === 'duo') {
-                    // Check Mode
-                    if (state.mode === 'quad') {
-                        config = CONFIG.bullet.ultraDuo; // Stronger
-                    } else {
-                        config = CONFIG.bullet.duo;
-                    }
-                    speed = config.speed;
-                    life = config.life;
-                    gravity = config.gravity;
-                    size = config.size;
-                    stats = { damage: config.damage, penetration: config.penetration, recoil: config.recoil, knockback: config.knockback };
-                    direction = this.getForwardVector();
-                    spawnBullet('duo');
-                    if (config.shockwave) spawnShockwave(config.shockwave, config.damage);
-                } else {
-                    // Single
-                    if (state.mode === 'quad') {
-                        config = CONFIG.bullet.ultraSingle; // Stronger
-                    } else {
-                        config = CONFIG.bullet.single;
-                    }
-
-                    speed = config.speedMin + Math.random() * (config.speedMax - config.speedMin);
-                    life = config.lifeMin + Math.random() * (config.lifeMax - config.lifeMin);
-                    gravity = config.gravity;
-                    size = config.size;
-                    stats = { damage: config.damage, penetration: config.penetration, recoil: config.recoil, knockback: config.knockback };
-
-                    // Spread
-                    const spread = (Math.random() - 0.5) * config.spread;
-                    direction = this.getForwardVector().applyAxisAngle(new THREE.Vector3(0, 1, 0), spread);
-
-                    spawnBullet(type);
-                }
+                });
             }
 
             activateCombo() {
                 state.comboActive = true;
 
-                // Initialize Combo State Machine
                 this.comboState = 'precast';
                 this.comboTimer = CONFIG.combo.preCastDelay;
 
@@ -2740,6 +2436,7 @@
             }
 
             update(dt) {
+                this.updateDragon(dt);
                 // HP Bar
                 if (this.hpBar) this.hpBar.update(this.mesh.position, this.hp, this.maxHP);
 
@@ -2874,288 +2571,52 @@
                 state.pulseValue = Math.min(100, Math.max(0, state.pulseValue + rate * dt));
                 state.pulse = state.pulseValue; // Keep state.pulse in sync with state.pulseValue
 
-                // Trigger Combo?
+                // --- Trigger Logic (Immediate) ---
                 if (state.pulseValue >= 100 && !state.comboActive && state.comboCooldown <= 0) {
                     this.activateCombo();
                     return; // Start combo frame
                 }
-
-                // --- Rhythm UI Update ---
-                const cycleTime = CONFIG.rhythm.beatInterval;
-                const prevRhythm = state.rhythmTime;
-                state.rhythmTime = (state.rhythmTime + (dt / cycleTime)) % 1.0;
-
-                // Sound Triggers
-                if (prevRhythm < 0.5 && state.rhythmTime >= 0.5) {
-                    SoundSystem.playKick(); // [Swap] Open Hi-Hat -> Kick
-                    // Character Bounce (Visual Beat)
-                    this.pulseScale = 1.15; // Jump to 1.15x
-
-                    // [New] Bass Line Trigger (Corrected to Downbeat)
-                    // Sequence: 1, 3b, 4, 5, 4#, 4, 3b, 7b (Low)
-                    // Relative Semitones: 0, 3, 5, 7, 6, 5, 3, -2
-                    if (state.beatCount === undefined) state.beatCount = 0;
-                    state.beatCount++;
-
-                    const bassSequence = [0, 3, 5, 7, 6, 5, 3, -2];
-                    const bassNote = bassSequence[(state.beatCount - 1) % bassSequence.length];
-                    if (SoundSystem.playBass) SoundSystem.playBass(bassNote);
-                }
-
-                // [New] Quarter-Note Hi-Hat (1/4 and 3/4)
-                if (state.quarterHiHat) {
-                    if (prevRhythm < 0.25 && state.rhythmTime >= 0.25) {
-                        SoundSystem.playHiHat();
-                    }
-                    if (prevRhythm < 0.75 && state.rhythmTime >= 0.75) {
-                        SoundSystem.playHiHat();
-                    }
-                }
-
-                if (state.rhythmTime < prevRhythm) SoundSystem.playOpenHiHat(); // [Swap] Kick -> Open Hi-Hat
-                const cursor = document.getElementById('rhythm-cursor');
-                const target = document.getElementById('rhythm-target');
-                cursor.style.left = (state.rhythmTime * 100) + '%';
-
-                // Dynamic Target Size based on Window
-                const currentWindow = (state.mode === 'quad') ? CONFIG.combat.quadWindow : CONFIG.combat.duoWindow;
-                const windowFraction = currentWindow / cycleTime; // e.g. 0.35 / 2.0 = 0.175
-
-                // Visual Circle Size:
-                // Range is +/- window/2. Total width = window.
-                // Circle Diameter should represent the full window width relative to the timeline?
-                // User said: "Circle intersection points = tolerance range". 
-                // Line is 0..1. Center 0.5. Tolerance +/- w/2.
-                // Intersection points are (0.5 - w/2) and (0.5 + w/2).
-                // Distance between them is w.
-                // So Circle Width should be w.
-                const percentWidth = windowFraction * 100;
-                target.style.width = percentWidth + '%';
-                // Keep aspect ratio 1:1 using calculated pixel width relative to container or just use aspect-ratio css if supported
-                // Since container is 500px, height needs to match.
-                // Let's just use CSS 'aspect-ratio: 1'.
-                // Update: Inline style for width, ensure CSS has aspect-ratio or handle height.
-                // Simple hack: set height to 'auto' and use aspect-ratio in CSS, or calculate px.
-                // Let's rely on CSS update in next step for aspect-ratio, or set height here if possible? 
-                // Easier: target.style.height/width in px.
-                const containerWidth = document.getElementById('rhythm-helper').clientWidth;
-                // Visual Circle Size Adjustment (0.7x to match strict feel)
-                const visualScale = 0.7;
-                const pxSize = containerWidth * windowFraction * visualScale;
-                target.style.width = pxSize + 'px';
-                target.style.height = pxSize + 'px';
-
-                // Color Feedback (Visual Only - Matches Visual Size)
-                const distToCenter = Math.abs(state.rhythmTime - 0.5) * cycleTime;
-                if (distToCenter <= (currentWindow * visualScale) / 2) {
-                    target.style.border = '2px solid #ffff00'; // Yellow when in zone
-                    target.style.transform = 'scale(1.1)';
-                    cursor.style.backgroundColor = '#ffff00';
-                } else {
-                    target.style.border = '2px solid white';
-                    target.style.transform = 'scale(1)';
-                    cursor.style.backgroundColor = 'white';
-                }
-
-                // --- Combat Logic Updates ---
 
                 // 1. Cooldown Management
                 players.forEach(p => {
                     if (this.cooldowns[p] > 0) this.cooldowns[p] -= dt;
                 });
 
-                // 2. Input Detection (Fresh Press) & Buffer
+                // 2. Input Detection & Attack Trigger
                 players.forEach(p => {
                     const isPress = state.input[p].attack && !this.lastAttackInput[p];
                     this.lastAttackInput[p] = state.input[p].attack;
-                    const isCharging = state.input[p].charge;
 
-                    // Trigger Check
-                    const checkTrigger = () => {
-                        // 1. Buffered Input (Early Press)
-                        if (this.bufferedInput[p] && this.cooldowns[p] <= 0) {
-                            this.bufferedInput[p] = false;
-                            return true;
+                    if (this.cooldowns[p] <= 0) {
+                        // Auto-fire enabled for Melee? Or just on press? 
+                        // Let's allow hold to spam.
+                        if (isPress || state.input[p].attack) {
+                            this.attack(p);
+                            this.cooldowns[p] = 0.5; // Melee Cooldown
                         }
-
-                        const isHeld = state.input[p].attack;
-
-                        // 2. Fresh Press (Buffer if cooldown active)
-                        if (isPress) {
-                            if (this.cooldowns[p] <= 0) return true;
-                            else if (this.cooldowns[p] <= CONFIG.combat.bufferWindow) {
-                                this.bufferedInput[p] = true;
-                                return false;
-                            }
-                        }
-
-                        // 3. Auto-Fire (Held Button)
-                        if (isHeld && this.cooldowns[p] <= 0) {
-                            return true;
-                        }
-
-                        return false;
-                    };
-
-                    if (checkTrigger() && !isCharging && !this.isWindup[p]) {
-                        this.isWindup[p] = true;
-                        this.windupTimer[p] = CONFIG.combat.preFireDelay;
-
-                        // Rhythm Check
-                        const timeDiff = Math.abs(state.rhythmTime - 0.5) * cycleTime;
-                        const validWindow = (state.mode === 'quad') ? CONFIG.combat.quadWindow : CONFIG.combat.duoWindow;
-                        this.rhythmBonus[p] = timeDiff <= (validWindow / 2);
-
-                        console.log(`${p.toUpperCase()} Rhythm: ${this.rhythmBonus[p]}`);
-
-                        // Spawn Feedback Dot
-                        if (this.activeIndicators[p]) this.activeIndicators[p].remove();
-                        this.activeIndicators[p] = state.showInputFeedback(p, this.rhythmBonus[p]);
                     }
                 });
 
-                // 3. Synergy Check
-                // Find all players who are Winding Up AND have Valid Rhythm
-                const readyPlayers = players.filter(p => this.isWindup[p] && this.rhythmBonus[p]);
-
-                // Determine Synergy Level (4=Quad, 3=Trio, 2=Duo)
-                // Only upgrade if we haven't already locked in a higher level?
-                // Actually, dynamic upgrade is fine as long as we haven't fired.
-
-                let synergyLevel = 0;
-                let synergyName = '';
-
-                if (readyPlayers.length === 4) { synergyLevel = 4; synergyName = 'quad'; }
-                else if (readyPlayers.length === 3) { synergyLevel = 3; synergyName = 'trio'; }
-                else if (readyPlayers.length === 2) { synergyLevel = 2; synergyName = 'duo'; }
-
-                if (synergyLevel > 0) {
-                    // Sync Timers: 
-                    // [New] "Start from 2nd player instant" Logic
-                    // If we just transitioned from <2 to >=2 ready players, we reset everyone's timer to FULL.
-                    // This effectively delays P1 to sync with P2's start time.
-
-                    if (!this.lastReadyCount) this.lastReadyCount = 0;
-
-                    // Check if this is the moment the group formed (became valid synergy)
-                    if (this.lastReadyCount < 2 && readyPlayers.length >= 2) {
-                        // Reset All to Full Duration
-                        readyPlayers.forEach(p => this.windupTimer[p] = CONFIG.combat.preFireDelay);
-                    }
-                    else {
-                        // Standard Sync: If already established, sync to the fastest timer (catch up logic for P3/P4 or just drift correction)
-                        // Actually, if we want strict "Second Player" rule, maybe we shouldn't speed up P3? 
-                        // But usually P3 should join the existing group. The group is defined by P2's deadline.
-                        // So existing logic (minTimer) is correct for P3/P4 joining P1+P2.
-
-                        const minTimer = Math.min(...readyPlayers.map(p => this.windupTimer[p]));
-                        readyPlayers.forEach(p => this.windupTimer[p] = minTimer);
-                    }
-
-                    // Mark as Synergy Pending (to prevent single fire)
-                    this.synergyPending = synergyLevel;
-                    this.synergyType = synergyName;
-
-                    // ... (rest of visual update logic)
-
-                    // Update Visuals: Remove individual dots and show Synergy Dot
-                    // Naive approach: Just remove all and show one big one if not already shown?
-                    // Ideally we identify if this is a NEW synergy state.
-                    // For now: Always refresh synergy feedback if changed
-
-                    if (this.lastSynergyLevel !== synergyLevel) {
-                        readyPlayers.forEach(p => {
-                            if (this.activeIndicators[p]) { this.activeIndicators[p].remove(); this.activeIndicators[p] = null; }
-                        });
-                        // We might want to clear previous synergy dot if we upgraded (e.g. Duo -> Trio)
-                        // But `showInputFeedback` just spawns a new one. 
-                        // Let's just spawn the new one.
-
-                        // [Fixed] Remove previous synergy indicator if exists
-                        if (this.activeSynergyIndicator) {
-                            this.activeSynergyIndicator.remove();
-                            this.activeSynergyIndicator = null;
-                        }
-
-                        this.activeSynergyIndicator = state.showInputFeedback('duo', true, synergyLevel); // Pass Synergy Level for visuals
-
-                        // Task says "reuse Duo bullet values" but for UI? 
-                        // Let's allow 'duo' style for all synergies in UI for now, maybe scale it?
-                    }
-                }
-                this.lastSynergyLevel = synergyLevel;
-                this.lastReadyCount = readyPlayers.length; // [New] Update state for next frame
-
-                // 4. Visuals & Logic Loop
+                // 3. Visuals Loop (Colors)
                 players.forEach(p => {
-                    const isCharging = state.input[p].charge;
-
-                    // Element Map
-                    const partMap = { p1: this.p1Part, p2: this.p2Part, p3: this.p3Part, p4: this.p4Part };
+                    // partMap is getting Groups (Neck/Tail Group) which don't have material.
+                    // We only color the "Head" part (Head Mesh / Tail Tip).
                     const headMap = { p1: this.p1HeadPart, p2: this.p2HeadPart, p3: this.p3HeadPart, p4: this.p4HeadPart };
-                    const baseMap = { p1: this.baseColorP1, p2: this.baseColorP2, p3: this.baseColorP3, p4: this.baseColorP4 };
-                    const darkMap = { p1: this.darkColorP1, p2: this.darkColorP2, p3: this.darkColorP3, p4: this.darkColorP4 };
+                    const baseMap = { p1: CONFIG.visuals.colors.p1, p2: CONFIG.visuals.colors.p2, p3: CONFIG.visuals.colors.p3, p4: CONFIG.visuals.colors.p4 };
 
-                    const part = partMap[p];
-                    const headPart = headMap[p];
+                    const head = headMap[p];
+                    if (!head) return;
 
-                    if (isCharging) {
-                        const time = Date.now() * 0.005;
-                        const hue = time % 1.0;
-                        const rainbow = new THREE.Color().setHSL(hue, 1.0, 0.5);
-                        part.material.color.copy(rainbow);
-                        headPart.material.color.copy(rainbow);
-                    }
-                    else if (this.isWindup[p]) {
-                        this.windupTimer[p] -= dt;
-
-                        const base = baseMap[p];
-                        const t = 1.0 - (this.windupTimer[p] / CONFIG.combat.preFireDelay);
-                        const targetHex = this.rhythmBonus[p] ? 0xffff00 : 0xffffff;
-                        const c = new THREE.Color().lerpColors(base, new THREE.Color(targetHex), t);
-
-                        part.material.color.copy(c);
-                        headPart.material.color.copy(c);
-
-                        if (this.windupTimer[p] <= 0) {
-                            // FIRE!
-                            this.isWindup[p] = false;
-
-                            // Check for Synergy Fire
-                            // If I am part of the Ready Set, dealing with Synergy
-                            if (this.synergyPending > 0 && readyPlayers.includes(p)) {
-                                // Execute Synergy Shot ONCE per group
-                                // Check if we are the "leader" (e.g. first in list of readyPlayers)
-                                // OR check if synergyPending is still set.
-
-                                if (this.synergyPending > 0) {
-                                    this.shoot(this.synergyType);
-
-                                    // Reset Synergy Logic
-                                    const type = this.synergyType;
-                                    this.synergyPending = 0;
-                                    this.synergyType = '';
-                                    this.lastSynergyLevel = 0;
-
-                                    // Reset ALL ready players cooldowns
-                                    readyPlayers.forEach(rp => {
-                                        this.isWindup[rp] = false;
-                                        this.cooldowns[rp] = CONFIG.combat.cooldown;
-                                        // Slight extra delay for Quad? No, use standard.
-                                    });
-                                }
-                            } else {
-                                // Single Fire
-                                this.shoot(p);
-                                this.cooldowns[p] = CONFIG.combat.cooldown;
-                            }
-                        }
+                    if (this.cooldowns[p] > 0) {
+                        // Cooldown Darken
+                        const base = new THREE.Color(baseMap[p]);
+                        base.multiplyScalar(0.5);
+                        head.material.color.copy(base);
                     } else {
-                        // Cooldown / Idle
-                        const color = this.cooldowns[p] > 0 ? darkMap[p] : baseMap[p];
-                        part.material.color.copy(color);
-                        headPart.material.color.copy(color);
+                        // Normal
+                        head.material.color.set(baseMap[p]);
                     }
+
                 });
 
 
@@ -3163,6 +2624,9 @@
                 let totalInput = new THREE.Vector3();
                 let totalRotationInput = new THREE.Vector3(); // [New] Separate rotation
                 const activeDirs = []; // Track directions for Synergy Boost
+
+                // [New] Check if ANY head is in windup (Input Lock)
+                const isAnyWindup = ['p1', 'p2', 'p3', 'p4'].some(p => this.attackStates[p] === 'windup');
 
                 players.forEach(p => {
                     const moveInput = state.input[p].move;
@@ -3179,7 +2643,8 @@
                     const arrowMap = { p1: this.p1Arrow, p2: this.p2Arrow, p3: this.p3Arrow, p4: this.p4Arrow };
                     const arrow = arrowMap[p];
 
-                    if (hasInput && !isCharging) {
+                    // [Modified] Hide arrows during windup, show only when has input and not charging/windup
+                    if (hasInput && !isCharging && !isAnyWindup) {
                         const inputVec = new THREE.Vector3(moveInput.x, 0, moveInput.y);
                         const dir = inputVec.clone().normalize();
 
@@ -3220,15 +2685,34 @@
                 // Speed Lines Trigger
                 // Rotation - MOVED BEFORE MOVEMENT for Car-like steering
                 // Rotate towards INPUT Direction
+                let turnPenalty = 1.0;
                 if (totalRotationInput.lengthSq() > 0.01 && !this.isBursting) {
                     const targetAngle = Math.atan2(totalRotationInput.x, totalRotationInput.z);
                     const currentAngle = this.mesh.rotation.y;
                     let deltaAngle = targetAngle - currentAngle;
                     while (deltaAngle > Math.PI) deltaAngle -= Math.PI * 2;
                     while (deltaAngle < -Math.PI) deltaAngle += Math.PI * 2;
-                    const rotStep = CONFIG.movement.rotationSpeed * dt;
+
+                    const rotStep = CONFIG.movement[state.mode].rotationSpeed * dt;
                     if (Math.abs(deltaAngle) < rotStep) this.mesh.rotation.y = targetAngle;
                     else this.mesh.rotation.y += Math.sign(deltaAngle) * rotStep;
+
+                    // [New Turn Penalty Logic]
+                    // 0 - 30 deg (0.523 rad): No Penalty (1.0)
+                    // 30 - 180 deg: Linear to 0.5
+                    // > 180 deg: 0.5
+                    const absDelta = Math.abs(deltaAngle);
+                    const deg = absDelta * (180 / Math.PI);
+
+                    if (deg <= 30) {
+                        turnPenalty = 1.0;
+                    } else if (deg >= 180) {
+                        turnPenalty = 0.5;
+                    } else {
+                        // Linear Intep
+                        const t = (deg - 30) / 150.0;
+                        turnPenalty = 1.0 - (t * 0.5);
+                    }
                 }
 
                 // Speed Lines Trigger
@@ -3237,7 +2721,8 @@
 
                 // Car-like Physics
                 const currentSpeed = this.velocity.length();
-                const maxSpeed = CONFIG.movement.maxSpeed * speedMult;
+                // Apply Turn Penalty to Max Speed
+                const maxSpeed = CONFIG.movement[state.mode].maxSpeed * speedMult * turnPenalty;
                 const forward = this.getForwardVector();
                 const isInputting = totalInput.lengthSq() > 0.01;
 
@@ -3245,12 +2730,12 @@
                     // A. Traction: Rotate velocity towards forward
                     if (currentSpeed > 0.1) {
                         const currentDir = this.velocity.clone().normalize();
-                        const traction = CONFIG.movement.traction * dt;
+                        const traction = CONFIG.movement[state.mode].traction * dt;
                         currentDir.lerp(forward, traction).normalize();
                         this.velocity.copy(currentDir.multiplyScalar(currentSpeed));
                     }
                     // B. Acceleration: Push forward
-                    const accel = CONFIG.movement.acceleration * dt;
+                    const accel = CONFIG.movement[state.mode].acceleration * dt;
                     this.velocity.add(forward.multiplyScalar(accel));
                     // Cap Speed
                     if (this.velocity.length() > maxSpeed) {
@@ -3258,7 +2743,7 @@
                     }
                 } else {
                     // C. Friction
-                    const friction = CONFIG.movement.friction * dt;
+                    const friction = CONFIG.movement[state.mode].friction * dt;
                     const spd = this.velocity.length();
                     if (spd > 0) {
                         if (spd < friction) this.velocity.set(0, 0, 0);
@@ -3268,6 +2753,12 @@
                 const currentVel = this.velocity;
 
                 this.mesh.position.add(currentVel.clone().multiplyScalar(dt));
+
+                // Knockback Physics (like enemies)
+                if (this.knockbackVel.lengthSq() > 0.001) {
+                    this.mesh.position.add(this.knockbackVel.clone().multiplyScalar(dt));
+                    this.knockbackVel.multiplyScalar(0.9); // Friction
+                }
 
                 // Player-Block Collision
                 // Simple Circle-Box or Box-Box resolution
@@ -3328,7 +2819,8 @@
                 // Camera & Follow
                 camera.position.x = this.mesh.position.x;
                 camera.position.z = this.mesh.position.z + 10;
-                camera.lookAt(this.mesh.position);
+                // [Fix] Target stable Y (1.2) to remove bobbing shake
+                camera.lookAt(this.mesh.position.x, 1.2, this.mesh.position.z);
                 if (this.comboGroup) this.comboGroup.position.copy(this.mesh.position);
 
                 // Scale Decay Logic (Beat Bounce) - Global
@@ -3341,6 +2833,7 @@
 
             }
         }
+
 
         // --- Input Handling ---
 
@@ -3385,25 +2878,6 @@
                 if (state.comboCooldown > 0) {
                     state.comboCooldown -= 0.016; // Approx per frame
                     if (state.comboCooldown < 0) state.comboCooldown = 0;
-
-                    // Update UI
-                    const pulseDiv = document.getElementById('pulse-container-central');
-                    const pulseBar = document.getElementById('pulse-bar');
-                    const pulseText = document.getElementById('pulse-text');
-
-                    pulseDiv.classList.add('pulse-locked');
-                    pulseBar.style.width = '100%'; // Full bar but gray
-                    pulseBar.style.background = '#555'; // Gray
-                    pulseText.innerText = `COOLDOWN: ${Math.ceil(state.comboCooldown)}`;
-                } else {
-                    const pulseDiv = document.getElementById('pulse-container-central');
-                    const pulseBar = document.getElementById('pulse-bar');
-                    const pulseText = document.getElementById('pulse-text');
-
-                    pulseDiv.classList.remove('pulse-locked');
-                    pulseBar.style.width = (state.pulse / state.maxPulse * 100) + '%';
-                    pulseBar.style.background = 'linear-gradient(90deg, #ff00ff, #00ffff)';
-                    pulseText.innerText = 'PULSE(Hold Skill Button)';
                 }
 
                 // --- P1 (Keyboard/Mouse) ---
@@ -3513,21 +2987,7 @@
             }
         });
 
-        // BPM Slider
-        const bpmSlider = document.getElementById('bpm-slider');
-        const bpmValue = document.getElementById('bpm-value');
-        bpmSlider.addEventListener('input', (e) => {
-            const newBPM = parseInt(e.target.value);
-            bpmValue.textContent = newBPM * 2; // Display quarter-note tempo (x2)
-            CONFIG.rhythm.bpm = newBPM;
-            CONFIG.rhythm.beatInterval = 60 / newBPM;
-        });
 
-        // Quarter Hi-Hat Toggle
-        const quarterHiHatToggle = document.getElementById('quarter-hihat-toggle');
-        quarterHiHatToggle.addEventListener('change', (e) => {
-            state.quarterHiHat = e.target.checked;
-        });
 
         // Dummy Toggle (Moved to Info Container)
         const dummyBtn = document.createElement('button');
@@ -3585,9 +3045,7 @@
                 }
             }
 
-            // Update Pulse Bar
-            const bar = document.getElementById('pulse-bar'); // Renamed to 'bar' to match original
-            bar.style.width = state.pulseValue + '%';
+
 
             // Debug Info
             document.getElementById('debug').innerHTML = `
