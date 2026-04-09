@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GIDO AI Bot 偏移測試環境 v3</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            background-color: #1a1a1a;
+            color: #ffffff;
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        canvas {
+            background-image:
+                radial-gradient(#333 1px, transparent 1px);
+            background-size: 40px 40px;
+            background-color: #121212;
+            cursor: none;
+            border: 4px solid #333;
+            border-radius: 12px;
+            box-shadow: 0 0 30px rgba(0, 0, 0, 0.5);
+        }
+
+        .ui-panel {
+            background: rgba(25, 25, 25, 0.95);
+            backdrop-filter: blur(10px);
+            border: 2px solid #555;
+            padding: 20px;
+            border-radius: 16px;
+            pointer-events: none;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.7);
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="fixed top-5 left-5 ui-panel z-10 w-80">
+        <h1 class="text-xl font-black text-yellow-400 mb-1 tracking-tighter italic">GIDO AI PERCEPTION v3</h1>
+        <p class="text-[10px] text-gray-400 uppercase tracking-widest mb-4">軌跡模擬：等速曲線飄移</p>
+
+        <div class="space-y-3 text-sm">
+            <div class="flex justify-between items-center">
+                <span class="text-gray-400">距離 (Distance):</span>
+                <span id="dist-val" class="text-blue-400 font-mono font-bold text-lg">0</span>
+            </div>
+            <div class="flex justify-between items-center">
+                <span class="text-gray-400">最大誤差半徑:</span>
+                <span id="offset-val" class="text-red-400 font-mono font-bold text-lg">0</span>
+            </div>
+            <div class="flex justify-between items-center">
+                <span class="text-gray-400">距離下次開火:</span>
+                <span id="timer-val" class="text-green-400 font-mono font-bold text-lg">2.0s</span>
+            </div>
+        </div>
+
+        <div class="mt-5 pt-4 border-t border-gray-700">
+            <div class="bg-black/50 p-2 rounded text-[11px] font-mono text-gray-300">
+                $Offset = 2.8 \times \ln(d) - 1.5$
+            </div>
+            <p class="text-[10px] text-gray-500 mt-3 italic">
+                更新日誌：<br>
+                - 角色移動速度調降 (4.5 → 3.0)<br>
+                - 紅點改為等速向量移動 (不再瞬移)<br>
+                - 引入 Steering 轉向力，產生弧形軌跡
+            </p>
+        </div>
+    </div>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        const uiDist = document.getElementById('dist-val');
+        const uiOffset = document.getElementById('offset-val');
+        const uiTimer = document.getElementById('timer-val');
+
+        // 核心規格參數
+        const SCALE_UNIT = 25;
+        const PLAYER_SPEED = 3.0; // 調低玩家速度
+        const SHOOT_INTERVAL = 2000;
+
+        let width, height;
+        function resize() {
+            width = window.innerWidth - 40;
+            height = window.innerHeight - 40;
+            canvas.width = width;
+            canvas.height = height;
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        const keys = {};
+        window.addEventListener('keydown', e => keys[e.code] = true);
+        window.addEventListener('keyup', e => keys[e.code] = false);
+
+        const player = {
+            x: width / 2 + 200,
+            y: height / 2,
+            radius: 25,
+            color: '#00d4ff'
+        };
+
+        const turret = {
+            x: 150,
+            y: height / 2,
+            radius: 30,
+            color: '#ff006e',
+            lastShot: 0
+        };
+
+        // Bot 感知屬性 - V3 曲線移動版
+        const perception = {
+            x: 0, // 相對於玩家的本地坐標
+            y: 0,
+            moveAngle: Math.random() * Math.PI * 2, // 當前移動方向角
+            speed: 1.2, // 等速移動 (像素/幀)
+            turnVelocity: 0, // 當前轉向速度
+            maxTurnSpeed: 0.1, // 最大轉向弧度
+            boundaryBuffer: 0.8 // 當到達 80% 邊界時開始轉向
+        };
+
+        const bullets = [];
+
+        function getDistance(x1, y1, x2, y2) {
+            return Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2);
+        }
+
+        function update(timestamp) {
+            // 1. 玩家移動
+            if (keys['KeyW'] || keys['ArrowUp']) player.y -= PLAYER_SPEED;
+            if (keys['KeyS'] || keys['ArrowDown']) player.y += PLAYER_SPEED;
+            if (keys['KeyA'] || keys['ArrowLeft']) player.x -= PLAYER_SPEED;
+            if (keys['KeyD'] || keys['ArrowRight']) player.x += PLAYER_SPEED;
+
+            player.x = Math.max(player.radius, Math.min(width - player.radius, player.x));
+            player.y = Math.max(player.radius, Math.min(height - player.radius, player.y));
+
+            // 2. 計算公式偏移半徑
+            const d_pixels = getDistance(player.x, player.y, turret.x, turret.y);
+            const d_units = d_pixels / SCALE_UNIT;
+
+            let offset_units = 2.8 * Math.log(Math.max(1.1, d_units)) - 1.5;
+            offset_units = Math.max(0, offset_units);
+            const offset_pixels = offset_units * SCALE_UNIT;
+
+            // 3. 更新感知紅點 (等速曲線移動)
+            // A. 隨機改變轉向，產生弧線感
+            perception.turnVelocity += (Math.random() - 0.5) * 0.02;
+            perception.turnVelocity = Math.max(-perception.maxTurnSpeed, Math.min(perception.maxTurnSpeed, perception.turnVelocity));
+            perception.moveAngle += perception.turnVelocity;
+
+            // B. 預測下一步位置
+            let nextX = perception.x + Math.cos(perception.moveAngle) * perception.speed;
+            let nextY = perception.y + Math.sin(perception.moveAngle) * perception.speed;
+
+            // C. 邊界檢測與導回 (Steering back to center)
+            const nextDist = Math.sqrt(nextX ** 2 + nextY ** 2);
+            if (nextDist > offset_pixels * perception.boundaryBuffer) {
+                // 如果快要出界，將角度朝向圓心方向微調
+                const angleToCenter = Math.atan2(-perception.y, -perception.x);
+                let angleDiff = angleToCenter - perception.moveAngle;
+
+                // 角度標準化
+                while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+                while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+
+                perception.moveAngle += angleDiff * 0.15; // 導回力道
+                perception.turnVelocity *= 0.9; // 減緩原本的混亂轉向
+            }
+
+            // D. 執行位移
+            perception.x += Math.cos(perception.moveAngle) * perception.speed;
+            perception.y += Math.sin(perception.moveAngle) * perception.speed;
+
+            // E. 硬性截斷（當 Offset 突然縮小時）
+            const finalDist = Math.sqrt(perception.x ** 2 + perception.y ** 2);
+            if (finalDist > offset_pixels && offset_pixels > 0) {
+                const ratio = offset_pixels / finalDist;
+                perception.x *= ratio;
+                perception.y *= ratio;
+            }
+
+            const redDotX = player.x + perception.x;
+            const redDotY = player.y + perception.y;
+
+            // 4. 砲塔射擊
+            if (timestamp - turret.lastShot >= SHOOT_INTERVAL) {
+                const angle = Math.atan2(redDotY - turret.y, redDotX - turret.x);
+                bullets.push({
+                    x: turret.x,
+                    y: turret.y,
+                    vx: Math.cos(angle) * 7.5,
+                    vy: Math.sin(angle) * 7.5,
+                    life: 250
+                });
+                turret.lastShot = timestamp;
+            }
+
+            // 5. 子彈更新
+            for (let i = bullets.length - 1; i >= 0; i--) {
+                const b = bullets[i];
+                b.x += b.vx;
+                b.y += b.vy;
+                b.life--;
+                if (getDistance(b.x, b.y, player.x, player.y) < player.radius) {
+                    createImpact(player.x, player.y);
+                    bullets.splice(i, 1);
+                    continue;
+                }
+                if (b.life <= 0) bullets.splice(i, 1);
+            }
+
+            // 6. UI 更新
+            uiDist.innerText = d_units.toFixed(1) + " U";
+            uiOffset.innerText = offset_units.toFixed(2) + " U";
+            const timeLeft = Math.max(0, (SHOOT_INTERVAL - (timestamp - turret.lastShot)) / 1000);
+            uiTimer.innerText = timeLeft.toFixed(1) + "s";
+
+            draw(redDotX, redDotY, offset_pixels);
+            requestAnimationFrame(update);
+        }
+
+        function createImpact(x, y) {
+            ctx.save();
+            ctx.fillStyle = '#fff';
+            ctx.shadowBlur = 30;
+            ctx.shadowColor = '#fff';
+            ctx.beginPath(); ctx.arc(x, y, 35, 0, Math.PI * 2); ctx.fill();
+            ctx.restore();
+        }
+
+        function draw(rx, ry, offset_px) {
+            ctx.clearRect(0, 0, width, height);
+
+            // 誤差範圍圓圈
+            ctx.beginPath();
+            ctx.arc(player.x, player.y, offset_px, 0, Math.PI * 2);
+            ctx.strokeStyle = 'rgba(255, 60, 60, 0.4)';
+            ctx.lineWidth = 1.5;
+            ctx.setLineDash([5, 5]);
+            ctx.stroke();
+            ctx.setLineDash([]);
+            ctx.fillStyle = 'rgba(255, 0, 0, 0.05)';
+            ctx.fill();
+
+            // 砲塔
+            ctx.shadowBlur = 20;
+            ctx.shadowColor = turret.color;
+            ctx.fillStyle = turret.color;
+            ctx.beginPath(); ctx.arc(turret.x, turret.y, turret.radius, 0, Math.PI * 2); ctx.fill();
+
+            const angle = Math.atan2(ry - turret.y, rx - turret.x);
+            ctx.save();
+            ctx.translate(turret.x, turret.y);
+            ctx.rotate(angle);
+            ctx.fillStyle = '#111';
+            ctx.fillRect(0, -12, 50, 24);
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(0, -12, 50, 24);
+            ctx.restore();
+
+            // 玩家
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = player.color;
+            ctx.fillStyle = player.color;
+            ctx.beginPath(); ctx.arc(player.x, player.y, player.radius, 0, Math.PI * 2); ctx.fill();
+            ctx.shadowBlur = 0;
+
+            // 紅點 (等速曲線運動中)
+            ctx.fillStyle = '#ff3e3e';
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = '#ff3e3e';
+            ctx.beginPath(); ctx.arc(rx, ry, 7, 0, Math.PI * 2); ctx.fill();
+            ctx.shadowBlur = 0;
+
+            // 瞄準輔助
+            ctx.beginPath();
+            ctx.moveTo(turret.x, turret.y);
+            ctx.lineTo(rx, ry);
+            ctx.strokeStyle = 'rgba(255, 62, 62, 0.4)';
+            ctx.setLineDash([2, 6]);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // 子彈
+            bullets.forEach(b => {
+                ctx.fillStyle = '#fff';
+                ctx.shadowBlur = 15;
+                ctx.shadowColor = '#ffff00';
+                ctx.beginPath(); ctx.arc(b.x, b.y, 6, 0, Math.PI * 2); ctx.fill();
+            });
+            ctx.shadowBlur = 0;
+        }
+
+        requestAnimationFrame(update);
+    </script>
+</body>
+
+</html>

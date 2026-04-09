@@ -3161,8 +3161,10 @@ class DetailsDisplayDialog(QDialog):
         # Set Headers
         if self.cb_transpose.isChecked():
              self.preview_table.setVerticalHeaderLabels([self.get_col_name(i) for i in range(len(data))])
+             self.preview_table.setHorizontalHeaderLabels([str(i+1) for i in range(len(data[0]) if data else 0)])
         else:
              self.preview_table.setVerticalHeaderLabels([str(i+1) for i in range(len(data))])
+             self.preview_table.setHorizontalHeaderLabels([self.get_col_name(i) for i in range(len(data[0]) if data else 0)])
              
         for r, row_data in enumerate(data):
             for c, val in enumerate(row_data):
@@ -3193,7 +3195,7 @@ class DetailsDisplayDialog(QDialog):
             self.list_values.addItem(item_text)
             
     def load_initial_state(self):
-        is_trans = self.config.get('transpose', False)
+        is_trans = self.config.get('transpose', True)
         self.cb_transpose.setChecked(is_trans)
         # on_transpose_changed will be called by setChecked if changed, or manual call if not?
         # signals are blocked by default? NO.
