@@ -55,6 +55,141 @@
             style="margin-top:10px; pointer-events:auto; background-color: #44aa44; color: white;">Start Enemy
             Spawn</button>
     </div>
+    <!-- 蓄力條 UI -->
+    <style>
+        #charge-bar-wrap {
+            transition: opacity 0.2s;
+        }
+
+        #charge-bar-fill {
+            transition: width 0.05s linear;
+        }
+
+        @keyframes beam-pulse {
+
+            0%,
+            100% {
+                box-shadow: 0 0 12px #ff00ff, 0 0 24px #ff00ff88
+            }
+
+            50% {
+                box-shadow: 0 0 22px #ff00ff, 0 0 44px #ff00ffcc
+            }
+        }
+
+        @keyframes label-flash {
+
+            0%,
+            100% {
+                opacity: 1
+            }
+
+            50% {
+                opacity: 0.5
+            }
+        }
+
+        .beam-firing #charge-bar-fill {
+            animation: beam-pulse 0.4s ease-in-out infinite;
+        }
+
+        .beam-prefire #charge-label {
+            animation: label-flash 0.25s ease-in-out infinite;
+            color: #ffff00 !important;
+        }
+    </style>
+    <div id="charge-bar-wrap"
+        style="position:absolute;bottom:24px;left:50%;transform:translateX(-50%);width:360px;pointer-events:none;z-index:10;">
+        <div id="charge-label"
+            style="text-align:center;color:white;font-size:13px;font-weight:bold;margin-bottom:5px;text-shadow:0 0 8px #ff00ff,0 0 16px #ff00ff88;letter-spacing:2px;">
+            蓄力 0%</div>
+        <div id="charge-bar-track"
+            style="background:rgba(0,0,0,0.7);height:22px;border-radius:11px;overflow:hidden;border:1px solid rgba(255,0,255,0.5);box-shadow:0 0 8px rgba(255,0,255,0.3);">
+            <div id="charge-bar-fill"
+                style="height:100%;width:0%;background:linear-gradient(90deg,#660066,#cc00cc,#ff00ff,#ffffff88);border-radius:11px;box-shadow:0 0 10px #ff00ff;">
+            </div>
+        </div>
+    </div>
+
+    <!-- 玩家蓄力狀態提示 (左下角) -->
+    <style>
+        #charge-indicators {
+            position: absolute;
+            bottom: 24px;
+            left: 20px;
+            pointer-events: none;
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .charge-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(0, 0, 0, 0.55);
+            border-radius: 8px;
+            padding: 5px 10px;
+            border: 1.5px solid rgba(255, 255, 255, 0.12);
+            transition: border-color 0.1s, background 0.1s;
+        }
+
+        .charge-indicator.pressing {
+            border-color: rgba(255, 0, 255, 0.7);
+            background: rgba(80, 0, 80, 0.6);
+        }
+
+        .charge-indicator .ci-dot {
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            flex-shrink: 0;
+            box-shadow: 0 0 6px currentColor;
+        }
+
+        .charge-indicator .ci-label {
+            font-size: 12px;
+            font-weight: bold;
+            color: #ccc;
+            letter-spacing: 1px;
+            min-width: 20px;
+        }
+
+        .charge-indicator .ci-status {
+            font-size: 11px;
+            color: #888;
+            letter-spacing: 0.5px;
+        }
+
+        .charge-indicator.pressing .ci-status {
+            color: #ff88ff;
+            text-shadow: 0 0 8px #ff00ff;
+        }
+    </style>
+    <div id="charge-indicators">
+        <div class="charge-indicator" id="ci-p1">
+            <div class="ci-dot" style="background:#ff4444;box-shadow:0 0 6px #ff4444;"></div>
+            <span class="ci-label">1P</span>
+            <span class="ci-status">未蓄力</span>
+        </div>
+        <div class="charge-indicator" id="ci-p2">
+            <div class="ci-dot" style="background:#4444ff;box-shadow:0 0 6px #4444ff;"></div>
+            <span class="ci-label">2P</span>
+            <span class="ci-status">未蓄力</span>
+        </div>
+        <div class="charge-indicator" id="ci-p3">
+            <div class="ci-dot" style="background:#ff69b4;box-shadow:0 0 6px #ff69b4;"></div>
+            <span class="ci-label">3P</span>
+            <span class="ci-status">未蓄力</span>
+        </div>
+        <div class="charge-indicator" id="ci-p4">
+            <div class="ci-dot" style="background:#00ffff;box-shadow:0 0 6px #00ffff;"></div>
+            <span class="ci-label">4P</span>
+            <span class="ci-status">未蓄力</span>
+        </div>
+    </div>
+
     <script type="importmap">
         {
             "imports": {
@@ -70,7 +205,9 @@
             // [New] General Stats
             stats: {
                 playerHP: 200,        // 角色血量
-                structureHPBase: 0.5   // 建築血量基值 (per unit volume)
+                structureHPBase: 0.5, // 建築血量基值 (per unit volume)
+                hpDecayRate: 2,       // 開啟Spawn後每秒扣血量
+                hpDecayRateBeam: 6    // 光束炮發射中每秒扣血量 (3倍)
             },
 
             // [New] Enemy Stats
@@ -185,8 +322,8 @@
             // 合體技相關 (Combo / Charge)
             combo: {
                 minCharge: 40,
-                chargeRateIndividual: 40, // 單人蓄力時脈衝增加速度 (每秒)
-                chargeRateDuo: 110,        // 雙人蓄力時脈衝增加速度 (每秒) - 鼓勵合作
+                chargeRateIndividual: 60, // 單人蓄力時脈衝增加速度 (每秒)
+                chargeRateDuo: 160,        // 雙人蓄力時脈衝增加速度 (每秒) - 鼓勵合作
                 decayRate: 30,            // 沒人蓄力時脈衝消退速度 (每秒)
 
                 preCastDelay: 2.3,        // 前搖時間 (秒)
@@ -208,6 +345,28 @@
                     activeDuration: 7.0,  // 傷害持續時間
                     radius: 12.0,         // 攻擊半徑
                     vineCount: 4          // 藤蔓數量
+                }
+            },
+
+            // 光束炮 (Beam Cannon)
+            beam: {
+                damagePerTick: 7,   // Duo 每 0.1 秒傷害
+                damageScale: 1.6,    // Quad 傷害倍率 (= 32/tick)
+                tickInterval: 0.1,   // 傷害間隔 (秒)
+                range: 25,           // 射程 (World units, 約半螢幕)
+                preFireDelay: 0.5,   // 蓄滿後延遲發射 (秒)
+                firingDuration: 3, // 固定發射持續時間 (秒)
+                postFireDelay: 0.6,  // 停止後恢復操作 (秒)
+                decayRate: 25,        // 無人蓄力時衰減速度 (/秒)
+                duo: {
+                    maxCharge: 100,
+                    chargeRates: [0, 50, 150],        // 依蓄力人數 [0人,1人,2人]
+                    width: 0.5                        // 兩人版光束粗細
+                },
+                quad: {
+                    maxCharge: 200,
+                    chargeRates: [0, 50, 150, 250, 500], // [0人,1人,2人,3人,4人]
+                    width: 0.8                         // 四人版光束非常粗
                 }
             },
 
@@ -251,6 +410,15 @@
             bullets: [],
             particles: [], // Array for simple particles
             comboActive: false,
+
+            // 光束炮狀態
+            beamCharge: 0,          // 當前蓄力值 (0 ~ maxCharge)
+            beamPhase: 'idle',      // 'idle' | 'prefire' | 'firing' | 'postfire'
+            beamPreFireTimer: 0,
+            beamFiringTimer: 0,     // 固定發射計時器
+            beamPostFireTimer: 0,
+            beamDotTimer: 0,
+            hpDecayEnabled: false,  // 按下StartEnemySpawn後啟動
 
             lastTime: 0
         };
@@ -1717,7 +1885,7 @@
 
                 // Player HP Bar (Global UI or Floating?)
                 // Raising to 4.5 (approx +20px equivalent?) to avoid clipping
-                this.hpBar = new HealthBar(scene, 4.5, 2.0, 0.2); // Scene attached
+                this.hpBar = new HealthBar(scene, 4.5, 4.0, 0.2); // Scene attached（寬度加倍）
 
 
                 // Combat State
@@ -1997,19 +2165,58 @@
                 this.p4Part = this.tailGroup;
                 this.p4HeadPart = this.tailTip;
 
-                // 4. Combo Visuals
-                this.comboGroup = new THREE.Group();
-                scene.add(this.comboGroup);
+                // 4. 光束炮 Mesh（半徑=1 單位，scale.x/y 設定粗細，scale.z 設定長度）
+                const _beamBase = () => {
+                    const g = new THREE.CylinderGeometry(1, 1, 1, 12);
+                    g.rotateX(Math.PI / 2);
+                    g.translate(0, 0, 0.5); // 起點在原點
+                    return g;
+                };
 
-                const r = CONFIG.combo.quad.radius;
-                const ringGeo = new THREE.RingGeometry(r - 0.2, r, 64);
-                ringGeo.rotateX(-Math.PI / 2);
-                const ringMat = new THREE.MeshBasicMaterial({ color: 0xff0000, side: THREE.DoubleSide, transparent: true, opacity: 0.0 });
-                this.comboRing = new THREE.Mesh(ringGeo, ringMat);
-                this.comboRing.position.y = 0.1;
-                this.comboGroup.add(this.comboRing);
+                // 主光束（白色核心）
+                this.beamMesh = new THREE.Mesh(_beamBase(), new THREE.MeshBasicMaterial({
+                    color: 0xffffff, transparent: true, opacity: 0.95, depthWrite: false
+                }));
+                this.beamMesh.visible = false;
+                scene.add(this.beamMesh);
 
-                this.vines = [];
+                // 外光暈（beam 色，加算混色，2.5 倍粗）
+                this.beamGlowMesh = new THREE.Mesh(_beamBase(), new THREE.MeshBasicMaterial({
+                    color: CONFIG.visuals.colors.beam,
+                    transparent: true, opacity: 0.0,
+                    blending: THREE.AdditiveBlending, depthWrite: false
+                }));
+                this.beamGlowMesh.visible = false;
+                scene.add(this.beamGlowMesh);
+
+                // 衝擊點球體閃光
+                this.beamImpactMesh = new THREE.Mesh(
+                    new THREE.SphereGeometry(1, 10, 8),
+                    new THREE.MeshBasicMaterial({
+                        color: 0xffffff, transparent: true, opacity: 0.0,
+                        blending: THREE.AdditiveBlending, depthWrite: false
+                    })
+                );
+                this.beamImpactMesh.visible = false;
+                scene.add(this.beamImpactMesh);
+
+                // 光束原點與衝擊點的動態光源
+                this.beamOriginLight = new THREE.PointLight(CONFIG.visuals.colors.beam, 0, 12);
+                scene.add(this.beamOriginLight);
+                this.beamImpactLight = new THREE.PointLight(0xffffff, 0, 14);
+                scene.add(this.beamImpactLight);
+
+                // 光束炮 prefire 閃光環（多層）
+                const chargeRingGeo = new THREE.RingGeometry(1.2, 2.2, 32);
+                chargeRingGeo.rotateX(-Math.PI / 2);
+                const chargeRingMat = new THREE.MeshBasicMaterial({
+                    color: CONFIG.visuals.colors.beam,
+                    side: THREE.DoubleSide, transparent: true, opacity: 0.0,
+                    blending: THREE.AdditiveBlending, depthWrite: false
+                });
+                this.beamChargeRing = new THREE.Mesh(chargeRingGeo, chargeRingMat);
+                this.beamChargeRing.position.y = 0.2;
+                scene.add(this.beamChargeRing);
             }
 
 
@@ -2402,36 +2609,200 @@
                 });
             }
 
-            activateCombo() {
-                state.comboActive = true;
+            // --- 光束炮狀態機 ---
+            _hideBeamFX() {
+                this.beamMesh.visible = false;
+                if (this.beamGlowMesh) this.beamGlowMesh.visible = false;
+                if (this.beamImpactMesh) this.beamImpactMesh.visible = false;
+                if (this.beamOriginLight) this.beamOriginLight.intensity = 0;
+                if (this.beamImpactLight) this.beamImpactLight.intensity = 0;
+            }
 
-                this.comboState = 'precast';
-                this.comboTimer = CONFIG.combo.preCastDelay;
+            updateBeam(dt) {
+                const beamCfg = CONFIG.beam;
+                const modeCfg = beamCfg[state.mode];
+                const maxCharge = modeCfg.maxCharge;
+                const beamWidth = modeCfg.width;
+                const now = Date.now();
+                const players = state.mode === 'quad' ? ['p1', 'p2', 'p3', 'p4'] : ['p1', 'p2'];
+                const chargeCount = players.filter(p => state.input[p].charge).length;
 
-                // Update Geometry/Visuals based on Mode
-                const config = CONFIG.combo[state.mode];
+                if (state.beamPhase === 'prefire') {
+                    // 前搖：全員放開 → 立刻進入後搖
+                    if (chargeCount === 0) {
+                        state.beamPhase = 'postfire';
+                        state.beamPostFireTimer = beamCfg.postFireDelay;
+                        this.beamChargeRing.material.opacity = 0;
+                        this._hideBeamFX();
+                        return;
+                    }
 
-                // 1. Update Ring Radius
-                const r = config.radius;
-                this.comboRing.geometry.dispose();
-                this.comboRing.geometry = new THREE.RingGeometry(r - 0.5, r, 64);
-                this.comboRing.geometry.rotateX(-Math.PI / 2);
+                    state.beamPreFireTimer -= dt;
+                    const progress = 1.0 - (state.beamPreFireTimer / beamCfg.preFireDelay);
+                    this.beamChargeRing.position.copy(this.mesh.position);
+                    this.beamChargeRing.position.y = 0.2;
+                    const flicker = 0.5 + Math.sin(progress * 40) * 0.5;
+                    this.beamChargeRing.material.opacity = flicker;
+                    this.beamChargeRing.scale.setScalar(0.8 + progress * 1.5);
 
-                // Visuals Setup
-                this.comboRing.visible = true;
-                this.comboRing.material.opacity = 0.5;
-                this.comboRing.scale.set(0, 0, 0);
+                    if (state.beamPreFireTimer <= 0) {
+                        state.beamPhase = 'firing';
+                        state.beamFiringTimer = beamCfg.firingDuration;  // 開始3.5秒計時
+                        state.beamDotTimer = 0;
+                        this.beamChargeRing.material.opacity = 0;
+                        this.beamMesh.visible = true;
+                        if (this.beamGlowMesh) this.beamGlowMesh.visible = true;
+                        if (this.beamImpactMesh) this.beamImpactMesh.visible = true;
+                    }
+                }
+                else if (state.beamPhase === 'firing') {
+                    // 固定3.5秒計時器倒數，時間到則自動結束
+                    state.beamFiringTimer -= dt;
+                    if (state.beamFiringTimer <= 0) {
+                        state.beamCharge = 0;           // 能量瞬間歸零
+                        state.beamPhase = 'postfire';
+                        state.beamPostFireTimer = beamCfg.postFireDelay;
+                        this._hideBeamFX();
+                        return;
+                    }
 
-                // Rebuild Vines Dynamically
-                if (this.vines) this.vines.forEach(v => v.destroy());
-                this.vines = [];
+                    // 更新光束 Mesh 位置與長度
+                    const forward = this.getForwardVector().normalize();
+                    const origin = this.mesh.position.clone();
+                    origin.y = 1.0;
 
-                for (let i = 0; i < config.vineCount; i++) {
-                    // Pass radius explicitly
-                    const vine = new Vine(this.comboGroup, i, config.vineCount, config.radius);
-                    vine.setVisible(false); // Hide initially
-                    vine.timer = 0;
-                    this.vines.push(vine);
+                    // 射線碰撞測試
+                    const hitRadius = beamWidth;
+                    let beamLength = beamCfg.range;
+
+                    if (state.enemyManager) {
+                        state.enemyManager.enemies.forEach(e => {
+                            if (e.isDead) return;
+                            const toE = e.mesh.position.clone().sub(origin);
+                            const along = toE.dot(forward);
+                            if (along < 0 || along > beamLength) return;
+                            const perp = toE.clone().sub(forward.clone().multiplyScalar(along));
+                            if (perp.length() < 1.2 + hitRadius) {
+                                beamLength = Math.min(beamLength, along);
+                            }
+                        });
+                    }
+                    if (state.levelManager) {
+                        state.levelManager.blocks.forEach(b => {
+                            if (b.isDead) return;
+                            const toB = b.mesh.position.clone().sub(origin);
+                            const along = toB.dot(forward);
+                            if (along < 0 || along > beamLength) return;
+                            const perp = toB.clone().sub(forward.clone().multiplyScalar(along));
+                            const hw = (b.mesh.geometry.parameters.width || 2) / 2 + hitRadius;
+                            const hd = (b.mesh.geometry.parameters.depth || 2) / 2 + hitRadius;
+                            if (Math.abs(perp.x) < hw && Math.abs(perp.z) < hd) {
+                                beamLength = Math.min(beamLength, along);
+                            }
+                        });
+                    }
+
+                    // 主光束 Mesh（scale.x/y = 粗細，scale.z = 長度）
+                    this.beamMesh.position.copy(origin);
+                    this.beamMesh.quaternion.copy(this.mesh.quaternion);
+                    this.beamMesh.scale.set(beamWidth, beamWidth, beamLength);
+
+                    // 外光暈（2.5 倍粗細）
+                    const glowW = beamWidth * 2.5;
+                    if (this.beamGlowMesh) {
+                        this.beamGlowMesh.position.copy(origin);
+                        this.beamGlowMesh.quaternion.copy(this.mesh.quaternion);
+                        this.beamGlowMesh.scale.set(glowW, glowW, beamLength);
+                    }
+
+                    // 衝擊點閃光
+                    const impactPos = origin.clone().add(forward.clone().multiplyScalar(beamLength));
+                    if (this.beamImpactMesh) {
+                        this.beamImpactMesh.position.copy(impactPos);
+                        const impactSize = beamWidth * (1.8 + Math.sin(now * 0.025) * 0.7);
+                        this.beamImpactMesh.scale.setScalar(impactSize);
+                    }
+
+                    // 閃爍效果
+                    const pulse = 0.8 + Math.sin(now * 0.022) * 0.2;
+                    this.beamMesh.material.opacity = pulse;
+                    if (this.beamGlowMesh) this.beamGlowMesh.material.opacity = 0.22 + Math.sin(now * 0.013) * 0.08;
+                    if (this.beamImpactMesh) this.beamImpactMesh.material.opacity = 0.65 + Math.sin(now * 0.035) * 0.35;
+
+                    // PointLight 效果
+                    if (this.beamOriginLight) {
+                        this.beamOriginLight.position.copy(origin);
+                        this.beamOriginLight.intensity = 2.5 + Math.sin(now * 0.02) * 0.8;
+                    }
+                    if (this.beamImpactLight) {
+                        this.beamImpactLight.position.copy(impactPos);
+                        this.beamImpactLight.intensity = 3.5 + Math.sin(now * 0.028) * 1.5;
+                    }
+
+                    // 傷害 tick
+                    state.beamDotTimer += dt;
+                    if (state.beamDotTimer >= beamCfg.tickInterval) {
+                        state.beamDotTimer = 0;
+                        const damage = beamCfg.damagePerTick * (state.mode === 'quad' ? beamCfg.damageScale : 1.0);
+
+                        if (state.enemyManager) {
+                            state.enemyManager.enemies.forEach(e => {
+                                if (e.isDead) return;
+                                const toE = e.mesh.position.clone().sub(origin);
+                                const along = toE.dot(forward);
+                                if (along < 0 || along > beamLength + 1.2) return;
+                                const perp = toE.clone().sub(forward.clone().multiplyScalar(along));
+                                if (perp.length() < 1.2 + hitRadius) {
+                                    e.takeDamage(damage, origin, 0);
+                                }
+                            });
+                        }
+                        if (state.levelManager) {
+                            state.levelManager.blocks.forEach(b => {
+                                if (b.isDead) return;
+                                const toB = b.mesh.position.clone().sub(origin);
+                                const along = toB.dot(forward);
+                                if (along < 0 || along > beamLength + 1.0) return;
+                                const perp = toB.clone().sub(forward.clone().multiplyScalar(along));
+                                const hw = (b.mesh.geometry.parameters.width || 2) / 2 + hitRadius;
+                                const hd = (b.mesh.geometry.parameters.depth || 2) / 2 + hitRadius;
+                                if (Math.abs(perp.x) < hw && Math.abs(perp.z) < hd) {
+                                    b.hp -= damage;
+                                    b.flashTimer = 0.1;
+                                    if (b.hp <= 0) {
+                                        b.isDead = true;
+                                        scene.remove(b.mesh);
+                                        b.mesh.geometry.dispose();
+                                        b.mesh.material.dispose();
+                                    }
+                                }
+                            });
+                        }
+                    }
+                }
+                else if (state.beamPhase === 'postfire') {
+                    // 後搖：能量緩慢衰減（有人按住也可再充能）
+                    if (chargeCount > 0) {
+                        const rates = modeCfg.chargeRates;
+                        const rate = rates[Math.min(chargeCount, rates.length - 1)];
+                        state.beamCharge = Math.min(maxCharge, state.beamCharge + rate * dt);
+                    } else {
+                        state.beamCharge = Math.max(0, state.beamCharge - beamCfg.decayRate * dt);
+                    }
+
+                    // 蓄力重新蓄滿 → 取消後搖，進入前搖
+                    if (state.beamCharge >= maxCharge) {
+                        state.beamPhase = 'prefire';
+                        state.beamPreFireTimer = beamCfg.preFireDelay;
+                        this.beamChargeRing.position.copy(this.mesh.position);
+                        return;
+                    }
+
+                    state.beamPostFireTimer -= dt;
+                    if (state.beamPostFireTimer <= 0) {
+                        // 後搖結束：回到 idle，保留當前蓄力量讓它自然衰減
+                        state.beamPhase = 'idle';
+                    }
                 }
             }
 
@@ -2455,126 +2826,38 @@
                     }
                 }
 
-                // --- Combo Skill State ---
-                if (state.comboActive) {
-                    this.comboTimer -= dt;
+                // --- 光束炮狀態機 ---
+                const players = state.mode === 'quad' ? ['p1', 'p2', 'p3', 'p4'] : ['p1', 'p2'];
+                const beamCfg = CONFIG.beam;
+                const modeCfg = beamCfg[state.mode];
+                const maxCharge = modeCfg.maxCharge;
+                const isBeamActive = (state.beamPhase !== 'idle');
 
-                    // 1. Pre-Cast Phase
-                    if (this.comboState === 'precast') {
-                        // Expand Ring Warning
-                        const progress = 1.0 - (this.comboTimer / CONFIG.combo.preCastDelay);
-                        this.comboRing.scale.set(progress, progress, progress);
-
-                        // Flash Ring
-                        this.comboRing.material.opacity = 0.5 + Math.sin(progress * 20) * 0.3;
-
-                        if (this.comboTimer <= 0) {
-                            // Transition to Active
-                            this.comboState = 'active';
-                            this.comboDotTimer = 0; // [New] Init DoT Timer
-
-                            // Get config again
-                            const config = CONFIG.combo[state.mode];
-                            this.comboTimer = config.activeDuration;
-
-                            // Visual Pop
-                            this.comboRing.material.opacity = 0.8;
-                            this.comboRing.scale.set(1, 1, 1);
-
-                            // Show Vines
-                            this.vines.forEach(v => v.setVisible(true));
-                        }
-                        return;
-                    }
-                    // 2. Active Phase
-                    else if (this.comboState === 'active') {
-                        const config = CONFIG.combo[state.mode];
-                        // Update All Active Vines
-                        this.vines.forEach(v => v.update(dt, true));
-
-                        // Combo Damage Logic (AoE DoT)
-                        // Accumulate Timer
-                        if (!this.comboDotTimer) this.comboDotTimer = 0;
-                        this.comboDotTimer += dt;
-
-                        if (this.comboDotTimer > CONFIG.combo.dotInterval) {
-                            this.comboDotTimer = 0; // Reset
-
-                            // Apply Tick Damage
-                            const damage = CONFIG.combo.dotDamage;
-
-                            // Enemies
-                            if (state.enemyManager) {
-                                state.enemyManager.enemies.forEach(e => {
-                                    if (e.isDead) return;
-                                    // 2D Distance Check (XZ Plane) + Hit Margin
-                                    const dx = e.mesh.position.x - this.mesh.position.x;
-                                    const dz = e.mesh.position.z - this.mesh.position.z;
-                                    const dist = Math.sqrt(dx * dx + dz * dz);
-
-                                    if (dist < config.radius + 1.0) { // +1.0 for Enemy Radius overlap
-                                        e.takeDamage(damage);
-                                    }
-                                });
-                            }
-
-                            // Blocks
-                            if (state.levelManager) {
-                                state.levelManager.blocks.forEach(b => {
-                                    if (b.isDead) return;
-                                    const dx = b.mesh.position.x - this.mesh.position.x;
-                                    const dz = b.mesh.position.z - this.mesh.position.z;
-                                    const dist = Math.sqrt(dx * dx + dz * dz);
-
-                                    if (dist < config.radius + 2.0) { // +2.0 for Block Size overlap
-                                        b.hp -= damage;
-                                        b.flashTimer = 0.1;
-                                        if (b.hp <= 0) {
-                                            b.isDead = true;
-                                            scene.remove(b.mesh);
-                                            b.mesh.geometry.dispose(); b.mesh.material.dispose();
-                                        }
-                                    }
-                                });
-                            }
-                        }
-
-                        const remain = this.comboTimer / config.activeDuration;
-                        this.comboRing.material.opacity = remain * 0.8;
-                        if (this.comboTimer <= 0) {
-                            state.comboActive = false;
-
-                            // Start Cooldown
-                            state.comboCooldown = state.comboCooldownMax;
-                            state.pulse = 0; // Reset Pulse
-
-                            // Hide visuals
-                            this.comboRing.material.opacity = 0;
-                            this.vines.forEach(v => v.setVisible(false));
-                        }
-                    }
+                // 光束期間：阻止移動，允許轉向（移動鎖定在後面 movement 段處理）
+                if (isBeamActive) {
+                    this.updateBeam(dt);
+                    // prefire/postfire 鎖定所有輸入
+                    if (state.beamPhase === 'prefire' || state.beamPhase === 'postfire') return;
                 }
 
-                // --- 4-Player Logic Setup ---
-                const players = state.mode === 'quad' ? ['p1', 'p2', 'p3', 'p4'] : ['p1', 'p2'];
+                // --- 蓄力邏輯（idle 中才更新；無人按時緩慢倒扣至 0）---
+                if (state.beamPhase === 'idle') {
+                    const chargeCount = players.filter(p => state.input[p].charge).length;
+                    const rates = modeCfg.chargeRates;
+                    const rate = chargeCount > 0
+                        ? rates[Math.min(chargeCount, rates.length - 1)]
+                        : -beamCfg.decayRate;
+                    state.beamCharge = Math.min(maxCharge, Math.max(0, state.beamCharge + rate * dt));
+                    state.pulseValue = (state.beamCharge / maxCharge) * 100; // 相容舊 debug 顯示
 
-                // --- Charge Logic ---
-                // Any member holding charge enters charge state
-                const chargers = players.filter(p => state.input[p].charge);
-                const chargeCount = chargers.length;
+                }
 
-                // Pulse Meter Update
-                let rate = -CONFIG.combo.decayRate;
-                if (chargeCount >= 2) rate = CONFIG.combo.chargeRateDuo;
-                else if (chargeCount === 1) rate = CONFIG.combo.chargeRateIndividual;
-
-                state.pulseValue = Math.min(100, Math.max(0, state.pulseValue + rate * dt));
-                state.pulse = state.pulseValue; // Keep state.pulse in sync with state.pulseValue
-
-                // --- Trigger Logic (Immediate) ---
-                if (state.pulseValue >= 100 && !state.comboActive && state.comboCooldown <= 0) {
-                    this.activateCombo();
-                    return; // Start combo frame
+                // --- 觸發 prefire ---
+                if (state.beamPhase === 'idle' && state.beamCharge >= maxCharge) {
+                    state.beamPhase = 'prefire';
+                    state.beamPreFireTimer = beamCfg.preFireDelay;
+                    this.beamChargeRing.position.copy(this.mesh.position);
+                    return;
                 }
 
                 // 1. Cooldown Management
@@ -2633,32 +2916,28 @@
                     const hasInput = moveInput.lengthSq() > 0.01;
                     const isCharging = state.input[p].charge;
                     // [New] Is Attacking? (Windup or Cooldown)
-                    const isAttacking = this.isWindup[p] || this.cooldowns[p] > 0.05; // Small buffer for cooldown? Or just > 0.
-                    // User said "Start of windup to end of cooldown".
-                    // Windup sets isWindup=true. Cooldown sets cooldown>0. 
-                    // Note: Cooldown starts exactly when Windup ends (in shoot()).
-                    // So (isWindup || cooldown > 0) covers the whole period.
+                    const isAttacking = this.isWindup[p] || this.cooldowns[p] > 0.05;
 
                     // Arrow Visualization
                     const arrowMap = { p1: this.p1Arrow, p2: this.p2Arrow, p3: this.p3Arrow, p4: this.p4Arrow };
                     const arrow = arrowMap[p];
 
-                    // [Modified] Hide arrows during windup, show only when has input and not charging/windup
-                    if (hasInput && !isCharging && !isAnyWindup) {
+                    // 轉向：只要有輸入且不在 windup 就允許（發射中也可以，速度縮減）
+                    if (hasInput && !isAnyWindup) {
                         const inputVec = new THREE.Vector3(moveInput.x, 0, moveInput.y);
                         const dir = inputVec.clone().normalize();
 
-                        // 1. Rotation: Always allowed if not charging
+                        // 1. 轉向輸入：發射/蓄力中仍允許，速度在旋轉段另外縮減
                         totalRotationInput.add(inputVec);
 
-                        // 2. Movement: Allowed only if NOT Attacking OR (Recovery & Single/UltraSingle)
-                        // User: "When Single/UltraSingle bullet enters attack recovery, player movement input is restored"
-                        if (!this.isWindup[p] && (this.cooldowns[p] <= 0.05 || (this.lastShotType[p] === 'single' || this.lastShotType[p] === 'ultraSingle'))) {
-                            totalInput.add(inputVec);
-                            activeDirs.push(dir); // Store for check
+                        // 2. 移動輸入：光束啟動中或正按蓄力鍵時鎖定
+                        if (!isBeamActive && !isCharging) {
+                            if (!this.isWindup[p] && (this.cooldowns[p] <= 0.05 || (this.lastShotType[p] === 'single' || this.lastShotType[p] === 'ultraSingle'))) {
+                                totalInput.add(inputVec);
+                                activeDirs.push(dir);
+                            }
                         }
 
-                        // Arrow shows Input Direction (Rotation intent)
                         arrow.visible = true;
                         arrow.position.copy(this.mesh.position);
                         arrow.setDirection(dir);
@@ -2693,7 +2972,9 @@
                     while (deltaAngle > Math.PI) deltaAngle -= Math.PI * 2;
                     while (deltaAngle < -Math.PI) deltaAngle += Math.PI * 2;
 
-                    const rotStep = CONFIG.movement[state.mode].rotationSpeed * dt;
+                    // 光束發射中轉向幅度縮小為 35%
+                    const rotSpeedMult = (state.beamPhase === 'firing') ? 0.35 : 1.0;
+                    const rotStep = CONFIG.movement[state.mode].rotationSpeed * rotSpeedMult * dt;
                     if (Math.abs(deltaAngle) < rotStep) this.mesh.rotation.y = targetAngle;
                     else this.mesh.rotation.y += Math.sign(deltaAngle) * rotStep;
 
@@ -2726,7 +3007,10 @@
                 const forward = this.getForwardVector();
                 const isInputting = totalInput.lengthSq() > 0.01;
 
-                if (isInputting) {
+                if (isBeamActive) {
+                    // 光束發射中：強制靜止（速度快速衰減）
+                    this.velocity.multiplyScalar(Math.max(0, 1 - 20 * dt));
+                } else if (isInputting) {
                     // A. Traction: Rotate velocity towards forward
                     if (currentSpeed > 0.1) {
                         const currentDir = this.velocity.clone().normalize();
@@ -2821,7 +3105,7 @@
                 camera.position.z = this.mesh.position.z + 10;
                 // [Fix] Target stable Y (1.2) to remove bobbing shake
                 camera.lookAt(this.mesh.position.x, 1.2, this.mesh.position.z);
-                if (this.comboGroup) this.comboGroup.position.copy(this.mesh.position);
+                // (combo group removed - beam uses scene-level mesh)
 
                 // Scale Decay Logic (Beat Bounce) - Global
                 if (!this.pulseScale) this.pulseScale = 1.0;
@@ -2851,6 +3135,13 @@
             });
             window.addEventListener('keyup', (e) => keys[e.code] = false);
 
+            // 視窗失焦時清除所有按鍵（避免 Alt+Tab 後按鍵卡住導致誤觸蓄力）
+            window.addEventListener('blur', () => {
+                Object.keys(keys).forEach(k => keys[k] = false);
+                mouseAttack = false;
+                mouseCharge = false;
+            });
+
             window.addEventListener('mousedown', (e) => {
                 SoundSystem.init();
                 if (e.button === 0) mouseAttack = true;
@@ -2874,11 +3165,8 @@
                 // Poll Gamepads
                 const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
 
-                // Update Cooldown State
-                if (state.comboCooldown > 0) {
-                    state.comboCooldown -= 0.016; // Approx per frame
-                    if (state.comboCooldown < 0) state.comboCooldown = 0;
-                }
+                // 蓄力按鍵狀態永遠透傳給 updateBeam，由狀態機內部決定邏輯
+                const canCharge = true;
 
                 // --- P1 (Keyboard/Mouse) ---
                 let vx = 0, vy = 0;
@@ -2889,9 +3177,9 @@
                 state.input.p1.move.set(vx, vy).normalize();
                 // P1 Attack: Mouse Left OR Key 1
                 state.input.p1.attack = mouseAttack || keys['Digit1'];
-                // Charge logic with cooldown check
+                // Charge
                 const p1RawCharge = mouseCharge || keys['ShiftLeft'];
-                state.input.p1.charge = (state.comboCooldown <= 0) && p1RawCharge;
+                state.input.p1.charge = canCharge && p1RawCharge;
 
                 // --- P2 (Gamepad 0) ---
                 const gp2 = gamepads[0];
@@ -2904,7 +3192,7 @@
                     state.input.p2.attack = gp2.buttons[2].pressed; // West button (X/Square)
                     // Charge logic with cooldown check
                     const p2RawCharge = gp2.buttons[7].pressed; // RT/R2
-                    state.input.p2.charge = (state.comboCooldown <= 0) && p2RawCharge;
+                    state.input.p2.charge = canCharge && p2RawCharge;
                 } else {
                     // Debug Keys Arrows
                     let vx2 = 0, vy2 = 0;
@@ -2916,7 +3204,7 @@
                     state.input.p2.attack = keys['Enter'] || keys['Digit2']; // Fixed: Added Digit2
                     // Charge logic with cooldown check
                     const p2RawCharge = keys['ShiftRight'];
-                    state.input.p2.charge = (state.comboCooldown <= 0) && p2RawCharge;
+                    state.input.p2.charge = canCharge && p2RawCharge;
                 }
                 if (keys['Digit2']) state.input.p2.attack = true;
 
@@ -2930,7 +3218,7 @@
                     state.input.p3.move.set(axisX, axisY);
                     state.input.p3.attack = gp3.buttons[2].pressed; // West
                     const p3RawCharge = gp3.buttons[7].pressed; // RT
-                    state.input.p3.charge = (state.comboCooldown <= 0) && p3RawCharge;
+                    state.input.p3.charge = canCharge && p3RawCharge;
                 }
                 if (keys['Digit3']) state.input.p3.attack = true;
 
@@ -2944,7 +3232,7 @@
                     state.input.p4.move.set(axisX, axisY);
                     state.input.p4.attack = gp4.buttons[2].pressed; // West
                     const p4RawCharge = gp4.buttons[7].pressed; // RT
-                    state.input.p4.charge = (state.comboCooldown <= 0) && p4RawCharge;
+                    state.input.p4.charge = canCharge && p4RawCharge;
                 }
                 if (keys['Digit4']) state.input.p4.attack = true;
             };
@@ -2982,6 +3270,9 @@
             spawnerBtn.innerText = state.spawnerEnabled ? "Enemy Spawner: ON" : "Enemy Spawner: OFF";
             spawnerBtn.style.backgroundColor = state.spawnerEnabled ? "#aa4444" : "#44aa44";
 
+            if (state.spawnerEnabled) {
+                state.hpDecayEnabled = true; // 一旦開啟就持續倒扣，不因暫停而停止
+            }
             if (!state.spawnerEnabled) {
                 if (state.enemyManager) state.enemyManager.killAll();
             }
@@ -3021,6 +3312,16 @@
             state.lastTime = time;
 
             gidora.update(dt);
+
+            // HP 緩慢倒扣（開啟Spawn後啟動，光束炮中3倍速）
+            if (state.hpDecayEnabled && !gidora.isDead) {
+                const decayRate = (state.beamPhase === 'firing')
+                    ? CONFIG.stats.hpDecayRateBeam
+                    : CONFIG.stats.hpDecayRate;
+                gidora.hp = Math.max(0, gidora.hp - decayRate * dt);
+                if (gidora.hp <= 0) gidora.isDead = true;
+            }
+
             gidora.checkCollisions(state.bullets); // Player check logic
 
             state.pollInputs();
@@ -3053,8 +3354,55 @@
                 P2: Atk=${state.input.p2.attack} Chg=${state.input.p2.charge ? 'ON' : 'OFF'}<br>
                 P3: Atk=${state.input.p3.attack} Chg=${state.input.p3.charge ? 'ON' : 'OFF'}<br>
                 P4: Atk=${state.input.p4.attack} Chg=${state.input.p4.charge ? 'ON' : 'OFF'}<br>
-                Pulse: ${state.pulseValue.toFixed(1)}% | Bullets: ${state.bullets.length}
+                Beam: ${state.beamPhase} | Charge: ${(state.beamCharge).toFixed(1)} | Bullets: ${state.bullets.length}
             `;
+
+            // 蓄力條 UI 更新
+            const beamMaxUI = CONFIG.beam[state.mode].maxCharge;
+            const pct = Math.min(100, (state.beamCharge / beamMaxUI) * 100);
+            const barFill = document.getElementById('charge-bar-fill');
+            const barWrap = document.getElementById('charge-bar-wrap');
+            const chargeLabel = document.getElementById('charge-label');
+            barFill.style.width = pct + '%';
+
+            // CSS class 驅動特效
+            barWrap.classList.toggle('beam-firing', state.beamPhase === 'firing');
+            barWrap.classList.toggle('beam-prefire', state.beamPhase === 'prefire');
+
+            // 發射中讓填充條顏色變白，後搖變暗
+            if (state.beamPhase === 'firing') {
+                barFill.style.background = 'linear-gradient(90deg,#cc00cc,#ff00ff,#ffffff)';
+                chargeLabel.style.color = '#ffffff';
+                chargeLabel.style.textShadow = '0 0 12px #ffffff, 0 0 24px #ff00ff';
+            } else if (state.beamPhase === 'postfire') {
+                barFill.style.background = 'linear-gradient(90deg,#440044,#880088,#cc00cc88)';
+                chargeLabel.style.color = '#cc88cc';
+                chargeLabel.style.textShadow = '0 0 6px #cc00cc';
+            } else {
+                barFill.style.background = 'linear-gradient(90deg,#660066,#cc00cc,#ff00ff,#ffffff88)';
+                chargeLabel.style.color = '#ffffff';
+                chargeLabel.style.textShadow = '0 0 8px #ff00ff, 0 0 16px #ff00ff88';
+            }
+
+            const phaseText = { idle: '⚡ 蓄力', prefire: '▶▶ 即將發射！', firing: '★ 光束炮發射中！', postfire: '◀◀ 冷卻中' };
+            let labelSuffix = '';
+            if (state.beamPhase === 'idle') labelSuffix = ` ${pct.toFixed(0)}%`;
+            else if (state.beamPhase === 'firing') labelSuffix = ` ${Math.ceil(state.beamFiringTimer)}s`;
+            chargeLabel.textContent = phaseText[state.beamPhase] + labelSuffix;
+
+            // 左下角蓄力狀態指示器
+            const players4 = ['p1', 'p2', 'p3', 'p4'];
+            const activePlayers = state.mode === 'quad' ? ['p1', 'p2', 'p3', 'p4'] : ['p1', 'p2'];
+            players4.forEach(p => {
+                const el = document.getElementById('ci-' + p);
+                if (!el) return;
+                const isActive = activePlayers.includes(p);
+                el.style.display = isActive ? 'flex' : 'none';
+                if (!isActive) return;
+                const pressing = state.input[p].charge;
+                el.classList.toggle('pressing', pressing);
+                el.querySelector('.ci-status').textContent = pressing ? '蓄力中 ⚡' : '未蓄力';
+            });
 
             renderer.render(scene, camera);
         }
