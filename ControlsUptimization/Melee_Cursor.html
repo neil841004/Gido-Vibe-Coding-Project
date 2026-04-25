@@ -111,16 +111,15 @@
             playerMaxStamina: 100,
             baseSpeed: 4.5,
 
-            // 蓄力技能基礎
-            skillStartCost: 15,
-            skillDrainPerFrame: 1.5,
+            // 蓄力技能基礎 (Shooter版：精力於發射時扣除)
+            skillCostNormal: 20,
+            skillCostBlade: 40,
             skillMaxChargeTime: 350,
             skillCD: 300,
-            skillExhaustedMult: 0.25,
 
             // 子彈等級參數
-            bulletLv1: { size: 16, damage: 12, speed: 11, life: 700, recoil: 0, recoilDuration: 0 },
-            bulletLv2: { size: 27, damage: 24, speed: 16, life: 900, recoil: 12, recoilDuration: 380 },
+            bulletLv1: { size: 16, damage: 12, speed: 11, life: 700, recoil: 4, postDelay: 300 },
+            bulletLv2: { size: 27, damage: 24, speed: 16, life: 900, recoil: 9, postDelay: 350 },
 
             // 劍氣專屬數值
             bladeWave: {
@@ -132,7 +131,7 @@
                 arc: Math.PI * 0.75,
                 thickness: 18,
                 recoilMag: 28,
-                recoilDuration: 500
+                postDelay: 250
             },
 
             // 近戰 (Melee) 參數
@@ -149,7 +148,7 @@
             dashDuration: 270,
             dashCD: 1000,
             dashStaminaCost: 0,
-            staminaRegen: 0.4,
+            staminaRegen: 0.25,
 
             // 環境參數
             buildingDensity: 0.000008,
@@ -254,7 +253,7 @@
                 let stats = CONFIG.bulletLv1;
                 if (level === 2) stats = CONFIG.bulletLv2;
                 this.level = level;
-                this.radius = stats.size; this.damage = stats.damage; this.speed = stats.speed; this.life = stats.life; this.recoil = stats.recoil; this.recoilDuration = stats.recoilDuration;
+                this.radius = stats.size; this.damage = stats.damage; this.speed = stats.speed; this.life = stats.life;
                 this.startTime = Date.now(); this.isDead = false;
             }
             update(dtFactor) {
@@ -357,11 +356,12 @@
                     triggerMove: false, carryoverEnd: 0, lastMoveDir: { x: 0, y: 0 }, hasHit: false,
                     intendedMoveDir: { x: 0, y: 0 }
                 };
-                this.recoil = { x: 0, y: 0 }; this.recoilStartTime = 0; this.recoilDuration = 0;
+                this.recoil = { x: 0, y: 0 }; this.recoilStartTime = 0; this.postDelay = 0;
                 this.coffeeUntil = 0;
+                this.isAiming = false;
                 this.isCharging = false; this.chargeValue = 0;
+                this.hasPlayedChargeCompleteEffect = false;
                 this.scaleX = 1; this.scaleY = 1;
-                this.isSlowCharging = false;
             }
 
             update(inputDx, inputDy, isDashPressed, isMeleePressed, isSkillPressed, target, dtFactor) {
@@ -369,25 +369,22 @@
                 const isDashing = now < this.dashActiveUntil;
                 const hasCoffee = now < this.coffeeUntil;
                 const recoilElapsed = now - this.recoilStartTime;
-                const isStunnedByRecoil = recoilElapsed < (this.recoilDuration / 2);
+                const isStunnedByRecoil = recoilElapsed < this.postDelay;
 
-                // 1. 精力回覆
+                // 1. 精力回覆 (蓄力滿門檻時鎖住精力)
+                const isHoldingCharge = isSkillPressed && this.stamina >= CONFIG.skillCostBlade;
                 if (hasCoffee) { this.stamina = CONFIG.playerMaxStamina; }
-                else if (!this.isCharging && this.stamina < CONFIG.playerMaxStamina) {
+                else if (!isHoldingCharge && this.stamina < CONFIG.playerMaxStamina) {
                     this.stamina = Math.min(CONFIG.playerMaxStamina, this.stamina + CONFIG.staminaRegen * dtFactor);
                 }
 
-                // 2. 蓄力技能邏輯
-                if (isSkillPressed) {
-                    // --- 核心修正：精力需 > 20 才可開始蓄力 ---
-                    if (!this.isCharging && (this.stamina > CONFIG.skillStartCost || hasCoffee) && now - this.lastSkillTime > CONFIG.skillCD) {
-                        this.isCharging = true;
-                        if (!hasCoffee) this.stamina = Math.max(0, this.stamina - CONFIG.skillStartCost);
-                        this.chargeValue = 0;
-                    }
+                // 2. 蓄力技能邏輯 (Shooter版)
+                if (isSkillPressed && now - this.lastSkillTime > CONFIG.skillCD) {
+                    const canAim = this.stamina >= CONFIG.skillCostNormal || hasCoffee;
+                    const canCharge = this.stamina >= CONFIG.skillCostBlade || hasCoffee;
 
-                    if (this.isCharging) {
-                        if (!isDashing) { inputDx = 0; inputDy = 0; }
+                    if (canCharge) {
+                        this.isAiming = true;
 
                         // 瞄準更新
                         if (this.id === 'P1') this.angle = Math.atan2(state.mouse.y - this.y, state.mouse.x - this.x);
@@ -401,33 +398,56 @@
                             }
                         }
 
-                        // 蓄力速度計算
+                        if (!this.isCharging) {
+                            this.isCharging = true;
+                            this.chargeValue = 0;
+                            this.hasPlayedChargeCompleteEffect = false;
+                        }
                         if (this.chargeValue < 1.0) {
                             let currentChargeSpeed = (16.66 / CONFIG.skillMaxChargeTime);
-                            if (this.stamina <= 0 && !hasCoffee) {
-                                currentChargeSpeed *= CONFIG.skillExhaustedMult;
-                                this.isSlowCharging = true;
-                            } else {
-                                this.isSlowCharging = false;
-                            }
                             this.chargeValue += currentChargeSpeed * dtFactor;
-                            if (!hasCoffee) this.stamina = Math.max(0, this.stamina - CONFIG.skillDrainPerFrame * dtFactor);
-                            if (this.chargeValue > 1.0) this.chargeValue = 1.0;
+                            if (this.chargeValue >= 1.0) {
+                                this.chargeValue = 1.0;
+                                if (!this.hasPlayedChargeCompleteEffect) {
+                                    this.hasPlayedChargeCompleteEffect = true;
+                                    createChargeCompleteEffect(this.x, this.y, this.color);
+                                }
+                            }
                         }
-                    }
-                } else if (this.isCharging) {
-                    // 發射
-                    let rMag = 0, rDur = 0;
-                    if (this.chargeValue > 0.9) {
-                        state.projectiles.push(new BladeWave(this.x, this.y, this.angle, this.id, this.color));
-                        rMag = CONFIG.bladeWave.recoilMag; rDur = CONFIG.bladeWave.recoilDuration;
+                        if (Math.random() > 0.3) {
+                            createChargeEffect(this.x, this.y, this.color, this.radius);
+                        }
                     } else {
-                        state.projectiles.push(new Bullet(this.x, this.y, this.angle, 1, this.id, this.color));
-                        rMag = CONFIG.bulletLv1.recoil; rDur = CONFIG.bulletLv1.recoilDuration;
+                        this.isAiming = false;
+                        this.isCharging = false;
+                        this.chargeValue = 0;
                     }
-                    this.recoil.x = -Math.cos(this.angle) * rMag; this.recoil.y = -Math.sin(this.angle) * rMag;
-                    this.recoilStartTime = now; this.recoilDuration = rDur;
-                    this.lastSkillTime = now; this.isCharging = false; this.chargeValue = 0; this.isSlowCharging = false;
+                } else {
+                    if (this.isAiming) {
+                        let rMag = 0, pDelay = 0;
+                        let fired = false;
+                        if (this.chargeValue > 0.9) {
+                            state.projectiles.push(new BladeWave(this.x, this.y, this.angle, this.id, this.color));
+                            rMag = CONFIG.bladeWave.recoilMag; pDelay = CONFIG.bladeWave.postDelay;
+                            if (!hasCoffee) this.stamina -= CONFIG.skillCostBlade;
+                            fired = true;
+                        } else if (this.stamina >= CONFIG.skillCostNormal || hasCoffee) {
+                            state.projectiles.push(new Bullet(this.x, this.y, this.angle, 1, this.id, this.color));
+                            rMag = CONFIG.bulletLv1.recoil; pDelay = CONFIG.bulletLv1.postDelay;
+                            if (!hasCoffee) this.stamina -= CONFIG.skillCostNormal;
+                            fired = true;
+                        }
+
+                        if (fired) {
+                            this.recoil.x = -Math.cos(this.angle) * rMag; this.recoil.y = -Math.sin(this.angle) * rMag;
+                            this.recoilStartTime = now; this.postDelay = pDelay;
+                        }
+                        this.lastSkillTime = now;
+                    }
+                    this.isAiming = false;
+                    this.isCharging = false;
+                    this.chargeValue = 0;
+                    this.hasPlayedChargeCompleteEffect = false;
                 }
 
                 // 3. 其他行為與移動
@@ -436,12 +456,12 @@
                     if (!hasCoffee) this.stamina = Math.max(0, this.stamina - CONFIG.dashStaminaCost);
                     this.melee.state = 'IDLE'; // 衝刺可中斷 Melee
                 }
-                if ((this.isCharging && !isDashing) || isStunnedByRecoil) { inputDx = 0; inputDy = 0; }
+                if (((this.isAiming || this.isCharging) && !isDashing) || isStunnedByRecoil) { inputDx = 0; inputDy = 0; }
 
                 let isMeleeActive = false;
                 let meleeMoveX = 0, meleeMoveY = 0;
 
-                if (!isDashing && !isStunnedByRecoil && !this.isCharging) {
+                if (!isDashing && !isStunnedByRecoil && !this.isCharging && !this.isAiming) {
                     if (this.melee.state === 'IDLE') {
                         if (now >= this.melee.comboResetTimerStart) this.melee.comboIndex = 0;
                         if (isMeleePressed && now >= this.melee.cooldownUntil) this.startMeleeAttack(now, inputDx, inputDy);
@@ -626,43 +646,12 @@
                     }
                 }
 
-                // --- 核心修正：UI 顏色邏輯 ---
-                const isLowStamina = this.stamina < 15 && !now < this.coffeeUntil;
-                const uiColor = isLowStamina ? "#c2410c" : null; // 暗橘色
+                // --- UI 瞄準箭頭 (Shooter版：粒子取代圓環) ---
+                const hasCoffee = now < this.coffeeUntil;
 
-                // 蓄力環
-                if (this.isCharging) {
-                    const total = this.chargeValue;
-                    const r = this.radius + 17;
-                    const isFlicker = this.isSlowCharging && (Math.floor(Date.now() / 100) % 2 === 0);
-                    const baseColor = isFlicker ? "#ef4444" : (this.isSlowCharging ? "#666" : uiColor);
-
-                    const segs = [
-                        { from: 0, to: Math.min(total, 0.9), color: baseColor || "#f97316" },
-                        { from: 0.9, to: Math.min(total, 1.0), color: baseColor || "#fff" }
-                    ];
-
-                    segs.forEach(seg => {
-                        if (seg.to > seg.from) {
-                            ctx.beginPath();
-                            ctx.arc(0, 0, r, Math.PI * 2 * seg.from, Math.PI * 2 * seg.to, false);
-                            ctx.strokeStyle = seg.color; ctx.lineWidth = 5;
-                            if (seg.color === "#fff") { ctx.shadowBlur = 16; ctx.shadowColor = "#fff"; }
-                            ctx.stroke(); ctx.shadowBlur = 0;
-                        }
-                    });
-
-                    if (this.isSlowCharging) {
-                        ctx.fillStyle = "#ef4444"; ctx.font = "bold 10px Inter"; ctx.textAlign = "center";
-                        ctx.fillText("LOW ENERGY (0.25x)", 0, -55);
-                    }
-                }
-
-                // 瞄準箭頭 (當按住技能但體力不足無法啟動時也顯示暗橘色箭頭)
-                const isTryingToCharge = state.inputs[this.id.toLowerCase()].skill;
-                if (this.isCharging || (isTryingToCharge && isLowStamina)) {
+                if (this.isAiming) {
                     let arrowLen = this.chargeValue > 0.9 ? 120 : 60;
-                    let arrowColor = uiColor || (this.chargeValue > 0.9 ? "#fff" : "#f97316");
+                    let arrowColor = "#fff";
 
                     ctx.save(); ctx.rotate(this.angle);
                     ctx.beginPath(); ctx.moveTo(this.radius + 8, 0); ctx.lineTo(this.radius + arrowLen, 0);
@@ -684,7 +673,7 @@
                 if (Date.now() < this.coffeeUntil) {
                     const hue = (Date.now() / 5) % 360; ctx.fillStyle = `hsl(${hue}, 80%, 60%)`;
                 } else {
-                    ctx.fillStyle = (this.stamina < 15) ? "#c2410c" : "#3b82f6";
+                    ctx.fillStyle = this.stamina < CONFIG.skillCostBlade ? "#ef4444" : "#3b82f6";
                 }
                 ctx.fillRect(sx, sy + 7, barW * (this.stamina / CONFIG.playerMaxStamina), 3);
             }
@@ -752,6 +741,19 @@
         }
 
         function createImpactEffect(x, y, color, count) { for (let i = 0; i < count; i++) { state.particles.push({ x, y, vx: (Math.random() - 0.5) * 8, vy: (Math.random() - 0.5) * 8, radius: Math.random() * 5 + 2, alpha: 1, color, decay: 0.02 }); } }
+
+        function createChargeEffect(x, y, color, radius) {
+            const angle = Math.random() * Math.PI * 2;
+            const dist = radius + Math.random() * 20;
+            state.particles.push({ x: x + Math.cos(angle) * dist, y: y + Math.sin(angle) * dist, vx: -Math.cos(angle) * 4, vy: -Math.sin(angle) * 4, radius: Math.random() * 3 + 1, alpha: 1, color: color, decay: 0.04 });
+        }
+
+        function createChargeCompleteEffect(x, y, color) {
+            for (let i = 0; i < 20; i++) {
+                const angle = (i / 20) * Math.PI * 2;
+                state.particles.push({ x, y, vx: Math.cos(angle) * 6, vy: Math.sin(angle) * 6, radius: 4, alpha: 1, color: '#fff', decay: 0.03 });
+            }
+        }
 
         function gameLoop(timestamp) {
             if (state.isGameOver) return; const dt = timestamp - state.lastFrameTime; state.lastFrameTime = timestamp; const dtFactor = Math.min(dt / 16.666, 3);
