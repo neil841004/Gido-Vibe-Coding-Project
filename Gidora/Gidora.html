@@ -250,7 +250,7 @@
                     damage: 25,
                     speed: 2.0,
                     attackRange: 4.0,
-                    spawnDelay: 0,    // [New] 按下開始後延遲 10秒 出現
+                    spawnDelay: 50,    // [New] 按下開始後延遲 10秒 出現
                     projectileSpeed: 18, // [New] Boss Bullet Speed
                     projectileKnockback: 42, // [New] Boss Bullet Knockback (擊退力)
                     color: 0x8800ff
@@ -817,25 +817,35 @@
 
         // 噴飛屍體：敵人死亡後飛向空中再落地
         class FlyingCorpse {
-            constructor(mesh, color) {
+            constructor(mesh, color, onLand) {
                 this.mesh = mesh;
                 this.color = color;
+                this.onLand = onLand || null;
                 this.isDone = false;
 
                 const angle = Math.random() * Math.PI * 2;
-                const hSpeed = 7 + Math.random() * 5;
+                const hSpeed = 16 + Math.random() * 6;
                 this.velocity = new THREE.Vector3(
                     Math.cos(angle) * hSpeed,
-                    14 + Math.random() * 6,
+                    16 + Math.random() * 5,
                     Math.sin(angle) * hSpeed
                 );
                 this.gravity = 30;
+                this.drag = 1.2; // 輕阻力，整段飛行維持拋物線；落地時水平速度仍有 ~25%
                 this.rotVel = new THREE.Vector3(
-                    (Math.random() - 0.5) * 14,
-                    (Math.random() - 0.5) * 14,
-                    (Math.random() - 0.5) * 14
+                    (Math.random() - 0.5) * 18,
+                    (Math.random() - 0.5) * 18,
+                    (Math.random() - 0.5) * 18
                 );
                 this.trailTimer = 0;
+
+                // 落地影子
+                const shadowGeo = new THREE.CircleGeometry(1.0, 12);
+                const shadowMat = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.5 });
+                this.shadowMesh = new THREE.Mesh(shadowGeo, shadowMat);
+                this.shadowMesh.rotation.x = -Math.PI / 2;
+                this.shadowMesh.position.set(mesh.position.x, 0.02, mesh.position.z);
+                scene.add(this.shadowMesh);
 
                 // 升空時的爆裂光環
                 this._spawnRing(mesh.position.clone(), 0xffcc00, 2.5);
@@ -871,11 +881,24 @@
             update(dt) {
                 if (this.isDone) return false;
 
+                // 水平空氣阻力（速度從快漸慢）
+                const dragFactor = Math.exp(-this.drag * dt);
+                this.velocity.x *= dragFactor;
+                this.velocity.z *= dragFactor;
+
                 this.velocity.y -= this.gravity * dt;
                 this.mesh.position.add(this.velocity.clone().multiplyScalar(dt));
                 this.mesh.rotation.x += this.rotVel.x * dt;
                 this.mesh.rotation.y += this.rotVel.y * dt;
                 this.mesh.rotation.z += this.rotVel.z * dt;
+
+                // 影子：跟隨 XZ，高度愈高愈小愈淡
+                const heightAbove = Math.max(0, this.mesh.position.y - 1.0);
+                const shadowScale = Math.max(0.25, 1.0 - heightAbove * 0.06);
+                this.shadowMesh.position.x = this.mesh.position.x;
+                this.shadowMesh.position.z = this.mesh.position.z;
+                this.shadowMesh.scale.setScalar(shadowScale);
+                this.shadowMesh.material.opacity = Math.max(0.08, 0.5 - heightAbove * 0.04);
 
                 // 飛行火花尾跡
                 this.trailTimer -= dt;
@@ -901,6 +924,11 @@
                 this.isDone = true;
                 const pos = this.mesh.position.clone();
 
+                // 清除影子
+                scene.remove(this.shadowMesh);
+                this.shadowMesh.geometry.dispose();
+                this.shadowMesh.material.dispose();
+
                 scene.remove(this.mesh);
                 this.mesh.geometry.dispose();
                 this.mesh.material.dispose();
@@ -918,7 +946,6 @@
                     );
                     smoke.life = 0.7 + Math.random() * 0.5;
                     smoke.maxLife = smoke.life;
-                    // 煙霧用較大的粒子
                     smoke.mesh.scale.setScalar(2.5 + Math.random() * 1.5);
                     state.particles.push(smoke);
                 }
@@ -927,6 +954,19 @@
                 const count = 5 + Math.floor(Math.random() * 4);
                 for (let i = 0; i < count; i++) {
                     state.meatChunks.push(new MeatChunk(pos));
+                }
+
+                // 落地回呼（例如 Dummy 重生計時）
+                if (this.onLand) {
+                    const cb = this.onLand;
+                    let countdown = 1.0;
+                    state.particles.push({
+                        update(dt) {
+                            countdown -= dt;
+                            if (countdown <= 0) { cb(); return false; }
+                            return true;
+                        }
+                    });
                 }
             }
         }
@@ -1357,9 +1397,8 @@
 
             die() {
                 this.isDead = true;
-                // HP Bar Cleanup
+                this.mesh.material.emissive.setHex(0x000000);
                 if (this.hpBar) this.hpBar.destroy();
-                // 噴飛動畫（mesh 由 FlyingCorpse 接管，不在此 dispose）
                 state.flyingCorpses.push(new FlyingCorpse(this.mesh, this.color));
             }
 
@@ -1653,18 +1692,22 @@
 
             takeDamage(amount, sourcePos, knockbackForce) {
                 super.takeDamage(amount, sourcePos, knockbackForce);
-                // Immortal Logic
-                if (this.hp <= 0) {
-                    this.hp = this.maxHP;
-                    this.isDead = false; // Prevent death
-                    this.healing = true;
-                    this.flashTimer = 0.2; // Flash
-                }
             }
 
             die() {
-                // Prevent death
-                return;
+                this.isDead = true;
+                this.mesh.material.emissive.setHex(0x000000);
+                if (this.hpBar) this.hpBar.destroy();
+                const manager = this.manager;
+                state.flyingCorpses.push(new FlyingCorpse(this.mesh, this.color, () => {
+                    // 肉塊出現 1 秒後重生新 Dummy
+                    if (manager) {
+                        const playerPos = window.gidoraInstance
+                            ? window.gidoraInstance.mesh.position.clone()
+                            : new THREE.Vector3(0, 1, 0);
+                        manager.spawnDummy(playerPos);
+                    }
+                }));
             }
         }
 
