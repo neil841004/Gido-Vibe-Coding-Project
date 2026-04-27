@@ -136,9 +136,9 @@
 
             // 近戰 (Melee) 參數
             meleeCombo: [
-                { pre: 120, attack: 140, recovery: 180, delayMove: 0, moveDur: 280, damage: 15, range: 65, angle: 1.2, startSpeedMul: 0.8, endSpeedMul: 0.35, knockback: 9 },
-                { pre: 120, attack: 140, recovery: 180, delayMove: 0, moveDur: 280, damage: 15, range: 65, angle: 1.2, startSpeedMul: 0.8, endSpeedMul: 0.35, knockback: 9 },
-                { pre: 260, attack: 140, recovery: 220, delayMove: 200, moveDur: 420, damage: 25, range: 80, angle: 1.7, startSpeedMul: 1.7, endSpeedMul: 0.5, knockback: 13 },
+                { pre: 120, attack: 140, recovery: 180, delayMove: 0, moveDur: 280, damage: 15, range: 65, angle: 1.2, startSpeedMul: 0.8, endSpeedMul: 0.35, knockback: 9, forceMove: false },
+                { pre: 120, attack: 140, recovery: 180, delayMove: 0, moveDur: 280, damage: 15, range: 65, angle: 1.2, startSpeedMul: 0.8, endSpeedMul: 0.35, knockback: 9, forceMove: false },
+                { pre: 260, attack: 140, recovery: 220, delayMove: 200, moveDur: 420, damage: 25, range: 80, angle: 1.7, startSpeedMul: 1.7, endSpeedMul: 0.5, knockback: 13, forceMove: true },
             ],
             meleeComboResetTime: 250,
             meleeLastHitIdleCooldown: 50,
@@ -501,7 +501,18 @@
                                     const my = state.mouse.y - this.y;
                                     this.angle = Math.atan2(my, mx);
                                     const len = Math.hypot(mx, my);
-                                    if (len > 0) this.melee.intendedMoveDir = { x: mx / len, y: my / len };
+                                    const def = CONFIG.meleeCombo[this.melee.comboIndex];
+                                    if (def.forceMove && len > 0) {
+                                        this.melee.intendedMoveDir = { x: mx / len, y: my / len };
+                                    } else if (!def.forceMove && (inputDx !== 0 || inputDy !== 0) && len > 0) {
+                                        const cursorAngle = Math.atan2(my, mx);
+                                        const wasdAngle = Math.atan2(inputDy, inputDx);
+                                        let diff = Math.abs(cursorAngle - wasdAngle);
+                                        if (diff > Math.PI) diff = Math.PI * 2 - diff;
+                                        this.melee.intendedMoveDir = diff <= Math.PI / 2 ? { x: mx / len, y: my / len } : { x: 0, y: 0 };
+                                    } else {
+                                        this.melee.intendedMoveDir = { x: 0, y: 0 };
+                                    }
                                 } else if (inputDx !== 0 || inputDy !== 0) {
                                     this.angle = Math.atan2(inputDy, inputDx);
                                     this.melee.intendedMoveDir = { x: inputDx, y: inputDy };
@@ -574,8 +585,15 @@
                     const my = state.mouse.y - this.y;
                     this.angle = Math.atan2(my, mx);
                     const len = Math.hypot(mx, my);
-                    if (len > 0) {
+                    const def = CONFIG.meleeCombo[this.melee.comboIndex];
+                    if (def.forceMove && len > 0) {
                         this.melee.intendedMoveDir = { x: mx / len, y: my / len };
+                    } else if (!def.forceMove && (dx !== 0 || dy !== 0) && len > 0) {
+                        const cursorAngle = Math.atan2(my, mx);
+                        const wasdAngle = Math.atan2(dy, dx);
+                        let diff = Math.abs(cursorAngle - wasdAngle);
+                        if (diff > Math.PI) diff = Math.PI * 2 - diff;
+                        this.melee.intendedMoveDir = diff <= Math.PI / 2 ? { x: mx / len, y: my / len } : { x: 0, y: 0 };
                     } else {
                         this.melee.intendedMoveDir = { x: 0, y: 0 };
                     }
