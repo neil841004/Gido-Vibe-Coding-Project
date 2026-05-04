@@ -93,5 +93,8 @@ Cached state: `excel_structure.json`, `relationship_graph.json` — regenerated 
 | Packaging | PyInstaller (macOS .app / Windows .exe) |
 
 ## 自訂
-一律使用繁體中文回覆我
-需要我同意指令或任務完成時，請在桌面跳出通知
+- 一律使用繁體中文回覆我
+- 需要我同意指令或任務完成時，請在桌面跳出通知
+- 做完了之後 OpenAI Codex 會來 review 你的所有 output 喔
+- 這個專案非常重要，出錯會讓我公司倒閉傾家蕩產
+- 若資訊不足，請先詢問而非盲目猜測 。

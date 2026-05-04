@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gidora Prototype - Ultra (4P)</title>
+    <script>
+        window.onerror = function (msg, url, line, col, error) {
+            const div = document.createElement('div');
+            div.style.position = 'absolute';
+            div.style.top = '10px';
+            div.style.left = '10px';
+            div.style.color = 'red';
+            div.style.background = 'rgba(0,0,0,0.8)';
+            div.style.padding = '20px';
+            div.style.zIndex = '9999';
+            div.innerHTML = `<h3>Error</h3><p>${msg}</p><p>${url}:${line}:${col}</p>`;
+            document.body.appendChild(div);
+            return false;
+        };
+    </script>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #202020;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        #info {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: white;
+            pointer-events: none;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 10px;
+            border-radius: 5px;
+            min-width: 300px;
+        }
+
+        /* 蓄力條樣式 — 移除 width transition 以避免「放開時跳到 0%」的視覺異常 */
+        #charge-bar-fill {
+            transition: none;
+        }
+
+        @keyframes beam-pulse {
+            0%, 100% { box-shadow: 0 0 12px #ff00ff, 0 0 24px #ff00ff88 }
+            50% { box-shadow: 0 0 22px #ff00ff, 0 0 44px #ff00ffcc }
+        }
+
+        @keyframes label-flash {
+            0%, 100% { opacity: 1 }
+            50% { opacity: 0.5 }
+        }
+
+        .beam-firing #charge-bar-fill { animation: beam-pulse 0.4s ease-in-out infinite; }
+        .beam-prefire #charge-label { animation: label-flash 0.25s ease-in-out infinite; color: #ffff00 !important; }
+
+        /* 玩家蓄力指示燈 */
+        #charge-indicators {
+            position: absolute;
+            bottom: 24px;
+            left: 20px;
+            pointer-events: none;
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .charge-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(0, 0, 0, 0.55);
+            border-radius: 8px;
+            padding: 5px 10px;
+            border: 1.5px solid rgba(255, 255, 255, 0.12);
+            transition: border-color 0.1s, background 0.1s;
+        }
+
+        .charge-indicator.pressing {
+            border-color: rgba(255, 0, 255, 0.7);
+            background: rgba(80, 0, 80, 0.6);
+        }
+
+        .charge-indicator .ci-dot {
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            flex-shrink: 0;
+            box-shadow: 0 0 6px currentColor;
+        }
+
+        .charge-indicator .ci-label {
+            font-size: 12px;
+            font-weight: bold;
+            color: #ccc;
+            letter-spacing: 1px;
+            min-width: 20px;
+        }
+
+        .charge-indicator .ci-status {
+            font-size: 11px;
+            color: #888;
+            letter-spacing: 0.5px;
+        }
+
+        .charge-indicator.pressing .ci-status {
+            color: #ff88ff;
+            text-shadow: 0 0 8px #ff00ff;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="info">
+        <h3>Gidora Dragon Prototype — Ultra (4P)</h3>
+        <p>1P (Red): WASD + Click (Headbutt)</p>
+        <p>2P (Blue): Arrows + Enter (Headbutt)</p>
+        <p>3P (Pink): IJKL + Space (Headbutt)</p>
+        <p>4P (Cyan): TFGH + V (Tail Attack)</p>
+        <div id="debug"></div>
+        <button id="spawner-toggle"
+            style="margin-top:10px; pointer-events:auto; background-color: #44aa44; color: white;">Enemy Spawner: OFF</button>
+    </div>
+
+    <!-- 蓄力條 UI -->
+    <div id="charge-bar-wrap"
+        style="position:absolute;bottom:24px;left:50%;transform:translateX(-50%);width:360px;pointer-events:none;z-index:10;">
+        <div id="charge-label"
+            style="text-align:center;color:white;font-size:13px;font-weight:bold;margin-bottom:5px;text-shadow:0 0 8px #ff00ff,0 0 16px #ff00ff88;letter-spacing:2px;">
+            蓄力 0%</div>
+        <div id="charge-bar-track"
+            style="background:rgba(0,0,0,0.7);height:22px;border-radius:11px;overflow:hidden;border:1px solid rgba(255,0,255,0.5);box-shadow:0 0 8px rgba(255,0,255,0.3);">
+            <div id="charge-bar-fill"
+                style="height:100%;width:0%;background:linear-gradient(90deg,#660066,#cc00cc,#ff00ff,#ffffff88);border-radius:11px;box-shadow:0 0 10px #ff00ff;">
+            </div>
+        </div>
+    </div>
+
+    <!-- 玩家蓄力狀態提示 (左下角) -->
+    <div id="charge-indicators">
+        <div class="charge-indicator" id="ci-p1">
+            <div class="ci-dot" style="background:#ff4444;box-shadow:0 0 6px #ff4444;"></div>
+            <span class="ci-label">1P</span>
+            <span class="ci-status">未蓄力</span>
+        </div>
+        <div class="charge-indicator" id="ci-p2">
+            <div class="ci-dot" style="background:#4444ff;box-shadow:0 0 6px #4444ff;"></div>
+            <span class="ci-label">2P</span>
+            <span class="ci-status">未蓄力</span>
+        </div>
+        <div class="charge-indicator" id="ci-p3">
+            <div class="ci-dot" style="background:#ff69b4;box-shadow:0 0 6px #ff69b4;"></div>
+            <span class="ci-label">3P</span>
+            <span class="ci-status">未蓄力</span>
+        </div>
+        <div class="charge-indicator" id="ci-p4">
+            <div class="ci-dot" style="background:#00ffff;box-shadow:0 0 6px #00ffff;"></div>
+            <span class="ci-label">4P</span>
+            <span class="ci-status">未蓄力</span>
+        </div>
+    </div>
+
+    <!--
+        模組載入順序 (對應 Unity Script Execution Order)
+        ----------------------------------------------------
+        1. THREE.js       — 全域 THREE
+        2. config.js      — CONFIG / state
+        3. core.js        — Entity / Component / EventBus (Phase 3+ 才大量使用)
+        4. audio.js       — SoundSystem
+        5. bullet.js      — Bullet / Particle / FlyingCorpse / MeatChunk
+        6. obstacles.js   — LevelManager (Phase 2 將擴充其他障礙物)
+        7. enemies.js     — Enemy 基底 / 子類 / EnemyManager / DummyEnemy
+        8. gidora.js      — Vine / Gidora 主類
+        9. input.js       — setupInputs / state.pollInputs
+        10. buffs.js      — Buff 系統 (Phase 3+)
+        11. ui.js         — DOM HUD / 按鈕
+        12. main.js       — 場景組裝 + animate 主迴圈
+    -->
+    <script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
+    <script src="js/config.js"></script>
+    <script src="js/core.js"></script>
+    <script src="js/audio.js"></script>
+    <script src="js/bullet.js"></script>
+    <script src="js/obstacles.js"></script>
+    <script src="js/enemies.js"></script>
+    <script src="js/gidora.js"></script>
+    <script src="js/input.js"></script>
+    <script src="js/buffs.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/main.js"></script>
+</body>
+
+</html>
