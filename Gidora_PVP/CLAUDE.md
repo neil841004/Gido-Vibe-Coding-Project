@@ -29,11 +29,11 @@ THREE.js 0.160.0 由 CDN 載入 (`https://unpkg.com/three@0.160.0/build/three.mi
 | 2 | `js/core.js` | UnityEngine 基底 | `Entity` / `Component` / `EventBus`（Phase 3+ 才大量使用） |
 | 3 | `js/audio.js` | AudioSource Manager | `SoundSystem`（Web Audio 合成） |
 | 4 | `js/bullet.js` | Bullet/Particle Prefabs | `Bullet`、`Particle`、`FlyingCorpse`、`MeatChunk`、`updateBullets()` |
-| 5 | `js/obstacles.js` | Level Geometry | `LevelManager`（目前僅可破壞方塊；Phase 2 將加入其他三種障礙物） |
+| 5 | `js/obstacles.js` | Level Geometry | `LevelManager`（四種障礙物：可破壞實體、不可破壞實體、黏液緩速、火焰 DOT） |
 | 6 | `js/enemies.js` | Enemy Manager | `HealthBar`、`Enemy` 基底、`MeleeEnemy`、`RangedEnemy`、`NinjaEnemy`、`DummyEnemy`、`TauntEnemy`(Boss)、`EnemyManager` |
 | 7 | `js/gidora.js` | Player Character | `Vine`、`Gidora` 主類（含建模、移動、近戰、光束合體技、相機跟隨） |
 | 8 | `js/input.js` | InputManager | `setupInputs()` 註冊事件並建立 `state.pollInputs()` |
-| 9 | `js/buffs.js` | Buff Components | Phase 3+ 才實作，目前為佔位 |
+| 9 | `js/buffs.js` | Buff Components | `BUFFS` 定義與 `BuffSystem`，負責 Buff 啟用、互斥、疊加與持續效果 |
 | 10 | `js/ui.js` | UGUI / DOM HUD | `setupUI()`（按鈕綁定）、`updateUI()`（每幀更新蓄力條/Debug HUD） |
 | 11 | `js/main.js` | GameManager | 建立 `scene` / `camera` / `renderer`，組裝物件，啟動 `animate` 主迴圈 |
 
@@ -99,10 +99,24 @@ THREE.js 0.160.0 由 CDN 載入 (`https://unpkg.com/three@0.160.0/build/three.mi
 | `stats` | 角色 HP、HP 衰減速率、建築 HP 基值 |
 | `enemy` | 各敵人血量/傷害/速度 + spawn weight；Boss 設定 |
 | `movement` | 最大速度、加速度、摩擦力、轉向速度（已移除 duo/quad 區隔） |
-| `combat` | 近戰傷害、攻擊範圍、前後搖時間 |
+| `combat` | 近戰傷害、攻擊範圍、前後搖、頭部蓄力攻擊、Melee 型態共用數值 |
+| `stagger` | 玩家與敵人的失衡 / 架勢值門檻、倒退速度、跌倒時間 |
+| `terrain` | 黏液、火焰、毒液、毒霧等地形或持續區域效果 |
+| `level` | 關卡物件動態生成：chunk 大小、生成半徑、各類障礙物數量、尺寸範圍 |
+| `bullet` | 玩家一般投射物傷害、速度、壽命、重力、擊退 |
 | `combo` | 合體技 CD（15s）、藤蔓速度、DoT 傷害 |
 | `beam` | 光束炮蓄力速率、發射時長、傷害 tick、寬度 |
+| `buffs` | Buff 數值：倍率、機率、半徑、持續時間、觸發門檻 |
 | `visuals` | 4 個玩家顏色、光束顏色 |
+
+### CONFIG 維護規範
+
+- `CONFIG` 視為本專案的可調 ScriptableObject；平衡、難度、時間、距離、半徑、倍率、機率、生成數量、冷卻、傷害、速度、HP、失衡值、Buff 效果等，若預期未來開發者或設計者會調整，必須整理到 `js/config.js`。
+- 新增任何數值前，先預測它是否屬於「可調參數」。如果是，放進最接近的 `CONFIG` 區塊；若現有區塊不合適，新增清楚分類並附繁體中文註解。
+- `CONFIG` 內每個欄位都要有中文註解，說明用途、單位或倍率語意。例：秒數、每秒、半徑、倍率、機率、顏色。
+- 不要在功能程式裡新增裸數字作為玩法規則。只允許局部演算法常數、Three.js 幾何細分、純視覺暫定值、DOM 排版值等短期不打算調參的數字留在邏輯檔；若之後變成要調整，需搬回 `CONFIG`。
+- 除非使用者明確要求調整平衡或數值，否則不要自行改動 `CONFIG` 裡既有數值。重構時只可搬移、整理或補註解，並保持數值完全相同。
+- 若改動需要新增可調數值，但不確定預設值，先沿用目前行為推導等價值；若無法等價推導，先詢問使用者，不要憑感覺調整。
 
 ## Tech Stack
 

@@ -23,14 +23,39 @@ class HealthBar {
         this.fg.position.z = 0.01;
         this.fg.renderOrder = 1000;
         this.group.add(this.fg);
+
+        const staggerBgGeo = new THREE.PlaneGeometry(width, height * 0.55);
+        const staggerBgMat = new THREE.MeshBasicMaterial({ color: 0x2b2410, depthTest: false, transparent: true, opacity: 0.9 });
+        this.staggerBg = new THREE.Mesh(staggerBgGeo, staggerBgMat);
+        this.staggerBg.position.y = -height * 0.9;
+        this.staggerBg.renderOrder = 999;
+        this.group.add(this.staggerBg);
+
+        const staggerFgGeo = new THREE.PlaneGeometry(width, height * 0.55);
+        const staggerFgMat = new THREE.MeshBasicMaterial({ color: 0xffcc33, depthTest: false, transparent: true, opacity: 0.95 });
+        this.staggerFg = new THREE.Mesh(staggerFgGeo, staggerFgMat);
+        this.staggerFg.position.set(0, -height * 0.9, 0.012);
+        this.staggerFg.renderOrder = 1000;
+        this.group.add(this.staggerFg);
     }
 
-    update(position, current, max) {
+    update(position, current, max, staggerCurrent, staggerMax) {
         this.group.position.copy(position);
         this.group.position.y += this.yOffset;
         const pct = Math.max(0, current / max);
         this.fg.scale.x = pct;
         this.fg.position.x = (pct - 1) * this.initialWidth / 2;
+
+        const showStagger = staggerMax !== undefined && staggerMax > 0;
+        this.staggerBg.visible = showStagger;
+        this.staggerFg.visible = showStagger;
+        if (showStagger) {
+            const staggerPct = THREE.MathUtils.clamp(staggerCurrent / staggerMax, 0, 1);
+            this.staggerFg.scale.x = staggerPct;
+            this.staggerFg.position.x = (staggerPct - 1) * this.initialWidth / 2;
+            const heat = 0.35 + staggerPct * 0.65;
+            this.staggerFg.material.color.setRGB(1, 0.55 + heat * 0.35, 0.1);
+        }
         if (window.camera) this.group.quaternion.copy(window.camera.quaternion);
     }
 
@@ -69,14 +94,21 @@ class Enemy {
         this.isDead = false;
         this.flashTimer = 0;
         this.knockbackVel = new THREE.Vector3();
+        this.staggerValue = 0;
+        this.staggerWindowTimer = 0;
+        this.fallTimer = 0;
+        this.slowTimer = 0;
+        this.slowFactor = 1.0;
 
         this.maxHP = this.hp;
         this.hpBar = new HealthBar(this.manager.scene, 1.2);
     }
 
     takeDamage(amount, sourcePos, knockbackForce) {
+        if (amount <= 0) return;
         this.hp -= amount;
         this.flashTimer = 0.1;
+        this.addStagger(amount, sourcePos);
 
         if (sourcePos) {
             const dir = this.mesh.position.clone().sub(sourcePos).normalize();
@@ -88,6 +120,32 @@ class Enemy {
         if (this.hp <= 0) this.die();
     }
 
+    addStagger(amount, sourcePos) {
+        if (amount <= 0 || this.fallTimer > 0) return;
+        this.staggerWindowTimer = CONFIG.stagger.enemyWindow;
+        this.staggerValue = Math.min(CONFIG.stagger.enemyThreshold, this.staggerValue + amount);
+        if (this.staggerValue >= CONFIG.stagger.enemyThreshold) {
+            this.fallTimer = CONFIG.stagger.enemyFallDuration;
+            this.staggerValue = 0;
+            this.knockbackVel.multiplyScalar(0.3);
+        }
+    }
+
+    updateStagger(dt) {
+        if (this.staggerWindowTimer > 0) {
+            this.staggerWindowTimer -= dt;
+            return;
+        }
+        if (this.staggerValue > 0) {
+            this.staggerValue = Math.max(0, this.staggerValue - CONFIG.stagger.enemyRecoveryRate * dt);
+        }
+    }
+
+    applySlow(factor, duration) {
+        this.slowFactor = Math.min(this.slowFactor, factor);
+        this.slowTimer = Math.max(this.slowTimer, duration);
+    }
+
     die() {
         this.isDead = true;
         this.mesh.material.emissive.setHex(0x000000);
@@ -97,7 +155,14 @@ class Enemy {
 
     update(dt, playerPos) {
         if (this.isDead) return;
-        if (this.hpBar) this.hpBar.update(this.mesh.position, this.hp, this.maxHP);
+        if (this.hpBar) this.hpBar.update(this.mesh.position, this.hp, this.maxHP, this.staggerValue, CONFIG.stagger.enemyThreshold);
+
+        this.updateStagger(dt);
+        if (this.slowTimer > 0) {
+            this.slowTimer -= dt;
+            if (this.slowTimer <= 0) this.slowFactor = 1.0;
+        }
+        if (state.levelManager) state.levelManager.applyHazardsToEnemy(this, dt);
 
         if (this.flashTimer > 0) {
             this.flashTimer -= dt;
@@ -112,10 +177,18 @@ class Enemy {
             this.knockbackVel.multiplyScalar(0.9);
         }
 
+        if (this.fallTimer > 0) {
+            this.fallTimer -= dt;
+            this.mesh.rotation.x = THREE.MathUtils.lerp(this.mesh.rotation.x, -1.2, dt * 8);
+            return;
+        } else if (Math.abs(this.mesh.rotation.x) > 0.001) {
+            this.mesh.rotation.x = THREE.MathUtils.lerp(this.mesh.rotation.x, 0, dt * 8);
+        }
+
         if (dist > this.attackRange) {
             const dir = playerPos.clone().sub(this.mesh.position).normalize();
             dir.y = 0;
-            this.mesh.position.add(dir.multiplyScalar(this.speed * dt));
+            this.mesh.position.add(dir.multiplyScalar(this.speed * this.slowFactor * dt));
             this.mesh.lookAt(playerPos);
         } else {
             if (this.attackTimer <= 0) {
@@ -179,7 +252,13 @@ class NinjaEnemy extends Enemy {
     update(dt, playerPos) {
         if (this.isDead) return;
 
-        if (this.hpBar) this.hpBar.update(this.mesh.position, this.hp, this.maxHP);
+        if (this.hpBar) this.hpBar.update(this.mesh.position, this.hp, this.maxHP, this.staggerValue, CONFIG.stagger.enemyThreshold);
+        this.updateStagger(dt);
+        if (this.slowTimer > 0) {
+            this.slowTimer -= dt;
+            if (this.slowTimer <= 0) this.slowFactor = 1.0;
+        }
+        if (state.levelManager) state.levelManager.applyHazardsToEnemy(this, dt);
         if (this.flashTimer > 0) {
             this.flashTimer -= dt;
             this.mesh.material.emissive.setHex(this.flashTimer > 0 ? 0xffffff : 0x000000);
@@ -190,6 +269,14 @@ class NinjaEnemy extends Enemy {
             this.mesh.position.y = 1.0;
             this.knockbackVel.multiplyScalar(0.9);
             return;
+        }
+
+        if (this.fallTimer > 0) {
+            this.fallTimer -= dt;
+            this.mesh.rotation.x = THREE.MathUtils.lerp(this.mesh.rotation.x, -1.2, dt * 8);
+            return;
+        } else if (Math.abs(this.mesh.rotation.x) > 0.001) {
+            this.mesh.rotation.x = THREE.MathUtils.lerp(this.mesh.rotation.x, 0, dt * 8);
         }
 
         if (this.recoveryTimer > 0) { this.recoveryTimer -= dt; return; }
@@ -247,7 +334,7 @@ class NinjaEnemy extends Enemy {
             if (dist > this.attackRange) {
                 const dir = playerPos.clone().sub(this.mesh.position).normalize();
                 dir.y = 0;
-                this.mesh.position.add(dir.multiplyScalar(this.speed * dt));
+                this.mesh.position.add(dir.multiplyScalar(this.speed * this.slowFactor * dt));
                 this.mesh.lookAt(playerPos);
             }
         }
@@ -301,7 +388,7 @@ class DummyEnemy extends Enemy {
     }
 
     update(dt, playerPos) {
-        if (this.hpBar) this.hpBar.update(this.mesh.position, this.hp, this.maxHP);
+        if (this.hpBar) this.hpBar.update(this.mesh.position, this.hp, this.maxHP, this.staggerValue, CONFIG.stagger.enemyThreshold);
 
         if (this.flashTimer > 0) {
             this.flashTimer -= dt;
@@ -367,16 +454,31 @@ class TauntEnemy extends Enemy {
     update(dt, playerPos) {
         if (this.isDead) return;
 
+        this.updateStagger(dt);
+        if (this.slowTimer > 0) {
+            this.slowTimer -= dt;
+            if (this.slowTimer <= 0) this.slowFactor = 1.0;
+        }
+        if (state.levelManager) state.levelManager.applyHazardsToEnemy(this, dt);
+
         if (this.flashTimer > 0) {
             this.flashTimer -= dt;
             this.mesh.material.emissive.setHex(this.flashTimer > 0 ? 0xffffff : 0x000000);
         }
 
-        if (this.hpBar) this.hpBar.update(this.mesh.position, this.hp, this.maxHP);
+        if (this.hpBar) this.hpBar.update(this.mesh.position, this.hp, this.maxHP, this.staggerValue, CONFIG.stagger.enemyThreshold);
 
         if (this.knockbackVel.lengthSq() > 0.001) {
             this.mesh.position.add(this.knockbackVel.clone().multiplyScalar(dt));
             this.knockbackVel.multiplyScalar(0.9);
+        }
+
+        if (this.fallTimer > 0) {
+            this.fallTimer -= dt;
+            this.mesh.rotation.x = THREE.MathUtils.lerp(this.mesh.rotation.x, -1.2, dt * 8);
+            return;
+        } else if (Math.abs(this.mesh.rotation.x) > 0.001) {
+            this.mesh.rotation.x = THREE.MathUtils.lerp(this.mesh.rotation.x, 0, dt * 8);
         }
 
         if (this.attackCooldown > 0) this.attackCooldown -= dt;
@@ -403,13 +505,14 @@ class TauntEnemy extends Enemy {
             this.pickNewTarget();
         } else {
             const dir = this.targetPos.clone().sub(this.mesh.position).normalize();
-            const moveStep = dir.multiplyScalar(this.speed * dt);
+            const moveStep = dir.multiplyScalar(this.speed * this.slowFactor * dt);
             const nextPos = this.mesh.position.clone().add(moveStep);
 
             let hitBlock = false;
             if (state.levelManager) {
                 state.levelManager.blocks.forEach(b => {
                     if (hitBlock || b.isDead) return;
+                    if (!b.solid) return;
                     const dx = Math.abs(b.mesh.position.x - nextPos.x);
                     const dz = Math.abs(b.mesh.position.z - nextPos.z);
                     if (dx < 4.0 && dz < 4.0) hitBlock = true;
@@ -511,6 +614,7 @@ class EnemyManager {
                         if (state.levelManager) {
                             state.levelManager.blocks.forEach(b => {
                                 if (hitBlock) return;
+                                if (b.isDead || !b.solid) return;
                                 const dx = Math.abs(b.mesh.position.x - spawnPos.x);
                                 const dz = Math.abs(b.mesh.position.z - spawnPos.z);
                                 if (dx < 4.0 && dz < 4.0) hitBlock = true;
@@ -620,6 +724,7 @@ class EnemyManager {
                     b.hitEntities.add(e.mesh.uuid);
 
                     e.takeDamage(b.damage, b.mesh.position, b.knockback);
+                    if (b.onImpact) b.onImpact(b);
 
                     b.penetration--;
                     if (b.penetration < 0) b.markedForDeletion = true;

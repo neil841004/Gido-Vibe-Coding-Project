@@ -90,10 +90,25 @@ class Gidora {
 
         this.cooldowns = { p1: 0, p2: 0, p3: 0, p4: 0 };
         this.attackStates = { p1: 'idle', p2: 'idle', p3: 'idle', p4: 'idle' };
+        this.attackKinds = { p1: 'light', p2: 'light', p3: 'light', p4: 'light' };
         this.windupTimer = { p1: 0, p2: 0, p3: 0, p4: 0 };
         this.isWindup = { p1: false, p2: false, p3: false, p4: false };
         this.attackTimers = { p1: 0, p2: 0, p3: 0, p4: 0 };
         this.lastAttackInput = { p1: false, p2: false, p3: false, p4: false };
+        this.attackHoldTimers = { p1: 0, p2: 0, p3: 0, p4: 0 };
+        this.attackReleaseQueued = { p1: false, p2: false, p3: false, p4: false };
+        this.attackQueuedKinds = { p1: 'light', p2: 'light', p3: 'light', p4: 'light' };
+        this.attackImpactDone = { p1: false, p2: false, p3: false, p4: false };
+        this.recoveryBufferedPress = { p1: false, p2: false, p3: false, p4: false };
+        this.chargeAim = {
+            p1: new THREE.Vector2(0, 1),
+            p2: new THREE.Vector2(0, 1),
+            p3: new THREE.Vector2(0, 1),
+            p4: new THREE.Vector2(0, -1)
+        };
+        this.chargeTargets = { p1: null, p2: null, p3: null, p4: null };
+        this.headAimYaw = { p1: -0.6, p2: 0.6, p3: 0 };
+        this.flamethrowerTimers = { p1: 0, p2: 0, p3: 0 };
         this.bufferedInput = { p1: false, p2: false, p3: false, p4: false };
         this.rhythmBonus = { p1: false, p2: false, p3: false, p4: false };
         this.activeIndicators = { p1: null, p2: null, p3: null, p4: null };
@@ -113,6 +128,13 @@ class Gidora {
         this.angularVelocity = 0;
 
         this.knockbackVel = new THREE.Vector3();
+        this.staggerValue = 0;
+        this.staggerWindowTimer = 0;
+        this.fallTimer = 0;
+        this.comboRampStacks = 0;
+        this.comboRampTimer = 0;
+        this.stationaryTimer = 0;
+        this.lastRamHit = new Map();
 
         this.buildModel();
         this.buildIndicators();
@@ -127,17 +149,69 @@ class Gidora {
 
     takeDamage(amount, sourcePos, knockbackForce) {
         if (this.isDead) return;
+        if (BuffSystem.isActive('comboInvincible') && state.beamPhase === 'firing') return;
+        if (BuffSystem.blockIncomingDamage(sourcePos)) return;
+
+        let finalAmount = amount;
+        if (BuffSystem.isActive('directionalGuard') && sourcePos) {
+            const toSource = sourcePos.clone().sub(this.mesh.position).normalize();
+            const facing = this.getForwardVector().normalize();
+            const dot = facing.dot(toSource);
+            finalAmount *= dot >= 0
+                ? CONFIG.buffs.frontDamageMultiplier
+                : CONFIG.buffs.backDamageMultiplier;
+        }
+        if (BuffSystem.isActive('stationaryShield') && this.stationaryTimer >= CONFIG.buffs.stationaryShieldDelay) {
+            finalAmount *= CONFIG.buffs.stationaryShieldMultiplier;
+        }
+
+        finalAmount = Math.max(0, finalAmount);
         this.hp -= amount;
         this.damageFlashTimer = 0.2;
+        this.hp = Math.max(0, this.hp + amount - finalAmount);
+
+        this.addStagger(finalAmount, sourcePos);
 
         if (sourcePos && this.mesh.position) {
             const dir = this.mesh.position.clone().sub(sourcePos).normalize();
             dir.y = 0;
-            const force = (knockbackForce !== undefined) ? knockbackForce : amount * 0.2;
+            const force = (knockbackForce !== undefined) ? knockbackForce : finalAmount * 0.2;
             this.knockbackVel.add(dir.multiplyScalar(force));
         }
 
         if (this.hp <= 0) this.die();
+    }
+
+    heal(amount) {
+        if (this.isDead || amount <= 0) return;
+        this.hp = Math.min(this.maxHP, this.hp + amount);
+    }
+
+    addStagger(amount, sourcePos) {
+        if (BuffSystem.isActive('staggerImmune') || this.fallTimer > 0 || amount <= 0) return;
+        this.staggerWindowTimer = CONFIG.stagger.playerWindow;
+        this.staggerValue = Math.min(CONFIG.stagger.playerThreshold, this.staggerValue + amount);
+        if (this.staggerValue >= CONFIG.stagger.playerThreshold) {
+            this.fallTimer = CONFIG.stagger.playerFallDuration;
+            this.staggerValue = 0;
+            this.attackStates = { p1: 'idle', p2: 'idle', p3: 'idle', p4: 'idle' };
+            this.velocity.multiplyScalar(0.2);
+            this.knockbackVel.multiplyScalar(0.2);
+            this.pulseScale = 1.25;
+            const pos = this.mesh.position.clone();
+            pos.y = 1.0;
+            for (let i = 0; i < 10; i++) state.particles.push(new Particle(pos, 0xffff66));
+        }
+    }
+
+    updateStagger(dt) {
+        if (this.staggerWindowTimer > 0) {
+            this.staggerWindowTimer -= dt;
+            return;
+        }
+        if (this.staggerValue > 0) {
+            this.staggerValue = Math.max(0, this.staggerValue - CONFIG.stagger.playerRecoveryRate * dt);
+        }
     }
 
     die() {
@@ -162,6 +236,7 @@ class Gidora {
         bullets.forEach(b => {
             if (b.markedForDeletion || !b.isEnemy) return;
             if (b.mesh.position.distanceTo(pPos) < hitRadius) {
+                if (BuffSystem.reflectProjectile(b, this)) return;
                 b.markedForDeletion = true;
                 this.takeDamage(b.damage || 10, b.mesh.position, b.knockback);
             }
@@ -242,7 +317,7 @@ class Gidora {
             pivotGroup.add(headMesh);
             this.mesh.add(neckGroup);
 
-            this.necks.push({ group: neckGroup, pivot: pivotGroup, head: headMesh, id: cfg.id, baseLean: leanAngle });
+            this.necks.push({ group: neckGroup, pivot: pivotGroup, head: headMesh, id: cfg.id, baseLean: leanAngle, baseYaw: cfg.angle });
 
             if (cfg.id === 'p1') { this.p1Part = neckGroup; this.p1HeadPart = headMesh; }
             if (cfg.id === 'p2') { this.p2Part = neckGroup; this.p2HeadPart = headMesh; }
@@ -368,34 +443,73 @@ class Gidora {
 
                 const currentState = this.attackStates[p] || 'idle';
 
-                if (currentState === 'windup') {
+                if (currentState === 'charging') {
+                    this.attackHoldTimers[p] += dt;
+                    this.updateChargeTarget(p);
+                    const windupT = Math.min(1, this.attackHoldTimers[p] / CONFIG.combat.windupTime);
+                    const ease = windupT * (2 - windupT);
+                    const backLean = this.getBackLean(n);
+                    n.pivot.rotation.x = n.baseLean * (1 - ease) + backLean * ease;
+                    n.group.rotation.y = THREE.MathUtils.lerp(n.group.rotation.y, this.headAimYaw[p], dt * 16);
+                    n.group.rotation.z = Math.sin(t * 18) * 0.02 * Math.min(1, this.attackHoldTimers[p] / CONFIG.combat.heavyChargeTime);
+                    if (this.attackReleaseQueued[p] && windupT >= 1) {
+                        this.beginHeadStrike(p, this.attackQueuedKinds[p]);
+                    }
+                } else if (currentState === 'flamethrower') {
+                    this.attackHoldTimers[p] += dt;
+                    n.pivot.rotation.x = n.baseLean + 0.2 + Math.sin(t * 30) * 0.06;
+                    this.updateFlamethrower(p, dt);
+                } else if (currentState === 'strike') {
                     this.attackTimers[p] -= dt;
-                    const progress = 1 - (this.attackTimers[p] / CONFIG.combat.windupTime);
+                    const totalStrike = CONFIG.combat.strikeTime;
+                    const progress = THREE.MathUtils.clamp(1 - (this.attackTimers[p] / totalStrike), 0, 1);
+                    const ease = progress * progress * (3 - 2 * progress);
+                    n.group.rotation.y = THREE.MathUtils.lerp(n.group.rotation.y, this.headAimYaw[p], dt * 18);
+                    n.pivot.rotation.x = this.getBackLean(n) * (1 - ease) + this.getForwardLean(n) * ease;
+
+                    if (!this.attackImpactDone[p] && progress >= 0.65) {
+                        this.attackImpactDone[p] = true;
+                        this.triggerAttackImpact(p);
+                    }
+                    if (this.attackTimers[p] <= 0) {
+                        this.attackStates[p] = 'recovery';
+                        this.attackTimers[p] = this.attackKinds[p] === 'heavy'
+                            ? CONFIG.combat.heavyRecoveryTime
+                            : CONFIG.combat.recoveryTime;
+                    }
+                } else if (currentState === 'windup') {
+                    this.attackTimers[p] -= dt;
+                    const totalWindup = this.attackKinds[p] === 'heavy'
+                        ? CONFIG.combat.heavyWindupTime
+                        : CONFIG.combat.windupTime;
+                    const progress = 1 - (this.attackTimers[p] / totalWindup);
                     const ease = progress * (2 - progress);
-                    n.pivot.rotation.x = n.baseLean - (ease * 1.0);
+                    n.pivot.rotation.x = n.baseLean - (ease * (this.attackKinds[p] === 'heavy' ? 1.2 : 1.0));
 
                     if (this.attackTimers[p] <= 0) {
                         this.triggerAttackImpact(p);
                         this.attackStates[p] = 'recovery';
-                        this.attackTimers[p] = CONFIG.combat.recoveryTime;
+                        this.attackTimers[p] = this.attackKinds[p] === 'heavy'
+                            ? CONFIG.combat.heavyRecoveryTime
+                            : CONFIG.combat.recoveryTime;
                     }
                 } else if (currentState === 'recovery') {
                     this.attackTimers[p] -= dt;
-                    const progress = 1 - (this.attackTimers[p] / CONFIG.combat.recoveryTime);
-                    let targetLean = n.baseLean;
-                    if (progress < 0.2) {
-                        const p2 = progress / 0.2;
-                        targetLean = (n.baseLean - 1.0) * (1 - p2) + (n.baseLean + 1.5) * p2;
-                    } else {
-                        const p2 = (progress - 0.2) / 0.8;
-                        const ease = p2 * p2 * (3 - 2 * p2);
-                        targetLean = (n.baseLean + 1.5) * (1 - ease) + (n.baseLean) * ease;
-                    }
-                    n.pivot.rotation.x = targetLean;
-                    if (this.attackTimers[p] <= 0) this.attackStates[p] = 'idle';
+                    const totalRecovery = this.attackKinds[p] === 'heavy'
+                        ? CONFIG.combat.heavyRecoveryTime
+                        : CONFIG.combat.recoveryTime;
+                    const progress = THREE.MathUtils.clamp(1 - (this.attackTimers[p] / totalRecovery), 0, 1);
+                    const ease = progress * progress * (3 - 2 * progress);
+                    n.pivot.rotation.x = this.getForwardLean(n) * (1 - ease) + n.baseLean * ease;
+                    const targetYaw = this.recoveryBufferedPress[p] && state.input[p].attack
+                        ? this.headAimYaw[p]
+                        : n.baseYaw;
+                    n.group.rotation.y = THREE.MathUtils.lerp(n.group.rotation.y, targetYaw, dt * 8);
+                    if (this.attackTimers[p] <= 0) this.finishHeadRecovery(p);
                 } else {
                     const lag = -this.angularVelocity * 0.1;
                     n.group.rotation.z = Math.sin(t * 5 + (p === 'p2' ? 1 : (p === 'p3' ? 2 : 0))) * 0.05 + lag;
+                    n.group.rotation.y = THREE.MathUtils.lerp(n.group.rotation.y, n.baseYaw, dt * 8);
                     n.pivot.rotation.x = n.baseLean + Math.sin(t * 8) * 0.05;
                     n.group.position.z = (p === 'p3' ? 1.0 : 1.1);
                 }
@@ -481,6 +595,24 @@ class Gidora {
         scene.add(this.p3Arrow);
         this.p4Arrow = new THREE.ArrowHelper(new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 2, 0), CONFIG.visuals.arrowLength, CONFIG.visuals.colors.p4);
         scene.add(this.p4Arrow);
+
+        this.attackLandingIndicators = {};
+        ['p1', 'p2', 'p3'].forEach(p => {
+            const geo = new THREE.RingGeometry(0.45, CONFIG.combat.attackRange, 32);
+            geo.rotateX(-Math.PI / 2);
+            const mat = new THREE.MeshBasicMaterial({
+                color: CONFIG.visuals.colors[p],
+                side: THREE.DoubleSide,
+                transparent: true,
+                opacity: 0.0,
+                depthWrite: false
+            });
+            const ring = new THREE.Mesh(geo, mat);
+            ring.visible = false;
+            ring.position.y = 0.08;
+            scene.add(ring);
+            this.attackLandingIndicators[p] = ring;
+        });
     }
 
     getForwardVector() {
@@ -489,17 +621,198 @@ class Gidora {
         return forward;
     }
 
-    attack(playerIndex) {
+    canChargeAttack(playerIndex) {
+        return playerIndex !== 'p4';
+    }
+
+    startAttackPress(playerIndex) {
+        if (this.attackStates[playerIndex] !== 'idle') {
+            if (this.canChargeAttack(playerIndex) &&
+                (this.attackStates[playerIndex] === 'strike' || this.attackStates[playerIndex] === 'recovery')) {
+                this.recoveryBufferedPress[playerIndex] = true;
+            }
+            return;
+        }
+        if (this.cooldowns[playerIndex] > 0) return;
+        if (BuffSystem.getMeleeForm() === 'flame' && this.canChargeAttack(playerIndex)) {
+            this.attackStates[playerIndex] = 'flamethrower';
+            this.attackHoldTimers[playerIndex] = 0;
+            return;
+        }
+        if (this.canChargeAttack(playerIndex)) {
+            this.resetChargeAim(playerIndex);
+            this.attackStates[playerIndex] = 'charging';
+            this.attackHoldTimers[playerIndex] = 0;
+            this.attackReleaseQueued[playerIndex] = false;
+            this.attackQueuedKinds[playerIndex] = 'light';
+            this.attackImpactDone[playerIndex] = false;
+            this.recoveryBufferedPress[playerIndex] = false;
+            this.updateChargeTarget(playerIndex);
+        } else {
+            this.attack(playerIndex, 'light');
+        }
+    }
+
+    releaseAttackPress(playerIndex) {
+        if (this.attackStates[playerIndex] === 'flamethrower') {
+            this.attackStates[playerIndex] = 'idle';
+            this.cooldowns[playerIndex] = CONFIG.combat.cooldown;
+            return;
+        }
+        if (this.attackStates[playerIndex] !== 'charging') return;
+        const holdTime = this.attackHoldTimers[playerIndex];
+        const kind = holdTime >= CONFIG.combat.heavyChargeTime ? 'heavy' : 'light';
+        this.attackQueuedKinds[playerIndex] = kind;
+        this.attackReleaseQueued[playerIndex] = true;
+        if (holdTime >= CONFIG.combat.windupTime) this.beginHeadStrike(playerIndex, kind);
+    }
+
+    attack(playerIndex, kind = 'light') {
         if (this.attackStates[playerIndex] !== 'idle') return;
+        this.attackKinds[playerIndex] = kind;
         this.attackStates[playerIndex] = 'windup';
-        this.attackTimers[playerIndex] = CONFIG.combat.windupTime;
+        this.attackTimers[playerIndex] = kind === 'heavy'
+            ? CONFIG.combat.heavyWindupTime
+            : CONFIG.combat.windupTime;
+        this.cooldowns[playerIndex] = CONFIG.combat.cooldown;
+        if (kind === 'heavy') this.cooldowns[playerIndex] = CONFIG.combat.cooldown + CONFIG.combat.heavyRecoveryTime;
+    }
+
+    beginHeadStrike(playerIndex, kind) {
+        if (kind === 'light') this.resetChargeAim(playerIndex);
+        this.attackKinds[playerIndex] = kind;
+        this.attackStates[playerIndex] = 'strike';
+        this.attackTimers[playerIndex] = CONFIG.combat.strikeTime;
+        this.attackReleaseQueued[playerIndex] = false;
+        this.attackImpactDone[playerIndex] = false;
+        this.hideChargeIndicator(playerIndex);
+        this.cooldowns[playerIndex] = kind === 'heavy'
+            ? CONFIG.combat.heavyRecoveryTime
+            : CONFIG.combat.recoveryTime;
+    }
+
+    finishHeadRecovery(playerIndex) {
+        this.attackStates[playerIndex] = 'idle';
+        this.attackTimers[playerIndex] = 0;
+        this.attackReleaseQueued[playerIndex] = false;
+        this.attackImpactDone[playerIndex] = false;
+        if (this.recoveryBufferedPress[playerIndex] && state.input[playerIndex].attack) {
+            this.cooldowns[playerIndex] = 0;
+            this.recoveryBufferedPress[playerIndex] = false;
+            this.startAttackPress(playerIndex);
+        } else {
+            this.recoveryBufferedPress[playerIndex] = false;
+        }
+    }
+
+    getBackLean(neck) {
+        return neck.baseLean - 1.1;
+    }
+
+    getForwardLean(neck) {
+        return neck.baseLean + 1.45;
+    }
+
+    getBaseAimYaw(playerIndex) {
+        if (playerIndex === 'p1') return -0.6;
+        if (playerIndex === 'p2') return 0.6;
+        return 0;
+    }
+
+    resetChargeAim(playerIndex) {
+        const yaw = this.getBaseAimYaw(playerIndex);
+        this.chargeAim[playerIndex].set(Math.sin(yaw), Math.cos(yaw));
+        this.headAimYaw[playerIndex] = yaw;
+        this.chargeTargets[playerIndex] = null;
+    }
+
+    updateChargeTarget(playerIndex) {
+        if (!this.canChargeAttack(playerIndex)) return null;
+        const rawAim = this.getRawAimVector(playerIndex);
+        if (rawAim && rawAim.lengthSq() > 0.05) {
+            this.chargeAim[playerIndex].copy(rawAim).normalize();
+        }
+
+        const baseYaw = this.getBaseAimYaw(playerIndex);
+        const aimYaw = Math.atan2(this.chargeAim[playerIndex].x, this.chargeAim[playerIndex].y);
+        let delta = aimYaw - baseYaw;
+        while (delta > Math.PI) delta -= Math.PI * 2;
+        while (delta < -Math.PI) delta += Math.PI * 2;
+        const clampedYaw = baseYaw + THREE.MathUtils.clamp(delta, -CONFIG.combat.chargeAimHalfAngle, CONFIG.combat.chargeAimHalfAngle);
+        this.headAimYaw[playerIndex] = clampedYaw;
+        this.chargeAim[playerIndex].set(Math.sin(clampedYaw), Math.cos(clampedYaw));
+
+        let local = new THREE.Vector3(
+            this.chargeAim[playerIndex].x * CONFIG.combat.chargeDefaultDistance,
+            0,
+            this.chargeAim[playerIndex].y * CONFIG.combat.chargeDefaultDistance
+        );
+        local.applyQuaternion(this.mesh.quaternion);
+
+        const target = this.mesh.position.clone().add(local);
+        target.y = 0.1;
+        this.chargeTargets[playerIndex] = target;
+
+        const ring = this.attackLandingIndicators[playerIndex];
+        if (ring) {
+            const visible = this.attackStates[playerIndex] === 'charging' &&
+                this.attackHoldTimers[playerIndex] >= CONFIG.combat.chargePreviewTime;
+            ring.visible = visible;
+            ring.material.opacity = visible
+                ? 0.75
+                : 0.0;
+            ring.position.copy(target);
+            const scale = this.attackHoldTimers[playerIndex] >= CONFIG.combat.heavyChargeTime
+                ? CONFIG.combat.heavyRadiusScale
+                : 1.0;
+            ring.scale.setScalar(scale);
+        }
+        return target;
+    }
+
+    getRawAimVector(playerIndex) {
+        if (playerIndex === 'p1' && state.input.p1.pointer && window.camera) {
+            const pointer = state.input.p1.pointer;
+            const ndc = new THREE.Vector2(
+                (pointer.x / window.innerWidth) * 2 - 1,
+                -(pointer.y / window.innerHeight) * 2 + 1
+            );
+            const raycaster = new THREE.Raycaster();
+            raycaster.setFromCamera(ndc, camera);
+            const ground = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+            const hit = new THREE.Vector3();
+            if (raycaster.ray.intersectPlane(ground, hit)) {
+                const worldDir = hit.sub(this.mesh.position);
+                worldDir.y = 0;
+                if (worldDir.lengthSq() > 0.05) {
+                    worldDir.normalize();
+                    worldDir.applyQuaternion(this.mesh.quaternion.clone().invert());
+                    return new THREE.Vector2(worldDir.x, worldDir.z);
+                }
+            }
+        }
+
+        const move = state.input[playerIndex].move;
+        if (move && move.lengthSq() > 0.05) return move.clone().normalize();
+        return null;
+    }
+
+
+    hideChargeIndicator(playerIndex) {
+        const ring = this.attackLandingIndicators[playerIndex];
+        if (ring) {
+            ring.visible = false;
+            ring.material.opacity = 0;
+        }
     }
 
     triggerAttackImpact(playerIndex) {
         let isTail = (playerIndex === 'p4');
-        let damage = CONFIG.combat.meleeDamage;
+        const kind = this.attackKinds[playerIndex] || 'light';
+        let damage = this.getMeleeDamage(playerIndex, kind);
         let radius = CONFIG.combat.attackRange;
         let color = CONFIG.visuals.colors[playerIndex];
+        const form = BuffSystem.getMeleeForm();
 
         const forward = this.getForwardVector();
         const spawnPos = this.mesh.position.clone();
@@ -508,15 +821,45 @@ class Gidora {
         if (isTail) {
             spawnPos.add(forward.clone().negate().multiplyScalar(3.0));
         } else {
-            if (playerIndex === 'p1') spawnPos.add(forward.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), -0.6).multiplyScalar(3.0));
-            if (playerIndex === 'p2') spawnPos.add(forward.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), 0.6).multiplyScalar(3.0));
-            if (playerIndex === 'p3') spawnPos.add(forward.multiplyScalar(3.2));
+            if (kind === 'heavy' && this.chargeTargets[playerIndex]) {
+                spawnPos.copy(this.chargeTargets[playerIndex]);
+                spawnPos.y = 0.5;
+            } else {
+                if (playerIndex === 'p1') spawnPos.add(forward.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), -0.6).multiplyScalar(3.0));
+                if (playerIndex === 'p2') spawnPos.add(forward.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), 0.6).multiplyScalar(3.0));
+                if (playerIndex === 'p3') spawnPos.add(forward.multiplyScalar(3.2));
+            }
         }
 
-        this.createHitbox(spawnPos, radius, damage, 0.2, isTail, color);
+        if (!isTail && form === 'fireball') {
+            const impactPos = (kind === 'heavy' && this.chargeTargets[playerIndex])
+                ? this.chargeTargets[playerIndex].clone()
+                : spawnPos.clone();
+            this.fireHeadFireball(playerIndex, impactPos, damage * CONFIG.combat.fireballDamageScale);
+            return;
+        }
+
+        if (kind === 'heavy') radius *= CONFIG.combat.heavyRadiusScale;
+        this.createHitbox(spawnPos, radius, damage, 0.2, isTail, color, { heavy: kind === 'heavy', form });
+        if (!isTail && kind === 'heavy' && form === 'shockwave') {
+            this.createShockwave(spawnPos, color);
+        }
     }
 
-    createHitbox(pos, radius, damage, duration, isTail, color) {
+    getMeleeDamage(playerIndex, kind) {
+        let damage = CONFIG.combat.meleeDamage * BuffSystem.getMeleeMultiplier();
+        if (playerIndex === 'p4' && BuffSystem.isActive('tailPower')) {
+            damage *= CONFIG.buffs.tailDamageMultiplier;
+        }
+        if (kind === 'heavy') damage *= CONFIG.combat.heavyDamageScale;
+        if (BuffSystem.isActive('comboRamp')) {
+            const stacks = this.comboRampStacks || 0;
+            damage *= 1 + stacks * CONFIG.buffs.comboDamageStepPct;
+        }
+        return damage;
+    }
+
+    createHitbox(pos, radius, damage, duration, isTail, color, options = {}) {
         const ringGeo = new THREE.RingGeometry(0.5, radius, 32);
         ringGeo.rotateX(-Math.PI / 2);
         const ringMat = new THREE.MeshBasicMaterial({ color, side: THREE.DoubleSide, transparent: true, opacity: 0.8 });
@@ -553,8 +896,11 @@ class Gidora {
                         if (e.isDead || this.hitList.has(e)) return;
                         if (e.mesh.position.distanceTo(ring.position) < radius + 0.5) {
                             e.takeDamage(damage, window.gidoraInstance.mesh.position, isTail ? 15 : 10);
+                            if (e.addStagger) e.addStagger(options.stagger || (options.heavy ? 35 : 0), ring.position);
                             this.hitList.add(e);
-                            if (!isTail) {
+                            BuffSystem.onEffectiveDamage(damage);
+                            window.gidoraInstance.tryMeleeExplosion(e.mesh.position, damage);
+                            if (!isTail && !options.noRecoil) {
                                 const recoilDir = window.gidoraInstance.mesh.position.clone().sub(e.mesh.position).normalize();
                                 recoilDir.y = 0;
                                 window.gidoraInstance.knockbackVel.add(recoilDir.multiplyScalar(4));
@@ -566,17 +912,12 @@ class Gidora {
                 if (state.levelManager && state.levelManager.blocks) {
                     state.levelManager.blocks.forEach(block => {
                         if (block.isDead || this.hitList.has(block)) return;
+                        if (!block.solid) return;
                         if (block.mesh.position.distanceTo(ring.position) < radius + 2.5) {
-                            block.hp -= damage;
-                            block.flashTimer = 0.1;
+                            const didDamage = state.levelManager.damageBlock(block, damage);
                             this.hitList.add(block);
-                            if (block.hp <= 0) {
-                                block.isDead = true;
-                                scene.remove(block.mesh);
-                                block.mesh.geometry.dispose();
-                                block.mesh.material.dispose();
-                            }
-                            if (!isTail) {
+                            if (didDamage) BuffSystem.onEffectiveDamage(damage);
+                            if (!isTail && !options.noRecoil) {
                                 const recoilDir = window.gidoraInstance.mesh.position.clone().sub(block.mesh.position).normalize();
                                 recoilDir.y = 0;
                                 window.gidoraInstance.knockbackVel.add(recoilDir.multiplyScalar(5));
@@ -586,6 +927,99 @@ class Gidora {
                 }
                 return true;
             }
+        });
+    }
+
+    createAreaDamage(pos, radius, damage, color, options = {}) {
+        options.noRecoil = true;
+        this.createHitbox(pos, radius, damage, 0.35, false, color, options);
+    }
+
+    createShockwave(pos, color) {
+        this.createAreaDamage(pos, 5.5, CONFIG.combat.meleeDamage * 0.8, color, { heavy: true, stagger: 80 });
+        if (state.enemyManager) {
+            state.enemyManager.enemies.forEach(e => {
+                if (!e.isDead && e.mesh.position.distanceTo(pos) < 6.0 && e.addStagger) {
+                    e.addStagger(CONFIG.stagger.enemyThreshold, pos);
+                }
+            });
+        }
+    }
+
+    fireHeadFireball(playerIndex, targetPos, damage) {
+        const startPos = this.mesh.position.clone();
+        startPos.y = 2.2;
+        const dir = targetPos.clone().sub(startPos).normalize();
+        const bullet = new Bullet(playerIndex, startPos, dir, 18, 1.4, 0, 0.45, {
+            damage,
+            color: CONFIG.visuals.colors[playerIndex],
+            knockback: 16,
+            penetration: 0
+        });
+        bullet.targetPoint = targetPos.clone();
+        bullet.explodeRadius = CONFIG.combat.fireballRadius;
+        bullet.onImpact = (b) => {
+            this.createAreaDamage(b.mesh.position.clone(), CONFIG.combat.fireballRadius, damage, CONFIG.visuals.colors[playerIndex], { heavy: true });
+        };
+        state.bullets.push(bullet);
+    }
+
+    tryMeleeExplosion(pos, sourceDamage) {
+        if (!BuffSystem.isActive('meleeExplosion')) return;
+        if (Math.random() >= CONFIG.buffs.meleeExplosionChance) return;
+        this.createAreaDamage(pos.clone(), 3.5, sourceDamage * 0.6, 0xff6600, { stagger: 45 });
+    }
+
+    updateFlamethrower(playerIndex, dt) {
+        const forward = this.getForwardVector().normalize();
+        const origin = this.mesh.position.clone();
+        origin.y = 1.3;
+        const range = CONFIG.combat.flamethrowerRange;
+        const halfAngle = CONFIG.combat.flamethrowerAngle;
+        const damage = CONFIG.combat.flamethrowerDamagePerSecond * dt * BuffSystem.getMeleeMultiplier();
+
+        this.flamethrowerTimers[playerIndex] = (this.flamethrowerTimers[playerIndex] || 0) + dt;
+        if (this.flamethrowerTimers[playerIndex] >= 0.06) {
+            this.flamethrowerTimers[playerIndex] = 0;
+            const pPos = origin.clone().add(forward.clone().multiplyScalar(2 + Math.random() * range));
+            const side = new THREE.Vector3(forward.z, 0, -forward.x).multiplyScalar((Math.random() - 0.5) * 2.6);
+            pPos.add(side);
+            pPos.y = 0.4 + Math.random() * 0.8;
+            const spark = new Particle(pPos, Math.random() > 0.5 ? 0xff3300 : 0xffaa00);
+            spark.velocity.multiplyScalar(0.15);
+            spark.life = 0.25;
+            spark.maxLife = 0.25;
+            spark.mesh.scale.setScalar(2.0);
+            state.particles.push(spark);
+        }
+
+        if (!state.enemyManager) return;
+        state.enemyManager.enemies.forEach(e => {
+            if (e.isDead) return;
+            const toE = e.mesh.position.clone().sub(origin);
+            const dist = toE.length();
+            if (dist > range || dist < 0.1) return;
+            const dir = toE.normalize();
+            if (forward.angleTo(dir) > halfAngle) return;
+            e.takeDamage(damage, origin, 2);
+            BuffSystem.onEffectiveDamage(damage);
+        });
+    }
+
+    updateRamStagger(dt) {
+        if (!BuffSystem.isActive('ramStagger')) return;
+        if (!state.enemyManager || this.velocity.length() < CONFIG.buffs.ramSpeedThreshold) return;
+        state.enemyManager.enemies.forEach(e => {
+            if (e.isDead) return;
+            const lastHit = this.lastRamHit.get(e) || 0;
+            if (lastHit > 0) {
+                this.lastRamHit.set(e, lastHit - dt);
+                return;
+            }
+            if (e.mesh.position.distanceTo(this.mesh.position) > 2.0) return;
+            e.takeDamage(CONFIG.buffs.ramDamage, this.mesh.position, 20);
+            if (e.addStagger) e.addStagger(CONFIG.buffs.ramStagger, this.mesh.position);
+            this.lastRamHit.set(e, 0.8);
         });
     }
 
@@ -664,6 +1098,7 @@ class Gidora {
             if (state.levelManager) {
                 state.levelManager.blocks.forEach(b => {
                     if (b.isDead) return;
+                    if (!b.solid) return;
                     const toB = b.mesh.position.clone().sub(origin);
                     const along = toB.dot(forward);
                     if (along < 0 || along > beamLength) return;
@@ -709,7 +1144,7 @@ class Gidora {
             state.beamDotTimer += dt;
             if (state.beamDotTimer >= beamCfg.tickInterval) {
                 state.beamDotTimer = 0;
-                const damage = beamCfg.damagePerTick * beamCfg.damageScale;
+                const damage = beamCfg.damagePerTick * beamCfg.damageScale * BuffSystem.getComboDamageMultiplier();
 
                 if (state.enemyManager) {
                     state.enemyManager.enemies.forEach(e => {
@@ -718,12 +1153,19 @@ class Gidora {
                         const along = toE.dot(forward);
                         if (along < 0 || along > beamLength + 1.2) return;
                         const perp = toE.clone().sub(forward.clone().multiplyScalar(along));
-                        if (perp.length() < 1.2 + hitRadius) e.takeDamage(damage, origin, 0);
+                        if (perp.length() < 1.2 + hitRadius) {
+                            e.takeDamage(damage, origin, 0);
+                            if (BuffSystem.isActive('beamSlow') && e.applySlow) {
+                                e.applySlow(CONFIG.buffs.beamSlowFactor, CONFIG.buffs.beamSlowDuration);
+                            }
+                            BuffSystem.onEffectiveDamage(damage);
+                        }
                     });
                 }
                 if (state.levelManager) {
                     state.levelManager.blocks.forEach(b => {
                         if (b.isDead) return;
+                        if (!b.solid) return;
                         const toB = b.mesh.position.clone().sub(origin);
                         const along = toB.dot(forward);
                         if (along < 0 || along > beamLength + 1.0) return;
@@ -731,14 +1173,7 @@ class Gidora {
                         const hw = (b.mesh.geometry.parameters.width || 2) / 2 + hitRadius;
                         const hd = (b.mesh.geometry.parameters.depth || 2) / 2 + hitRadius;
                         if (Math.abs(perp.x) < hw && Math.abs(perp.z) < hd) {
-                            b.hp -= damage;
-                            b.flashTimer = 0.1;
-                            if (b.hp <= 0) {
-                                b.isDead = true;
-                                scene.remove(b.mesh);
-                                b.mesh.geometry.dispose();
-                                b.mesh.material.dispose();
-                            }
+                            if (state.levelManager.damageBlock(b, damage)) BuffSystem.onEffectiveDamage(damage);
                         }
                     });
                 }
@@ -756,7 +1191,28 @@ class Gidora {
 
     update(dt) {
         this.updateDragon(dt);
-        if (this.hpBar) this.hpBar.update(this.mesh.position, this.hp, this.maxHP);
+        if (this.hpBar) this.hpBar.update(this.mesh.position, this.hp, this.maxHP, this.staggerValue, CONFIG.stagger.playerThreshold);
+
+        this.updateStagger(dt);
+        if (this.comboRampTimer > 0) {
+            this.comboRampTimer -= dt;
+            if (this.comboRampTimer <= 0) this.comboRampStacks = 0;
+        }
+        if (this.velocity.lengthSq() < 0.05 && this.knockbackVel.lengthSq() < 0.05) this.stationaryTimer += dt;
+        else this.stationaryTimer = 0;
+
+        if (this.fallTimer > 0) {
+            this.fallTimer -= dt;
+            this.mesh.rotation.x = THREE.MathUtils.lerp(this.mesh.rotation.x, -0.9, dt * 8);
+            this.velocity.multiplyScalar(Math.max(0, 1 - 12 * dt));
+            camera.position.x = this.mesh.position.x;
+            camera.position.z = this.mesh.position.z + 10;
+            camera.lookAt(this.mesh.position.x, 1.2, this.mesh.position.z);
+            if (this.fallTimer <= 0) this.mesh.rotation.x = 0;
+            return;
+        } else if (Math.abs(this.mesh.rotation.x) > 0.001) {
+            this.mesh.rotation.x = THREE.MathUtils.lerp(this.mesh.rotation.x, 0, dt * 8);
+        }
 
         if (this.damageFlashTimer > 0) {
             this.damageFlashTimer -= dt;
@@ -804,14 +1260,12 @@ class Gidora {
 
         // Attack input
         players.forEach(p => {
-            const isPress = state.input[p].attack && !this.lastAttackInput[p];
+            const isDown = state.input[p].attack;
+            const isPress = isDown && !this.lastAttackInput[p];
+            const isRelease = !isDown && this.lastAttackInput[p];
             this.lastAttackInput[p] = state.input[p].attack;
-            if (this.cooldowns[p] <= 0) {
-                if (isPress || state.input[p].attack) {
-                    this.attack(p);
-                    this.cooldowns[p] = 0.5;
-                }
-            }
+            if (isPress) this.startAttackPress(p);
+            if (isRelease) this.releaseAttackPress(p);
         });
 
         // Visual: head colors
@@ -833,21 +1287,26 @@ class Gidora {
         let totalInput = new THREE.Vector3();
         let totalRotationInput = new THREE.Vector3();
         const activeDirs = [];
-        const isAnyWindup = players.some(p => this.attackStates[p] === 'windup');
+        const blocksMovement = players.some(p =>
+            this.attackStates[p] === 'windup' ||
+            this.attackStates[p] === 'strike' ||
+            (this.attackStates[p] === 'recovery' && this.attackKinds[p] === 'heavy')
+        );
 
         players.forEach(p => {
             const moveInput = state.input[p].move;
             const hasInput = moveInput.lengthSq() > 0.01;
             const isCharging = state.input[p].charge;
+            const isMeleeAiming = this.attackStates[p] === 'charging';
 
             const arrowMap = { p1: this.p1Arrow, p2: this.p2Arrow, p3: this.p3Arrow, p4: this.p4Arrow };
             const arrow = arrowMap[p];
 
-            if (hasInput && !isAnyWindup) {
+            if (hasInput && !blocksMovement) {
                 const inputVec = new THREE.Vector3(moveInput.x, 0, moveInput.y);
                 const dir = inputVec.clone().normalize();
-                totalRotationInput.add(inputVec);
-                if (!isBeamActive && !isCharging) {
+                if (!isMeleeAiming) totalRotationInput.add(inputVec);
+                if (!isBeamActive && !isCharging && !isMeleeAiming) {
                     if (!this.isWindup[p] && (this.cooldowns[p] <= 0.05 || (this.lastShotType[p] === 'single' || this.lastShotType[p] === 'ultraSingle'))) {
                         totalInput.add(inputVec);
                         activeDirs.push(dir);
@@ -871,6 +1330,9 @@ class Gidora {
                 if (speedMult > 1.0) break;
             }
         }
+        if (BuffSystem.isActive('teamworkRegen') && speedMult > 1.0) {
+            this.heal(CONFIG.buffs.teamworkRegenPerSecond * dt);
+        }
 
         // Rotation
         let turnPenalty = 1.0;
@@ -882,7 +1344,7 @@ class Gidora {
             while (deltaAngle < -Math.PI) deltaAngle += Math.PI * 2;
 
             const rotSpeedMult = (state.beamPhase === 'firing') ? 0.35 : 1.0;
-            const rotStep = CONFIG.movement.rotationSpeed * rotSpeedMult * dt;
+            const rotStep = CONFIG.movement.rotationSpeed * BuffSystem.getTurnMultiplier() * rotSpeedMult * dt;
             if (Math.abs(deltaAngle) < rotStep) this.mesh.rotation.y = targetAngle;
             else this.mesh.rotation.y += Math.sign(deltaAngle) * rotStep;
 
@@ -900,9 +1362,10 @@ class Gidora {
         this.updateSpeedLines(dt);
 
         const currentSpeed = this.velocity.length();
-        const maxSpeed = CONFIG.movement.maxSpeed * speedMult * turnPenalty;
+        const terrainSpeedFactor = state.levelManager ? state.levelManager.getSpeedFactor(this.mesh.position) : 1.0;
+        const maxSpeed = CONFIG.movement.maxSpeed * BuffSystem.getSpeedMultiplier() * terrainSpeedFactor * speedMult * turnPenalty;
         const forward = this.getForwardVector();
-        const isInputting = totalInput.lengthSq() > 0.01;
+        const isInputting = totalInput.lengthSq() > 0.01 && !blocksMovement;
 
         if (isBeamActive) {
             this.velocity.multiplyScalar(Math.max(0, 1 - 20 * dt));
@@ -913,7 +1376,7 @@ class Gidora {
                 currentDir.lerp(forward, traction).normalize();
                 this.velocity.copy(currentDir.multiplyScalar(currentSpeed));
             }
-            const accel = CONFIG.movement.acceleration * dt;
+            const accel = CONFIG.movement.acceleration * BuffSystem.getSpeedMultiplier() * terrainSpeedFactor * dt;
             this.velocity.add(forward.multiplyScalar(accel));
             if (this.velocity.length() > maxSpeed) this.velocity.setLength(maxSpeed);
         } else {
@@ -938,6 +1401,7 @@ class Gidora {
             const pPos = this.mesh.position;
             state.levelManager.blocks.forEach(b => {
                 if (b.isDead) return;
+                if (!b.solid) return;
                 const width = b.mesh.geometry.parameters.width;
                 const depth = b.mesh.geometry.parameters.depth;
                 const minX = b.mesh.position.x - width / 2 - pRadius;
@@ -960,7 +1424,10 @@ class Gidora {
                     }
                 }
             });
+            state.levelManager.applyHazardsToPlayer(this, dt);
         }
+
+        this.updateRamStagger(dt);
 
         // Camera follow
         camera.position.x = this.mesh.position.x;

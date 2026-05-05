@@ -7,6 +7,7 @@ function setupInputs() {
     const keys = {};
     let mouseAttack = false;
     let mouseCharge = false;
+    let mousePos = new THREE.Vector2(window.innerWidth / 2, window.innerHeight / 2);
 
     window.addEventListener('keydown', (e) => {
         keys[e.code] = true;
@@ -22,8 +23,12 @@ function setupInputs() {
 
     window.addEventListener('mousedown', (e) => {
         SoundSystem.init();
+        mousePos.set(e.clientX, e.clientY);
         if (e.button === 0) mouseAttack = true;
         if (e.button === 2) mouseCharge = true;
+    });
+    window.addEventListener('mousemove', (e) => {
+        mousePos.set(e.clientX, e.clientY);
     });
     window.addEventListener('mouseup', (e) => {
         if (e.button === 0) mouseAttack = false;
@@ -41,6 +46,7 @@ function setupInputs() {
     ['p1', 'p2', 'p3', 'p4'].forEach(p => {
         if (!state.input[p].move) state.input[p].move = new THREE.Vector2();
     });
+    if (!state.input.p1.pointer) state.input.p1.pointer = new THREE.Vector2();
 
     state.pollInputs = () => {
         const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
@@ -53,6 +59,7 @@ function setupInputs() {
         if (keys['KeyA']) vx -= 1;
         if (keys['KeyD']) vx += 1;
         state.input.p1.move.set(vx, vy).normalize();
+        state.input.p1.pointer.copy(mousePos);
         state.input.p1.attack = mouseAttack || keys['Digit1'];
         state.input.p1.charge = canCharge && (mouseCharge || keys['ShiftLeft']);
 
@@ -87,6 +94,15 @@ function setupInputs() {
             state.input.p3.move.set(axisX, axisY);
             state.input.p3.attack = gp3.buttons[2].pressed;
             state.input.p3.charge = canCharge && gp3.buttons[7].pressed;
+        } else {
+            let vx3 = 0, vy3 = 0;
+            if (keys['KeyI']) vy3 -= 1;
+            if (keys['KeyK']) vy3 += 1;
+            if (keys['KeyJ']) vx3 -= 1;
+            if (keys['KeyL']) vx3 += 1;
+            state.input.p3.move.set(vx3, vy3).normalize();
+            state.input.p3.attack = keys['Space'];
+            state.input.p3.charge = false;
         }
         if (keys['Digit3']) state.input.p3.attack = true;
 
@@ -100,6 +116,15 @@ function setupInputs() {
             state.input.p4.move.set(axisX, axisY);
             state.input.p4.attack = gp4.buttons[2].pressed;
             state.input.p4.charge = canCharge && gp4.buttons[7].pressed;
+        } else {
+            let vx4 = 0, vy4 = 0;
+            if (keys['KeyT']) vy4 -= 1;
+            if (keys['KeyG']) vy4 += 1;
+            if (keys['KeyF']) vx4 -= 1;
+            if (keys['KeyH']) vx4 += 1;
+            state.input.p4.move.set(vx4, vy4).normalize();
+            state.input.p4.attack = keys['KeyV'];
+            state.input.p4.charge = false;
         }
         if (keys['Digit4']) state.input.p4.attack = true;
     };

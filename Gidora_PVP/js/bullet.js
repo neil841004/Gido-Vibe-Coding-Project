@@ -30,6 +30,9 @@ class Bullet {
         this.isHoming = stats.isHoming || false;
         this.homingTarget = stats.target || null;
         this.homingStrength = stats.homingStrength || 5.0;
+        this.targetPoint = stats.targetPoint || null;
+        this.explodeRadius = stats.explodeRadius || 0;
+        this.onImpact = stats.onImpact || null;
 
         let color;
         if (stats.color) color = stats.color;
@@ -92,6 +95,10 @@ class Bullet {
         this.lifeTimer += dt;
         if (this.lifeTimer >= this.maxLife) this.markedForDeletion = true;
         if (this.mesh.position.y < 0) this.markedForDeletion = true;
+        if (this.targetPoint && this.mesh.position.distanceTo(this.targetPoint) < Math.max(0.5, this.size + 0.3)) {
+            if (this.onImpact) this.onImpact(this);
+            this.markedForDeletion = true;
+        }
 
         if (this.isRotator) {
             this.mesh.rotation.x += this.rotationSpeed * dt;
