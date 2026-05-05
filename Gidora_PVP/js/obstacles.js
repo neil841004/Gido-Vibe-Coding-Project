@@ -169,7 +169,7 @@ class LevelManager {
 
                     b.markedForDeletion = true;
                     b.penetration = -1;
-                    if (didDamage) BuffSystem.onEffectiveDamage(b.damage);
+                    if (didDamage && !b.isEnemy) BuffSystem.onEffectiveDamage(b.damage);
                     break;
                 }
             }

@@ -8,6 +8,9 @@ class HealthBar {
         this.group = new THREE.Group();
         this.yOffset = yOffset;
         this.initialWidth = width;
+        this.height = height;
+        this.tickCount = -1;
+        this.buffIconKey = '';
 
         scene.add(this.group);
 
@@ -37,6 +40,15 @@ class HealthBar {
         this.staggerFg.position.set(0, -height * 0.9, 0.012);
         this.staggerFg.renderOrder = 1000;
         this.group.add(this.staggerFg);
+
+        this.tickGroup = new THREE.Group();
+        this.tickGroup.position.z = 0.02;
+        this.group.add(this.tickGroup);
+
+        this.buffIconGroup = new THREE.Group();
+        this.buffIconGroup.position.y = height * 2.2;
+        this.buffIconGroup.position.z = 0.04;
+        this.group.add(this.buffIconGroup);
     }
 
     update(position, current, max, staggerCurrent, staggerMax) {
@@ -45,6 +57,7 @@ class HealthBar {
         const pct = Math.max(0, current / max);
         this.fg.scale.x = pct;
         this.fg.position.x = (pct - 1) * this.initialWidth / 2;
+        this.syncTicks(max);
 
         const showStagger = staggerMax !== undefined && staggerMax > 0;
         this.staggerBg.visible = showStagger;
@@ -59,8 +72,77 @@ class HealthBar {
         if (window.camera) this.group.quaternion.copy(window.camera.quaternion);
     }
 
+    syncTicks(maxHP) {
+        const tickHP = CONFIG.ui.healthBarTickHP;
+        const ticks = Math.max(0, Math.floor((maxHP - 0.001) / tickHP));
+        if (ticks === this.tickCount) return;
+
+        while (this.tickGroup.children.length > 0) {
+            const child = this.tickGroup.children[0];
+            this.tickGroup.remove(child);
+            child.geometry.dispose();
+            child.material.dispose();
+        }
+        this.tickCount = ticks;
+
+        for (let i = 1; i <= ticks; i++) {
+            const hpAtTick = i * tickHP;
+            if (hpAtTick >= maxHP) continue;
+            const x = (hpAtTick / maxHP - 0.5) * this.initialWidth;
+            const geo = new THREE.PlaneGeometry(0.018, this.height);
+            const mat = new THREE.MeshBasicMaterial({
+                color: 0x000000,
+                depthTest: false,
+                transparent: true,
+                opacity: 0.9
+            });
+            const tick = new THREE.Mesh(geo, mat);
+            tick.position.x = x;
+            tick.renderOrder = 1001;
+            this.tickGroup.add(tick);
+        }
+    }
+
+    setBuffIcons(entries) {
+        entries = entries || [];
+        const key = entries.map(entry => `${entry.id}:${entry.stack}`).join('|');
+        if (key === this.buffIconKey) return;
+        this.buffIconKey = key;
+
+        while (this.buffIconGroup.children.length > 0) {
+            const child = this.buffIconGroup.children[0];
+            this.buffIconGroup.remove(child);
+            if (child.material && child.material.map) child.material.map.dispose();
+            if (child.material) child.material.dispose();
+        }
+
+        if (entries.length === 0 || typeof createBuffIconSprite !== 'function') return;
+
+        const iconSize = 0.28;
+        const gap = 0.05;
+        const maxPerRow = Math.max(1, Math.floor(this.initialWidth / (iconSize + gap)));
+        entries.forEach((entry, index) => {
+            const sprite = createBuffIconSprite(entry.id, entry.stack);
+            const row = Math.floor(index / maxPerRow);
+            const col = index % maxPerRow;
+            const countInRow = Math.min(maxPerRow, entries.length - row * maxPerRow);
+            const rowWidth = countInRow * iconSize + (countInRow - 1) * gap;
+            sprite.scale.set(iconSize, iconSize, 1);
+            sprite.position.set(
+                -rowWidth / 2 + iconSize / 2 + col * (iconSize + gap),
+                row * (iconSize + gap),
+                0
+            );
+            this.buffIconGroup.add(sprite);
+        });
+    }
+
     destroy() {
         if (this.group.parent) this.group.parent.remove(this.group);
+        this.group.traverse(obj => {
+            if (obj.geometry) obj.geometry.dispose();
+            if (obj.material) obj.material.dispose();
+        });
     }
 }
 
@@ -218,7 +300,7 @@ class MeleeEnemy extends Enemy {
         }, 100);
 
         if (this.mesh.position.distanceTo(targetPos) < this.attackRange * 1.5) {
-            window.gidoraInstance.takeDamage(this.damage);
+            window.gidoraInstance.takeDamage(this.damage, this.mesh.position, this.damage * 0.6);
         }
     }
 }
@@ -372,7 +454,7 @@ class NinjaEnemy extends Enemy {
 
         const slashRange = 4.0;
         if (this.mesh.position.distanceTo(playerPos) < slashRange) {
-            window.gidoraInstance.takeDamage(this.damage);
+            window.gidoraInstance.takeDamage(this.damage, this.mesh.position, this.damage);
         }
 
         this.recoveryTimer = 0.5;
@@ -725,6 +807,7 @@ class EnemyManager {
 
                     e.takeDamage(b.damage, b.mesh.position, b.knockback);
                     if (b.onImpact) b.onImpact(b);
+                    BuffSystem.onEffectiveDamage(b.damage);
 
                     b.penetration--;
                     if (b.penetration < 0) b.markedForDeletion = true;

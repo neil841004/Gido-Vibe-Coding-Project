@@ -166,9 +166,8 @@ class Gidora {
         }
 
         finalAmount = Math.max(0, finalAmount);
-        this.hp -= amount;
         this.damageFlashTimer = 0.2;
-        this.hp = Math.max(0, this.hp + amount - finalAmount);
+        this.hp = Math.max(0, this.hp - finalAmount);
 
         this.addStagger(finalAmount, sourcePos);
 
@@ -457,7 +456,9 @@ class Gidora {
                     }
                 } else if (currentState === 'flamethrower') {
                     this.attackHoldTimers[p] += dt;
+                    this.updateChargeTarget(p);
                     n.pivot.rotation.x = n.baseLean + 0.2 + Math.sin(t * 30) * 0.06;
+                    n.group.rotation.y = THREE.MathUtils.lerp(n.group.rotation.y, this.headAimYaw[p], dt * 18);
                     this.updateFlamethrower(p, dt);
                 } else if (currentState === 'strike') {
                     this.attackTimers[p] -= dt;
@@ -635,8 +636,10 @@ class Gidora {
         }
         if (this.cooldowns[playerIndex] > 0) return;
         if (BuffSystem.getMeleeForm() === 'flame' && this.canChargeAttack(playerIndex)) {
+            this.resetChargeAim(playerIndex);
             this.attackStates[playerIndex] = 'flamethrower';
             this.attackHoldTimers[playerIndex] = 0;
+            this.updateChargeTarget(playerIndex);
             return;
         }
         if (this.canChargeAttack(playerIndex)) {
@@ -743,9 +746,9 @@ class Gidora {
         this.chargeAim[playerIndex].set(Math.sin(clampedYaw), Math.cos(clampedYaw));
 
         let local = new THREE.Vector3(
-            this.chargeAim[playerIndex].x * CONFIG.combat.chargeDefaultDistance,
+            this.chargeAim[playerIndex].x * this.getChargeAimDistance(),
             0,
-            this.chargeAim[playerIndex].y * CONFIG.combat.chargeDefaultDistance
+            this.chargeAim[playerIndex].y * this.getChargeAimDistance()
         );
         local.applyQuaternion(this.mesh.quaternion);
 
@@ -768,6 +771,21 @@ class Gidora {
             ring.scale.setScalar(scale);
         }
         return target;
+    }
+
+    getChargeAimDistance() {
+        return BuffSystem.getMeleeForm() === 'fireball'
+            ? CONFIG.combat.fireballAimDistance
+            : CONFIG.combat.chargeDefaultDistance;
+    }
+
+    getAttackAimWorldVector(playerIndex) {
+        const yaw = this.headAimYaw[playerIndex] !== undefined
+            ? this.headAimYaw[playerIndex]
+            : this.getBaseAimYaw(playerIndex);
+        const local = new THREE.Vector3(Math.sin(yaw), 0, Math.cos(yaw));
+        local.applyQuaternion(this.mesh.quaternion);
+        return local.normalize();
     }
 
     getRawAimVector(playerIndex) {
@@ -832,9 +850,9 @@ class Gidora {
         }
 
         if (!isTail && form === 'fireball') {
-            const impactPos = (kind === 'heavy' && this.chargeTargets[playerIndex])
-                ? this.chargeTargets[playerIndex].clone()
-                : spawnPos.clone();
+            const impactPos = this.mesh.position.clone()
+                .add(this.getAttackAimWorldVector(playerIndex).multiplyScalar(CONFIG.combat.fireballAimDistance));
+            impactPos.y = 0.5;
             this.fireHeadFireball(playerIndex, impactPos, damage * CONFIG.combat.fireballDamageScale);
             return;
         }
@@ -842,7 +860,7 @@ class Gidora {
         if (kind === 'heavy') radius *= CONFIG.combat.heavyRadiusScale;
         this.createHitbox(spawnPos, radius, damage, 0.2, isTail, color, { heavy: kind === 'heavy', form });
         if (!isTail && kind === 'heavy' && form === 'shockwave') {
-            this.createShockwave(spawnPos, color);
+            this.createShockwave(spawnPos);
         }
     }
 
@@ -935,11 +953,20 @@ class Gidora {
         this.createHitbox(pos, radius, damage, 0.35, false, color, options);
     }
 
-    createShockwave(pos, color) {
-        this.createAreaDamage(pos, 5.5, CONFIG.combat.meleeDamage * 0.8, color, { heavy: true, stagger: 80 });
+    createShockwaveBlast(pos, radius, damage, stagger = 80) {
+        this.createAreaDamage(pos, radius, damage, 0xffffff, { heavy: true, stagger });
+    }
+
+    createShockwave(pos) {
+        this.createShockwaveBlast(
+            pos,
+            CONFIG.combat.shockwaveRadius,
+            CONFIG.combat.meleeDamage * CONFIG.combat.shockwaveDamageScale,
+            80
+        );
         if (state.enemyManager) {
             state.enemyManager.enemies.forEach(e => {
-                if (!e.isDead && e.mesh.position.distanceTo(pos) < 6.0 && e.addStagger) {
+                if (!e.isDead && e.mesh.position.distanceTo(pos) < CONFIG.combat.shockwaveRadius + 0.5 && e.addStagger) {
                     e.addStagger(CONFIG.stagger.enemyThreshold, pos);
                 }
             });
@@ -950,7 +977,7 @@ class Gidora {
         const startPos = this.mesh.position.clone();
         startPos.y = 2.2;
         const dir = targetPos.clone().sub(startPos).normalize();
-        const bullet = new Bullet(playerIndex, startPos, dir, 18, 1.4, 0, 0.45, {
+        const bullet = new Bullet(playerIndex, startPos, dir, CONFIG.combat.fireballSpeed, 1.4, 0, 0.45, {
             damage,
             color: CONFIG.visuals.colors[playerIndex],
             knockback: 16,
@@ -971,7 +998,8 @@ class Gidora {
     }
 
     updateFlamethrower(playerIndex, dt) {
-        const forward = this.getForwardVector().normalize();
+        this.updateChargeTarget(playerIndex);
+        const forward = this.getAttackAimWorldVector(playerIndex);
         const origin = this.mesh.position.clone();
         origin.y = 1.3;
         const range = CONFIG.combat.flamethrowerRange;
@@ -979,31 +1007,50 @@ class Gidora {
         const damage = CONFIG.combat.flamethrowerDamagePerSecond * dt * BuffSystem.getMeleeMultiplier();
 
         this.flamethrowerTimers[playerIndex] = (this.flamethrowerTimers[playerIndex] || 0) + dt;
-        if (this.flamethrowerTimers[playerIndex] >= 0.06) {
+        if (this.flamethrowerTimers[playerIndex] >= 0.035) {
             this.flamethrowerTimers[playerIndex] = 0;
-            const pPos = origin.clone().add(forward.clone().multiplyScalar(2 + Math.random() * range));
-            const side = new THREE.Vector3(forward.z, 0, -forward.x).multiplyScalar((Math.random() - 0.5) * 2.6);
-            pPos.add(side);
-            pPos.y = 0.4 + Math.random() * 0.8;
-            const spark = new Particle(pPos, Math.random() > 0.5 ? 0xff3300 : 0xffaa00);
-            spark.velocity.multiplyScalar(0.15);
-            spark.life = 0.25;
-            spark.maxLife = 0.25;
-            spark.mesh.scale.setScalar(2.0);
-            state.particles.push(spark);
+            for (let i = 0; i < 3; i++) {
+                const dist = 1.4 + Math.random() * range;
+                const lateralWidth = Math.tan(halfAngle) * dist * 0.85;
+                const pPos = origin.clone().add(forward.clone().multiplyScalar(dist));
+                const side = new THREE.Vector3(forward.z, 0, -forward.x).multiplyScalar((Math.random() - 0.5) * 2 * lateralWidth);
+                pPos.add(side);
+                pPos.y = 0.65 + Math.random() * 1.2;
+                const spark = new Particle(pPos, Math.random() > 0.45 ? 0xff3300 : 0xffaa00);
+                spark.velocity.multiplyScalar(0.08);
+                spark.life = 0.34 + Math.random() * 0.18;
+                spark.maxLife = spark.life;
+                spark.mesh.scale.setScalar(5.0 + Math.random() * 2.4);
+                state.particles.push(spark);
+            }
         }
 
-        if (!state.enemyManager) return;
-        state.enemyManager.enemies.forEach(e => {
-            if (e.isDead) return;
-            const toE = e.mesh.position.clone().sub(origin);
-            const dist = toE.length();
-            if (dist > range || dist < 0.1) return;
-            const dir = toE.normalize();
-            if (forward.angleTo(dir) > halfAngle) return;
-            e.takeDamage(damage, origin, 2);
-            BuffSystem.onEffectiveDamage(damage);
-        });
+        const isInCone = (pos) => {
+            const flatPos = pos.clone();
+            flatPos.y = origin.y;
+            const toTarget = flatPos.sub(origin);
+            const dist = toTarget.length();
+            if (dist > range || dist < 0.1) return false;
+            const dir = toTarget.normalize();
+            return forward.angleTo(dir) <= halfAngle;
+        };
+
+        if (state.enemyManager) {
+            state.enemyManager.enemies.forEach(e => {
+                if (e.isDead || !isInCone(e.mesh.position)) return;
+                e.takeDamage(damage, origin, CONFIG.combat.flamethrowerKnockback);
+                BuffSystem.onEffectiveDamage(damage);
+            });
+        }
+
+        if (state.levelManager && state.levelManager.blocks) {
+            state.levelManager.blocks.forEach(block => {
+                if (block.isDead || !block.solid || !block.destructible) return;
+                if (!isInCone(block.mesh.position)) return;
+                const didDamage = state.levelManager.damageBlock(block, damage * CONFIG.combat.flamethrowerBlockDamageScale);
+                if (didDamage) BuffSystem.onEffectiveDamage(damage * CONFIG.combat.flamethrowerBlockDamageScale);
+            });
+        }
     }
 
     updateRamStagger(dt) {
@@ -1017,8 +1064,9 @@ class Gidora {
                 return;
             }
             if (e.mesh.position.distanceTo(this.mesh.position) > 2.0) return;
-            e.takeDamage(CONFIG.buffs.ramDamage, this.mesh.position, 20);
+            e.takeDamage(CONFIG.buffs.ramDamage, this.mesh.position, CONFIG.buffs.ramKnockback);
             if (e.addStagger) e.addStagger(CONFIG.buffs.ramStagger, this.mesh.position);
+            BuffSystem.onEffectiveDamage(CONFIG.buffs.ramDamage);
             this.lastRamHit.set(e, 0.8);
         });
     }
@@ -1036,18 +1084,9 @@ class Gidora {
         const maxCharge = beamCfg.maxCharge;
         const beamWidth = beamCfg.width;
         const now = Date.now();
-        const players = ['p1', 'p2', 'p3', 'p4'];
-        const chargeCount = players.filter(p => state.input[p].charge).length;
 
         if (state.beamPhase === 'prefire') {
-            if (chargeCount === 0) {
-                state.beamPhase = 'postfire';
-                state.beamPostFireTimer = beamCfg.postFireDelay;
-                this.beamChargeRing.material.opacity = 0;
-                this._hideBeamFX();
-                return;
-            }
-
+            state.beamCharge = maxCharge;
             state.beamPreFireTimer -= dt;
             const progress = 1.0 - (state.beamPreFireTimer / beamCfg.preFireDelay);
             this.beamChargeRing.position.copy(this.mesh.position);
@@ -1191,7 +1230,10 @@ class Gidora {
 
     update(dt) {
         this.updateDragon(dt);
-        if (this.hpBar) this.hpBar.update(this.mesh.position, this.hp, this.maxHP, this.staggerValue, CONFIG.stagger.playerThreshold);
+        if (this.hpBar) {
+            this.hpBar.update(this.mesh.position, this.hp, this.maxHP, this.staggerValue, CONFIG.stagger.playerThreshold);
+            this.hpBar.setBuffIcons(BuffSystem.getActiveIconEntries());
+        }
 
         this.updateStagger(dt);
         if (this.comboRampTimer > 0) {
@@ -1249,6 +1291,7 @@ class Gidora {
         }
 
         if (state.beamPhase === 'idle' && state.beamCharge >= maxCharge && state.comboCooldown <= 0) {
+            state.beamCharge = maxCharge;
             state.beamPhase = 'prefire';
             state.beamPreFireTimer = beamCfg.preFireDelay;
             this.beamChargeRing.position.copy(this.mesh.position);
@@ -1439,6 +1482,8 @@ class Gidora {
             this.pulseScale -= (this.pulseScale - 1.0) * 10.0 * dt;
             if (this.pulseScale < 1.0) this.pulseScale = 1.0;
         }
-        this.mesh.scale.set(this.pulseScale, this.pulseScale, this.pulseScale);
+        const buffScale = BuffSystem.getBodyVisualScale ? BuffSystem.getBodyVisualScale() : 1.0;
+        const finalScale = this.pulseScale * buffScale;
+        this.mesh.scale.set(finalScale, finalScale, finalScale);
     }
 }

@@ -103,10 +103,16 @@ const CONFIG = {
         chargeAimHalfAngle: Math.PI / 4,    // 每顆頭可瞄準扇形半角，Math.PI / 4 = 45 度
         strikeTime: 0.16,                   // 頭部從後方向前攻擊的動畫秒數
         fireballDamageScale: 1.2,           // 火球型態傷害倍率
+        fireballAimDistance: 13.0,          // 火球型態固定落點距離，比一般頭槌落點更遠
+        fireballSpeed: 24,                  // 火球型態投射物飛行速度
         fireballRadius: 2.4,                // 火球爆炸半徑
         flamethrowerDamagePerSecond: 36,    // 噴火型態每秒傷害
-        flamethrowerRange: 7.0,             // 噴火型態射程
-        flamethrowerAngle: 0.75             // 噴火型態半角，單位為弧度
+        flamethrowerRange: 4.2,             // 噴火型態射程
+        flamethrowerAngle: 0.45,            // 噴火型態半角，單位為弧度
+        flamethrowerKnockback: 0.15,        // 噴火型態每次傷害 tick 的擊退力
+        flamethrowerBlockDamageScale: 0.7,  // 噴火型態對可破壞關卡物件的傷害倍率
+        shockwaveRadius: 3.3,               // 蓄力震波 Buff 的震波半徑
+        shockwaveDamageScale: 0.8           // 蓄力震波 Buff 的震波傷害倍率
     },
 
     // -----------------------------------------------------------------
@@ -215,17 +221,17 @@ const CONFIG = {
     // -----------------------------------------------------------------
     buffs: {
         hpBoostPct: 0.3,                  // 可疊加血量 Buff：每層最大血量增加比例
-        speedBoostPct: 0.2,               // 可疊加速度 Buff：每層速度與轉向增加比例
+        speedBoostPct: 0.3,               // 可疊加速度 Buff：每層速度與轉向增加比例
         meleeBoostPct: 0.3,               // 可疊加近戰 Buff：每層近戰傷害增加比例
         comboCooldownMultiplier: 0.4,     // 組合技 CD 縮短 Buff：冷卻倍率
         comboDamageMultiplier: 2.0,       // 組合技傷害 Buff：傷害倍率
         lifeStealPct: 0.12,               // 有效傷害回血 Buff：造成傷害轉換回血比例
         tailDamageMultiplier: 4.0,        // 尾巴攻擊力 Buff：尾巴傷害倍率
         leafShieldCount: 4,               // 葉子護盾 Buff：護盾葉片數量
-        missileInterval: 2.5,             // 飛彈巢 Buff：發射間隔秒數
+        missileInterval: 2,             // 飛彈巢 Buff：發射間隔秒數
         missileDamage: 18,                // 飛彈巢 Buff：單發飛彈傷害
         missileSpeed: 18,                 // 飛彈巢 Buff：飛彈速度
-        stepShockwaveDistance: 10,        // 落腳震波 Buff：每移動多少距離觸發
+        stepShockwaveDistance: 7,        // 落腳震波 Buff：每移動多少距離觸發
         stepShockwaveDamage: 18,          // 落腳震波 Buff：震波傷害
         comboDamageWindow: 2.0,           // 連擊 Buff：有效攻擊後維持連擊的秒數
         comboDamageStepPct: 0.18,         // 連擊 Buff：每層傷害增加比例
@@ -240,13 +246,24 @@ const CONFIG = {
         poisonCloudRadius: 9.0,           // 毒霧 Buff：毒霧半徑
         meleeExplosionChance: 0.25,       // Melee 爆炸 Buff：觸發機率
         ramSpeedThreshold: 8.5,           // 高速衝撞 Buff：觸發所需速度
-        ramDamage: 16,                    // 高速衝撞 Buff：撞擊傷害
+        ramDamage: 32,                    // 高速衝撞 Buff：撞擊傷害
+        ramKnockback: 55,                 // 高速衝撞 Buff：撞擊擊退力
         ramStagger: 80,                   // 高速衝撞 Buff：額外失衡值
         stationaryShieldDelay: 1.0,       // 靜止護盾 Buff：站定多久後啟用
         stationaryShieldMultiplier: 0.7,  // 靜止護盾 Buff：受傷倍率
         teamworkRegenPerSecond: 4,        // 同心協力回血 Buff：每秒回血量
         lowHpExplosionDamage: 120,        // 半血爆炸 Buff：爆炸傷害
-        lowHpExplosionRadius: 12          // 半血爆炸 Buff：爆炸半徑
+        lowHpExplosionRadius: 12,         // 半血爆炸 Buff：爆炸半徑
+        visualOrbitRadius: 2.8,           // Buff 視覺標記繞角色旋轉半徑
+        visualPulseInterval: 0.35,        // Buff 持續粒子特效生成間隔秒數
+        hpVisualScalePerStack: 0.1        // 血量 Buff 每層角色視覺放大比例
+    },
+
+    // -----------------------------------------------------------------
+    // UI 顯示設定
+    // -----------------------------------------------------------------
+    ui: {
+        healthBarTickHP: 50               // 血條每多少 HP 顯示一個刻度
     },
 
     // -----------------------------------------------------------------

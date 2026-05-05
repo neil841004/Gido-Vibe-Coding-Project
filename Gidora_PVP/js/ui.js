@@ -82,7 +82,7 @@ function setupBuffUI() {
 
     Object.keys(BUFFS).forEach(id => {
         const cfg = BUFFS[id];
-        const row = document.createElement('label');
+        const row = document.createElement('div');
         row.className = 'buff-row';
         row.dataset.buffId = id;
         row.style.display = 'flex';
@@ -93,25 +93,40 @@ function setupBuffUI() {
         row.style.borderRadius = '7px';
         row.style.background = 'rgba(255,255,255,0.05)';
         row.style.cursor = 'pointer';
+        row.classList.toggle('buff-incomplete', !isBuffImplemented(id));
 
         const input = document.createElement('input');
         input.type = 'checkbox';
         input.dataset.buffId = id;
         input.style.marginTop = '3px';
         input.addEventListener('change', () => {
-            BuffSystem.toggle(id);
+            if (cfg.stackable) {
+                if (input.checked && BuffSystem.getStack(id) === 0) BuffSystem.setStack(id, 1);
+                if (!input.checked) BuffSystem.clear(id);
+            } else {
+                BuffSystem.toggle(id);
+            }
             refreshBuffUI();
         });
         row.appendChild(input);
 
         const text = document.createElement('div');
         text.style.flex = '1';
+
+        const titleLine = document.createElement('div');
+        titleLine.style.display = 'flex';
+        titleLine.style.alignItems = 'center';
+        titleLine.style.gap = '6px';
+        titleLine.appendChild(createBuffIconElement(id));
+
         const title = document.createElement('div');
         title.className = 'buff-title';
         title.style.fontSize = '13px';
         title.style.fontWeight = 'bold';
+        title.style.color = isBuffImplemented(id) ? '#ffffff' : '#ff5a5a';
         title.textContent = cfg.name;
-        text.appendChild(title);
+        titleLine.appendChild(title);
+        text.appendChild(titleLine);
 
         const desc = document.createElement('div');
         desc.style.fontSize = '11px';
@@ -127,10 +142,59 @@ function setupBuffUI() {
         text.appendChild(meta);
 
         row.appendChild(text);
+
+        if (cfg.stackable) {
+            const controls = document.createElement('div');
+            controls.style.display = 'flex';
+            controls.style.flexDirection = 'column';
+            controls.style.gap = '4px';
+
+            const plus = document.createElement('button');
+            plus.type = 'button';
+            plus.textContent = '+';
+            plus.title = '增加一層';
+            plus.style.pointerEvents = 'auto';
+            plus.style.width = '24px';
+            plus.style.height = '22px';
+            plus.style.border = '1px solid rgba(255,255,255,0.25)';
+            plus.style.background = 'rgba(80,255,170,0.22)';
+            plus.style.color = 'white';
+            plus.style.cursor = 'pointer';
+            plus.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                BuffSystem.addStack(id);
+                refreshBuffUI();
+            });
+            controls.appendChild(plus);
+
+            const minus = document.createElement('button');
+            minus.type = 'button';
+            minus.textContent = '-';
+            minus.title = '減少一層';
+            minus.style.pointerEvents = 'auto';
+            minus.style.width = '24px';
+            minus.style.height = '22px';
+            minus.style.border = '1px solid rgba(255,255,255,0.25)';
+            minus.style.background = 'rgba(255,255,255,0.08)';
+            minus.style.color = 'white';
+            minus.style.cursor = 'pointer';
+            minus.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                BuffSystem.removeStack(id);
+                refreshBuffUI();
+            });
+            controls.appendChild(minus);
+
+            row.appendChild(controls);
+        }
         list.appendChild(row);
     });
 
-    let collapsed = false;
+    let collapsed = true;
+    list.style.display = 'none';
+    header.textContent = 'Buff 系統 ◂';
     header.addEventListener('click', () => {
         collapsed = !collapsed;
         list.style.display = collapsed ? 'none' : 'block';
@@ -150,6 +214,7 @@ function refreshBuffUI() {
         input.checked = stack > 0;
         row.style.background = stack > 0 ? 'rgba(84, 255, 175, 0.16)' : 'rgba(255,255,255,0.05)';
         title.textContent = BUFFS[id].name + (BUFFS[id].stackable && stack > 0 ? ` x${stack}` : '');
+        title.style.color = isBuffImplemented(id) ? '#ffffff' : '#ff5a5a';
     });
 }
 
@@ -169,7 +234,13 @@ function updateUI() {
 
     // Charge bar (Phase 1: 直接以 state.beamCharge 為準，CSS transition 已移除以避免顯示落差)
     const beamMaxUI = CONFIG.beam.maxCharge;
-    const pct = Math.min(100, Math.max(0, (state.beamCharge / beamMaxUI) * 100));
+    const cooldownPct = state.comboCooldownMax > 0
+        ? Math.min(100, Math.max(0, (state.comboCooldown / state.comboCooldownMax) * 100))
+        : 0;
+    const isCooldownLocked = state.comboCooldown > 0 && state.beamPhase === 'idle';
+    const pct = isCooldownLocked
+        ? cooldownPct
+        : Math.min(100, Math.max(0, (state.beamCharge / beamMaxUI) * 100));
     const barFill = document.getElementById('charge-bar-fill');
     const barWrap = document.getElementById('charge-bar-wrap');
     const chargeLabel = document.getElementById('charge-label');
@@ -182,7 +253,11 @@ function updateUI() {
         barFill.style.background = 'linear-gradient(90deg,#cc00cc,#ff00ff,#ffffff)';
         chargeLabel.style.color = '#ffffff';
         chargeLabel.style.textShadow = '0 0 12px #ffffff, 0 0 24px #ff00ff';
-    } else if (state.beamPhase === 'postfire' || state.comboCooldown > 0) {
+    } else if (isCooldownLocked) {
+        barFill.style.background = 'linear-gradient(90deg,#5f6268,#8b8f96,#c8ccd2)';
+        chargeLabel.style.color = '#d9dde3';
+        chargeLabel.style.textShadow = '0 0 6px #111';
+    } else if (state.beamPhase === 'postfire') {
         barFill.style.background = 'linear-gradient(90deg,#440044,#880088,#cc00cc88)';
         chargeLabel.style.color = '#cc88cc';
         chargeLabel.style.textShadow = '0 0 6px #cc00cc';
@@ -197,8 +272,8 @@ function updateUI() {
         labelText = `★ 光束炮發射中！ ${Math.ceil(state.beamFiringTimer)}s`;
     } else if (state.beamPhase === 'prefire') {
         labelText = '▶▶ 即將發射！';
-    } else if (state.comboCooldown > 0) {
-        labelText = `◀◀ 合體技冷卻 ${state.comboCooldown.toFixed(1)}s`;
+    } else if (isCooldownLocked) {
+        labelText = `合體技封鎖 ${state.comboCooldown.toFixed(1)}s`;
     } else if (state.beamPhase === 'postfire') {
         labelText = '◀◀ 後搖中';
     } else {
