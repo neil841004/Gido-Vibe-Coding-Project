@@ -1,7 +1,25 @@
 // =====================================================================
 // enemies.js — Enemy 基底、四種子類、Boss、Dummy、EnemyManager
 // 依賴: scene, state, CONFIG, Bullet, FlyingCorpse
+// PVP 版本：原本 window.gidoraInstance 直接引用，改為「最近的活龍」。
 // =====================================================================
+
+// 取得距離 pos 最近、且仍存活的三頭龍；找不到回傳 null。
+function getClosestAliveDragon(pos) {
+    let best = null;
+    let bestDistSq = Infinity;
+    (state.dragons || []).forEach(d => {
+        if (!d || d.isDead) return;
+        const dx = d.mesh.position.x - pos.x;
+        const dz = d.mesh.position.z - pos.z;
+        const distSq = dx * dx + dz * dz;
+        if (distSq < bestDistSq) {
+            best = d;
+            bestDistSq = distSq;
+        }
+    });
+    return best;
+}
 
 class HealthBar {
     constructor(scene, yOffset, width = 1.5, height = 0.15) {
@@ -235,7 +253,7 @@ class Enemy {
         state.flyingCorpses.push(new FlyingCorpse(this.mesh, this.color));
     }
 
-    update(dt, playerPos) {
+    update(dt, _ignoredPos) {
         if (this.isDead) return;
         if (this.hpBar) this.hpBar.update(this.mesh.position, this.hp, this.maxHP, this.staggerValue, CONFIG.stagger.enemyThreshold);
 
@@ -251,6 +269,10 @@ class Enemy {
             this.mesh.material.emissive.setHex(this.flashTimer > 0 ? 0xffffff : 0x000000);
         }
 
+        // PVP：每幀重新鎖定最近的活龍
+        const target = getClosestAliveDragon(this.mesh.position);
+        if (!target) return; // 場上沒有活龍，待機
+        const playerPos = target.mesh.position;
         const dist = this.mesh.position.distanceTo(playerPos);
 
         if (this.knockbackVel.lengthSq() > 0.001) {
@@ -274,19 +296,19 @@ class Enemy {
             this.mesh.lookAt(playerPos);
         } else {
             if (this.attackTimer <= 0) {
-                this.performAttack(playerPos);
+                this.performAttack(playerPos, target);
                 this.attackTimer = this.attackRate;
             }
         }
         if (this.attackTimer > 0) this.attackTimer -= dt;
     }
 
-    performAttack(targetPos) {}
+    performAttack(targetPos, targetDragon) {}
 }
 
 class MeleeEnemy extends Enemy {
     constructor(manager, pos) { super(manager, pos, CONFIG.enemy.melee); }
-    performAttack(targetPos) {
+    performAttack(targetPos, targetDragon) {
         const flash = new THREE.Mesh(
             new THREE.SphereGeometry(1.2, 8, 8),
             new THREE.MeshBasicMaterial({ color: 0xff0000, transparent: true, opacity: 0.5 })
@@ -299,15 +321,15 @@ class MeleeEnemy extends Enemy {
             flash.material.dispose();
         }, 100);
 
-        if (this.mesh.position.distanceTo(targetPos) < this.attackRange * 1.5) {
-            window.gidoraInstance.takeDamage(this.damage, this.mesh.position, this.damage * 0.6);
+        if (targetDragon && this.mesh.position.distanceTo(targetPos) < this.attackRange * 1.5) {
+            targetDragon.takeDamage(this.damage, this.mesh.position, this.damage * 0.6);
         }
     }
 }
 
 class RangedEnemy extends Enemy {
     constructor(manager, pos) { super(manager, pos, CONFIG.enemy.ranged); }
-    performAttack(targetPos) {
+    performAttack(targetPos, targetDragon) {
         const dir = targetPos.clone().sub(this.mesh.position).normalize();
         const stats = { damage: this.damage, penetration: 0 };
         const bullet = new Bullet(
@@ -331,7 +353,7 @@ class NinjaEnemy extends Enemy {
         this.recoveryTimer = 0;
     }
 
-    update(dt, playerPos) {
+    update(dt, _ignoredPos) {
         if (this.isDead) return;
 
         if (this.hpBar) this.hpBar.update(this.mesh.position, this.hp, this.maxHP, this.staggerValue, CONFIG.stagger.enemyThreshold);
@@ -361,13 +383,18 @@ class NinjaEnemy extends Enemy {
             this.mesh.rotation.x = THREE.MathUtils.lerp(this.mesh.rotation.x, 0, dt * 8);
         }
 
+        // PVP：每幀重新鎖定最近的活龍
+        const target = getClosestAliveDragon(this.mesh.position);
+        if (!target) return;
+        const playerPos = target.mesh.position;
+
         if (this.recoveryTimer > 0) { this.recoveryTimer -= dt; return; }
 
         if (this.isWarning) {
             this.warningTimer -= dt;
             this.mesh.rotation.y += 10 * dt;
             if (this.warningTimer <= 0) {
-                this.performAttack(playerPos);
+                this.performAttack(playerPos, target);
                 this.isWarning = false;
                 this.teleportCooldown = 5.0;
             }
@@ -379,13 +406,8 @@ class NinjaEnemy extends Enemy {
         const dist = this.mesh.position.distanceTo(playerPos);
 
         if (dist < CONFIG.enemy.ninja.teleportDist && this.teleportCooldown <= 0) {
-            let backPos;
-            if (window.gidoraInstance) {
-                const fwd = window.gidoraInstance.getForwardVector().normalize();
-                backPos = playerPos.clone().sub(fwd.multiplyScalar(3.0));
-            } else {
-                backPos = playerPos.clone().add(new THREE.Vector3(3, 0, 0));
-            }
+            const fwd = target.getForwardVector().normalize();
+            let backPos = playerPos.clone().sub(fwd.multiplyScalar(3.0));
             backPos.y = 1.0;
 
             const smokeGeo = new THREE.SphereGeometry(1, 8, 8);
@@ -422,7 +444,7 @@ class NinjaEnemy extends Enemy {
         }
     }
 
-    performAttack(playerPos) {
+    performAttack(playerPos, targetDragon) {
         this.mesh.material.color.setHex(this.color);
 
         const slashGeo = new THREE.RingGeometry(1.0, 2.5, 32, 1, 0, Math.PI);
@@ -453,8 +475,8 @@ class NinjaEnemy extends Enemy {
         animateSlash();
 
         const slashRange = 4.0;
-        if (this.mesh.position.distanceTo(playerPos) < slashRange) {
-            window.gidoraInstance.takeDamage(this.damage, this.mesh.position, this.damage);
+        if (targetDragon && this.mesh.position.distanceTo(playerPos) < slashRange) {
+            targetDragon.takeDamage(this.damage, this.mesh.position, this.damage);
         }
 
         this.recoveryTimer = 0.5;
@@ -497,8 +519,9 @@ class DummyEnemy extends Enemy {
         state.flyingCorpses.push(new FlyingCorpse(this.mesh, this.color, () => {
             // Phase 1: 只在 dummyEnabled 為 true 時自動重生
             if (manager && state.dummyEnabled) {
-                const playerPos = window.gidoraInstance
-                    ? window.gidoraInstance.mesh.position.clone()
+                const refDragon = (state.dragons || []).find(d => d && !d.isDead);
+                const playerPos = refDragon
+                    ? refDragon.mesh.position.clone()
                     : new THREE.Vector3(0, 1, 0);
                 manager.spawnDummy(playerPos);
             }
@@ -565,16 +588,17 @@ class TauntEnemy extends Enemy {
 
         if (this.attackCooldown > 0) this.attackCooldown -= dt;
 
-        const distToPlayer = this.mesh.position.distanceTo(window.gidoraInstance.mesh.position);
+        const target = getClosestAliveDragon(this.mesh.position);
+        const distToPlayer = target ? this.mesh.position.distanceTo(target.mesh.position) : Infinity;
 
         if (this.rangeRing) {
             this.rangeRing.position.copy(this.mesh.position);
             this.rangeRing.position.y = 0.1;
         }
 
-        if (distToPlayer <= this.attackRange) {
+        if (target && distToPlayer <= this.attackRange) {
             if (this.attackCooldown <= 0) {
-                this.fireHomingMissile();
+                this.fireHomingMissile(target);
                 this.attackCooldown = 2.0;
             }
             this.waitTime = 0.5;
@@ -616,7 +640,9 @@ class TauntEnemy extends Enemy {
         this.waitTime = 1.0 + Math.random() * 2.0;
     }
 
-    fireHomingMissile() {
+    fireHomingMissile(target) {
+        if (!target) target = getClosestAliveDragon(this.mesh.position);
+        if (!target) return;
         const startPos = this.mesh.position.clone();
         startPos.y = 2.5;
 
@@ -627,12 +653,12 @@ class TauntEnemy extends Enemy {
                 damage: 15,
                 color: 0x8800ff,
                 isHoming: true,
-                target: window.gidoraInstance.mesh,
+                target: target.mesh,
                 homingStrength: 2.0,
                 knockback: CONFIG.enemy.boss.projectileKnockback
             }
         );
-        const dir = window.gidoraInstance.mesh.position.clone().sub(startPos).normalize();
+        const dir = target.mesh.position.clone().sub(startPos).normalize();
         bullet.velocity = dir.multiplyScalar(bullet.speed);
         bullet.mesh.lookAt(bullet.mesh.position.clone().add(bullet.velocity));
         state.bullets.push(bullet);
@@ -757,9 +783,12 @@ class EnemyManager {
 
     spawnDummy(playerPos) {
         let spawnPos;
-        if (window.gidoraInstance) {
-            const dir = window.gidoraInstance.getForwardVector().normalize();
-            spawnPos = window.gidoraInstance.mesh.position.clone().add(dir.multiplyScalar(8));
+        const ref = (state.dragons || []).find(d => d && !d.isDead);
+        if (ref) {
+            const dir = ref.getForwardVector().normalize();
+            spawnPos = ref.mesh.position.clone().add(dir.multiplyScalar(8));
+        } else if (playerPos) {
+            spawnPos = playerPos.clone();
         } else {
             spawnPos = new THREE.Vector3(0, 1, -10);
         }
@@ -807,7 +836,9 @@ class EnemyManager {
 
                     e.takeDamage(b.damage, b.mesh.position, b.knockback);
                     if (b.onImpact) b.onImpact(b);
-                    BuffSystem.onEffectiveDamage(b.damage);
+                    if (b.attackerDragon && b.attackerDragon.buffSystem) {
+                        b.attackerDragon.buffSystem.onEffectiveDamage(b.damage);
+                    }
 
                     b.penetration--;
                     if (b.penetration < 0) b.markedForDeletion = true;

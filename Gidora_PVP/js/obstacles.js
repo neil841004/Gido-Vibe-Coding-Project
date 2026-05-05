@@ -169,7 +169,9 @@ class LevelManager {
 
                     b.markedForDeletion = true;
                     b.penetration = -1;
-                    if (didDamage && !b.isEnemy) BuffSystem.onEffectiveDamage(b.damage);
+                    if (didDamage && !b.isEnemy && b.attackerDragon && b.attackerDragon.buffSystem) {
+                        b.attackerDragon.buffSystem.onEffectiveDamage(b.damage);
+                    }
                     break;
                 }
             }
@@ -196,9 +198,11 @@ class LevelManager {
     }
 
     update(dt) {
-        if (window.gidoraInstance) {
-            this.generateAroundPosition(window.gidoraInstance.mesh.position);
-            this.cleanupFarChunks(window.gidoraInstance.mesh.position);
+        // 以場上第一隻活著的龍為 chunk 中心；若都掛了就停留原處
+        const center = (state.dragons || []).find(d => d && !d.isDead);
+        if (center) {
+            this.generateAroundPosition(center.mesh.position);
+            this.cleanupFarChunks(center.mesh.position);
         }
 
         this.blocks.forEach(b => {

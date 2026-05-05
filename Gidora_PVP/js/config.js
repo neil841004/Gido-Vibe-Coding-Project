@@ -1,6 +1,8 @@
 // =====================================================================
-// config.js — 全域數值與遊戲狀態 (移除 2P/duo 配置，僅保留 Ultra 4P)
+// config.js — 全域數值與遊戲狀態
 // 對應 Unity: ScriptableObject + Singleton GameState
+// PVP 版本：所有原本「每隻龍一份」的數值（光束、合體技 CD、輸入）
+//          已移到 Gidora 實體內，state 只保留全場共用的資料。
 // =====================================================================
 
 const CONFIG = {
@@ -8,9 +10,9 @@ const CONFIG = {
     // 角色 / 世界基礎數值
     // -----------------------------------------------------------------
     stats: {
-        playerHP: 200,          // 玩家融合獸基礎最大血量
+        playerHP: 1000,          // 玩家融合獸基礎最大血量
         structureHPBase: 0.5,   // 可破壞障礙物 HP 係數，會乘上體積
-        hpDecayRate: 2,         // 開啟敵人生成後，每秒自然扣血量
+        hpDecayRate: 0,         // 開啟敵人生成後，每秒自然扣血量
         hpDecayRateBeam: 6      // 光束施放期間，每秒自然扣血量
     },
 
@@ -85,8 +87,8 @@ const CONFIG = {
     // 近戰 / 頭部蓄力攻擊
     // -----------------------------------------------------------------
     combat: {
-        meleeDamage: 25,                    // 基礎近戰傷害
-        attackRange: 2.5,                   // 近戰命中半徑
+        meleeDamage: 22,                    // 基礎近戰傷害
+        attackRange: 2,                   // 近戰命中半徑
         windupTime: 0.2,                    // 輕攻擊 / 蓄力按下後往後擺的前搖秒數
         recoveryTime: 0.4,                  // 輕攻擊後搖秒數
         heavyWindupTime: 0.16,              // 保留用重攻擊前搖秒數
@@ -94,21 +96,21 @@ const CONFIG = {
         cooldown: 0.6,                      // 攻擊基礎冷卻秒數
         recoilForce: 10,                    // 保留用玩家反作用力
         knockbackBase: 0.2,                 // 傷害轉換為擊退的基礎倍率
-        chargePreviewTime: 0.5,             // 按住多久後顯示落點預判
-        heavyChargeTime: 0.5,               // 按住多久後視為蓄力攻擊完成
+        chargePreviewTime: 0.4,             // 按住多久後顯示落點預判
+        heavyChargeTime: 0.4,               // 按住多久後視為蓄力攻擊完成
         heavyDamageScale: 2.0,              // 蓄力攻擊傷害倍率
-        heavyRadiusScale: 1.25,             // 蓄力攻擊範圍倍率
+        heavyRadiusScale: 1.4,             // 蓄力攻擊範圍倍率
         chargeAimRadius: 6.0,               // 保留用蓄力瞄準最大半徑
         chargeDefaultDistance: 4.2,         // 蓄力落點與身體的固定距離
-        chargeAimHalfAngle: Math.PI / 4,    // 每顆頭可瞄準扇形半角，Math.PI / 4 = 45 度
+        chargeAimHalfAngle: Math.PI / 3.5,    // 每顆頭可瞄準扇形半角，Math.PI / 4 = 45 度
         strikeTime: 0.16,                   // 頭部從後方向前攻擊的動畫秒數
         fireballDamageScale: 1.2,           // 火球型態傷害倍率
         fireballAimDistance: 13.0,          // 火球型態固定落點距離，比一般頭槌落點更遠
         fireballSpeed: 24,                  // 火球型態投射物飛行速度
         fireballRadius: 2.4,                // 火球爆炸半徑
-        flamethrowerDamagePerSecond: 36,    // 噴火型態每秒傷害
-        flamethrowerRange: 4.2,             // 噴火型態射程
-        flamethrowerAngle: 0.45,            // 噴火型態半角，單位為弧度
+        flamethrowerDamagePerSecond: 40,    // 噴火型態每秒傷害
+        flamethrowerRange: 5.5,             // 噴火型態射程
+        flamethrowerAngle: 0.5,            // 噴火型態半角，單位為弧度
         flamethrowerKnockback: 0.15,        // 噴火型態每次傷害 tick 的擊退力
         flamethrowerBlockDamageScale: 0.7,  // 噴火型態對可破壞關卡物件的傷害倍率
         shockwaveRadius: 3.3,               // 蓄力震波 Buff 的震波半徑
@@ -119,9 +121,9 @@ const CONFIG = {
     // 失衡 / 架勢值
     // -----------------------------------------------------------------
     stagger: {
-        playerThreshold: 45,       // 玩家失衡條滿值，達到後跌倒
+        playerThreshold: 320,       // 玩家失衡條滿值，達到後跌倒
         playerWindow: 3,         // 玩家受傷後延遲多久才開始倒退失衡值
-        playerRecoveryRate: 15,    // 玩家未受傷後，每秒倒退的失衡值
+        playerRecoveryRate: 100,    // 玩家未受傷後，每秒倒退的失衡值
         playerFallDuration: 3.5,   // 玩家跌倒不可操作秒數
         enemyThreshold: 60,        // 敵人失衡條滿值，達到後跌倒
         enemyWindow: 1.0,          // 敵人受傷後延遲多久才開始倒退失衡值
@@ -134,11 +136,11 @@ const CONFIG = {
     // -----------------------------------------------------------------
     terrain: {
         slimeSlowFactor: 0.45,       // 黏液地形速度倍率，越低越慢
-        fireDamagePerSecond: 8,      // 火焰地形每秒傷害
+        fireDamagePerSecond: 18,      // 火焰地形每秒傷害
         poisonDamagePerSecond: 7,    // 毒液 / 毒霧每秒傷害
         poisonSlowFactor: 0.5,       // 毒液造成的敵人速度倍率
-        poisonLife: 10,              // 毒液殘留秒數
-        poisonDropInterval: 0.25     // 毒液足跡生成間隔秒數
+        poisonLife: 7,              // 毒液殘留秒數
+        poisonDropInterval: 0.4     // 毒液足跡生成間隔秒數
     },
 
     // -----------------------------------------------------------------
@@ -208,7 +210,7 @@ const CONFIG = {
         tickInterval: 0.1,                 // 光束傷害 tick 間隔秒數
         range: 25,                         // 光束最大射程
         preFireDelay: 0.5,                 // 蓄滿後發射前延遲秒數
-        firingDuration: 3,                 // 光束持續發射秒數
+        firingDuration: 4,                 // 光束持續發射秒數
         postFireDelay: 0.6,                // 光束結束後搖秒數
         decayRate: 25,                     // 未蓄力或冷卻時蓄力值衰減速度
         maxCharge: 200,                    // 光束最大蓄力值，原 quad 值
@@ -229,31 +231,31 @@ const CONFIG = {
         tailDamageMultiplier: 4.0,        // 尾巴攻擊力 Buff：尾巴傷害倍率
         leafShieldCount: 4,               // 葉子護盾 Buff：護盾葉片數量
         missileInterval: 2,             // 飛彈巢 Buff：發射間隔秒數
-        missileDamage: 18,                // 飛彈巢 Buff：單發飛彈傷害
+        missileDamage: 20,                // 飛彈巢 Buff：單發飛彈傷害
         missileSpeed: 18,                 // 飛彈巢 Buff：飛彈速度
-        stepShockwaveDistance: 7,        // 落腳震波 Buff：每移動多少距離觸發
-        stepShockwaveDamage: 18,          // 落腳震波 Buff：震波傷害
+        stepShockwaveDistance: 8,        // 落腳震波 Buff：每移動多少距離觸發
+        stepShockwaveDamage: 22,          // 落腳震波 Buff：震波傷害
         comboDamageWindow: 2.0,           // 連擊 Buff：有效攻擊後維持連擊的秒數
         comboDamageStepPct: 0.18,         // 連擊 Buff：每層傷害增加比例
         comboDamageMaxStacks: 5,          // 連擊 Buff：最高層數
-        frontDamageMultiplier: 0.65,      // 正面減傷 Buff：正面受傷倍率
-        backDamageMultiplier: 1.45,       // 正面減傷 Buff：背面受傷倍率
+        frontDamageMultiplier: 0.7,      // 正面減傷 Buff：正面受傷倍率
+        backDamageMultiplier: 1.4,       // 正面減傷 Buff：背面受傷倍率
         projectileReflectChance: 0.5,     // 反彈投射物 Buff：反彈機率
-        beamSlowDuration: 3.0,            // 光束緩速 Buff：緩速持續秒數
-        beamSlowFactor: 0.55,             // 光束緩速 Buff：敵人速度倍率
+        beamSlowDuration: 2.0,            // 光束緩速 Buff：緩速持續秒數
+        beamSlowFactor: 0.5,             // 光束緩速 Buff：敵人速度倍率
         poisonCloudInterval: 8.0,         // 毒霧 Buff：噴發間隔秒數
         poisonCloudDuration: 3.5,         // 毒霧 Buff：毒霧持續秒數
-        poisonCloudRadius: 9.0,           // 毒霧 Buff：毒霧半徑
+        poisonCloudRadius: 8.0,           // 毒霧 Buff：毒霧半徑
         meleeExplosionChance: 0.25,       // Melee 爆炸 Buff：觸發機率
         ramSpeedThreshold: 8.5,           // 高速衝撞 Buff：觸發所需速度
-        ramDamage: 32,                    // 高速衝撞 Buff：撞擊傷害
+        ramDamage: 45,                    // 高速衝撞 Buff：撞擊傷害
         ramKnockback: 55,                 // 高速衝撞 Buff：撞擊擊退力
-        ramStagger: 80,                   // 高速衝撞 Buff：額外失衡值
-        stationaryShieldDelay: 1.0,       // 靜止護盾 Buff：站定多久後啟用
-        stationaryShieldMultiplier: 0.7,  // 靜止護盾 Buff：受傷倍率
-        teamworkRegenPerSecond: 4,        // 同心協力回血 Buff：每秒回血量
-        lowHpExplosionDamage: 120,        // 半血爆炸 Buff：爆炸傷害
-        lowHpExplosionRadius: 12,         // 半血爆炸 Buff：爆炸半徑
+        ramStagger: 100,                   // 高速衝撞 Buff：額外失衡值
+        stationaryShieldDelay: 2.0,       // 靜止護盾 Buff：站定多久後啟用
+        stationaryShieldMultiplier: 0.8,  // 靜止護盾 Buff：受傷倍率
+        teamworkRegenPerSecond: 25,        // 同心協力回血 Buff：每秒回血量
+        lowHpExplosionDamage: 180,        // 半血爆炸 Buff：爆炸傷害
+        lowHpExplosionRadius: 15,         // 半血爆炸 Buff：爆炸半徑
         visualOrbitRadius: 2.8,           // Buff 視覺標記繞角色旋轉半徑
         visualPulseInterval: 0.35,        // Buff 持續粒子特效生成間隔秒數
         hpVisualScalePerStack: 0.1        // 血量 Buff 每層角色視覺放大比例
@@ -267,11 +269,27 @@ const CONFIG = {
     },
 
     // -----------------------------------------------------------------
+    // PVP 對戰模式
+    // -----------------------------------------------------------------
+    pvp: {
+        // 兩隻三頭龍出生位置（測試模式 / PVP 模式共用）
+        dragonASpawn: { x: -8, z: 0, facingY: 0 }, // 第一隻三頭龍出生點與初始面向 (弧度)
+        dragonBSpawn: { x: 8, z: 0, facingY: Math.PI }, // 第二隻三頭龍出生點與初始面向 (弧度)
+        // PVP 配對介面選項
+        maxBuffsPerDragon: 10,            // 配對介面 Buff 數量上限
+        cameraMargin: 8,                  // PVP 鏡頭跟隨額外邊界，越大鏡頭拉得越遠
+        cameraMinDist: 12,                // PVP 鏡頭最小距離，避免過於貼近
+        cameraMaxDist: 50,                // PVP 鏡頭最大距離，避免拉得過遠
+        respawnButtonLabel: '重新開始'      // 結束畫面按鈕文字
+    },
+
+    // -----------------------------------------------------------------
     // 視覺與玩家顏色
     // -----------------------------------------------------------------
     visuals: {
         arrowLength: 4, // 玩家輸入方向箭頭長度
         colors: {
+            // 預設第一隻三頭龍配色 (Dragon A)
             p1: 0xff4444,          // P1 紅頭顏色
             p2: 0x4444ff,          // P2 藍頭顏色
             p3: 0xff69b4,          // P3 粉頭顏色
@@ -281,46 +299,62 @@ const CONFIG = {
             mouth: 0x00ffff,       // 嘴部 / 能量顏色
             beam: 0xff00ff,        // 光束顏色
             indicatorSpacing: 3.5  // 保留用指示器間距
+        },
+        // 第二隻三頭龍配色 (Dragon B)，用同一組欄位區分敵我
+        colorsB: {
+            p1: 0xffaa44,          // P1 橘頭顏色
+            p2: 0xeeee44,          // P2 黃頭顏色
+            p3: 0xaaff66,          // P3 黃綠頭顏色
+            p4: 0xff44aa,          // P4 洋紅尾巴顏色
+            body: 0x7744aa,        // 紫色身體
+            head: 0x7744aa,        // 預設頭部顏色
+            mouth: 0xff44aa,       // 嘴部 / 能量顏色
+            beam: 0x88ff44         // 光束顏色 (亮綠)
         }
     }
 };
 
-// --- 全域遊戲狀態 ---
+// =====================================================================
+// 全域遊戲狀態
+// PVP 重構後：beam / combo CD / input / HP 等「每隻龍一份」的狀態
+//             已搬到 Gidora 實體，state 只放全場共享資料。
+// =====================================================================
 const state = {
-    // 合體技冷卻 (Phase 1: 新增可運作的 CD 機制)
-    comboCooldown: 0,
-    comboCooldownMax: CONFIG.combo.cooldown,
+    // 場上所有三頭龍 (Dragon A 永遠存在；Dragon B 由 UI 切換 / PVP 模式建立)
+    dragons: [],
 
-    // 4P (Ultra) 是唯一模式
-    playerCount: 4,
-
-    input: {
-        p1: { move: null, attack: false, charge: false },
-        p2: { move: null, attack: false, charge: false },
-        p3: { move: null, attack: false, charge: false },
-        p4: { move: null, attack: false, charge: false }
-    },
-
+    // 全場共享子彈、特效、屍體、肉塊
     bullets: [],
     particles: [],
     flyingCorpses: [],
     meatChunks: [],
 
-    comboActive: false,
-
-    beamCharge: 0,
-    beamPhase: 'idle',
-    beamPreFireTimer: 0,
-    beamFiringTimer: 0,
-    beamPostFireTimer: 0,
-    beamDotTimer: 0,
+    // 全場 HP 倒扣（仍綁在 Spawner 開關，PVP 模式內不啟用）
     hpDecayEnabled: false,
 
     // Phase 1: Dummy 開關狀態 (true = 場上有 Dummy)
     dummyEnabled: true,
 
-    // Spawner 開關
+    // 一般敵人 Spawner 開關（PVP 模式時禁用，Mode 切換時自動關閉）
     spawnerEnabled: false,
+
+    // 第二隻三頭龍是否生成（左上 Spawn Enemy Dragon 按鈕）
+    enemyDragonEnabled: false,
+
+    // Buff 面板目前操作的對象 (0 = Dragon A, 1 = Dragon B)
+    buffTarget: 0,
+
+    // PVP 對戰狀態機
+    pvp: {
+        active: false,        // true = 已進入 PVP 對戰中
+        configuring: false,   // true = 配對介面開啟、世界暫停
+        ended: false,         // 對戰結束等待重來
+        winnerIndex: -1,      // 勝者三頭龍 index (-1 表示未結束 / 平手)
+        // 配對結果：8 個 slot，slot[i] = { device } 或 null
+        // 索引: 0~3 = Dragon A 的 P1/P2/P3/P4，4~7 = Dragon B 的 P1/P2/P3/P4
+        slots: [null, null, null, null, null, null, null, null],
+        buffCounts: [0, 0]    // Dragon A / B 各自的 Buff 數量設定 (-1 表示「隨機」)
+    },
 
     lastTime: 0
 };

@@ -7,6 +7,9 @@ class Bullet {
     constructor(owner, position, direction, speed, life, gravity, size, stats = {}) {
         this.owner = owner;
         this.isEnemy = (owner === 'enemy');
+        // PVP：發射來源三頭龍 (Gidora)；後續可由建立者填入。
+        // 用來判斷子彈屬於哪一隻龍，避免打到自己；也用於 onEffectiveDamage 路由。
+        this.attackerDragon = stats.attackerDragon || null;
 
         if (direction && direction.clone) {
             this.direction = direction.clone();

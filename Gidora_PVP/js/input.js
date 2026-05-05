@@ -1,19 +1,30 @@
 // =====================================================================
-// input.js — 鍵盤 + Gamepad 輸入 (4P 控制配置)
-// 在 main.js 呼叫 setupInputs() 後，每幀呼叫 state.pollInputs()
+// input.js — 鍵盤 + Gamepad 輸入
+// 測試模式：鍵盤可直接同時操作兩隻三頭龍。
+// PVP 模式：配對完成後，只有被指派的 slot 會接收對應裝置輸入。
 // =====================================================================
 
 function setupInputs() {
     const keys = {};
+    const gamepadButtonMemory = new Map();
     let mouseAttack = false;
     let mouseCharge = false;
     let mousePos = new THREE.Vector2(window.innerWidth / 2, window.innerHeight / 2);
 
-    window.addEventListener('keydown', (e) => {
-        keys[e.code] = true;
-        SoundSystem.init();
-    });
-    window.addEventListener('keyup', (e) => keys[e.code] = false);
+    const keyboardDevice = { type: 'keyboard', id: 'keyboard', label: 'Keyboard / Mouse' };
+
+    const setKey = (e, isDown) => {
+        keys[e.code] = isDown;
+        if (isDown) {
+            SoundSystem.init();
+            if (state.pvp && state.pvp.configuring && typeof window.pvpSetPendingDevice === 'function') {
+                window.pvpSetPendingDevice(keyboardDevice);
+            }
+        }
+    };
+
+    window.addEventListener('keydown', (e) => setKey(e, true));
+    window.addEventListener('keyup', (e) => setKey(e, false));
 
     window.addEventListener('blur', () => {
         Object.keys(keys).forEach(k => keys[k] = false);
@@ -24,6 +35,9 @@ function setupInputs() {
     window.addEventListener('mousedown', (e) => {
         SoundSystem.init();
         mousePos.set(e.clientX, e.clientY);
+        if (state.pvp && state.pvp.configuring && typeof window.pvpSetPendingDevice === 'function') {
+            window.pvpSetPendingDevice(keyboardDevice);
+        }
         if (e.button === 0) mouseAttack = true;
         if (e.button === 2) mouseCharge = true;
     });
@@ -42,90 +56,159 @@ function setupInputs() {
             e.gamepad.buttons.length, e.gamepad.axes.length);
     });
 
-    // 初始化每個玩家的 move Vector2
-    ['p1', 'p2', 'p3', 'p4'].forEach(p => {
-        if (!state.input[p].move) state.input[p].move = new THREE.Vector2();
-    });
-    if (!state.input.p1.pointer) state.input.p1.pointer = new THREE.Vector2();
+    const resetDragonInput = (dragon) => {
+        if (!dragon) return;
+        ['p1', 'p2', 'p3', 'p4'].forEach(p => {
+            dragon.input[p].move.set(0, 0);
+            dragon.input[p].attack = false;
+            dragon.input[p].charge = false;
+        });
+        if (dragon.input.p1.pointer) dragon.input.p1.pointer.copy(mousePos);
+    };
 
-    state.pollInputs = () => {
-        const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
+    const assignMove = (dragon, player, vx, vy) => {
+        if (!dragon || !dragon.input[player]) return;
+        dragon.input[player].move.set(vx, vy);
+        if (dragon.input[player].move.length() > 1) dragon.input[player].move.normalize();
+    };
+
+    const applyKeyboardTestControls = () => {
+        const dragonA = state.dragons[0];
+        const dragonB = state.dragons[1];
         const canCharge = true;
 
-        // P1 (Keyboard / Mouse)
+        if (dragonA) {
+            let vx = 0, vy = 0;
+            if (keys['KeyW']) vy -= 1;
+            if (keys['KeyS']) vy += 1;
+            if (keys['KeyA']) vx -= 1;
+            if (keys['KeyD']) vx += 1;
+            assignMove(dragonA, 'p1', vx, vy);
+            dragonA.input.p1.pointer.copy(mousePos);
+            dragonA.input.p1.attack = mouseAttack || !!keys['Digit1'];
+            dragonA.input.p2.attack = !!keys['Digit2'];
+            dragonA.input.p3.attack = !!keys['Digit3'];
+            dragonA.input.p4.attack = !!keys['Digit4'];
+            dragonA.input.p1.charge = canCharge && (mouseCharge || !!keys['Digit5']);
+            dragonA.input.p2.charge = canCharge && !!keys['Digit6'];
+            dragonA.input.p3.charge = canCharge && !!keys['Digit7'];
+            dragonA.input.p4.charge = canCharge && !!keys['Digit8'];
+        }
+
+        if (dragonB) {
+            let vx = 0, vy = 0;
+            if (keys['ArrowUp']) vy -= 1;
+            if (keys['ArrowDown']) vy += 1;
+            if (keys['ArrowLeft']) vx -= 1;
+            if (keys['ArrowRight']) vx += 1;
+            assignMove(dragonB, 'p1', vx, vy);
+            dragonB.input.p1.attack = !!keys['Numpad1'];
+            dragonB.input.p2.attack = !!keys['Numpad2'];
+            dragonB.input.p3.attack = !!keys['Numpad3'];
+            dragonB.input.p4.attack = !!keys['Numpad4'];
+            dragonB.input.p1.charge = canCharge && !!keys['Numpad5'];
+            dragonB.input.p2.charge = canCharge && !!keys['Numpad6'];
+            dragonB.input.p3.charge = canCharge && !!keys['Numpad7'];
+            dragonB.input.p4.charge = canCharge && !!keys['Numpad8'];
+        }
+    };
+
+    const getKeyboardSlotControls = (slotIndex) => {
+        const dragonIndex = slotIndex < 4 ? 0 : 1;
+        const partOffset = slotIndex % 4;
+        const player = ['p1', 'p2', 'p3', 'p4'][partOffset];
+
+        if (dragonIndex === 0) {
+            let vx = 0, vy = 0;
+            if (keys['KeyW']) vy -= 1;
+            if (keys['KeyS']) vy += 1;
+            if (keys['KeyA']) vx -= 1;
+            if (keys['KeyD']) vx += 1;
+            return {
+                player,
+                move: new THREE.Vector2(vx, vy),
+                attack: !!keys[`Digit${partOffset + 1}`] || (partOffset === 0 && mouseAttack),
+                charge: !!keys[`Digit${partOffset + 5}`] || (partOffset === 0 && mouseCharge),
+                pointer: mousePos
+            };
+        }
+
         let vx = 0, vy = 0;
-        if (keys['KeyW']) vy -= 1;
-        if (keys['KeyS']) vy += 1;
-        if (keys['KeyA']) vx -= 1;
-        if (keys['KeyD']) vx += 1;
-        state.input.p1.move.set(vx, vy).normalize();
-        state.input.p1.pointer.copy(mousePos);
-        state.input.p1.attack = mouseAttack || keys['Digit1'];
-        state.input.p1.charge = canCharge && (mouseCharge || keys['ShiftLeft']);
+        if (keys['ArrowUp']) vy -= 1;
+        if (keys['ArrowDown']) vy += 1;
+        if (keys['ArrowLeft']) vx -= 1;
+        if (keys['ArrowRight']) vx += 1;
+        return {
+            player,
+            move: new THREE.Vector2(vx, vy),
+            attack: !!keys[`Numpad${partOffset + 1}`],
+            charge: !!keys[`Numpad${partOffset + 5}`],
+            pointer: mousePos
+        };
+    };
 
-        // P2 (Gamepad 0 / Arrows)
-        const gp2 = gamepads[0];
-        if (gp2) {
-            const axisX = Math.abs(gp2.axes[0]) > 0.1 ? gp2.axes[0] : 0;
-            const axisY = Math.abs(gp2.axes[1]) > 0.1 ? gp2.axes[1] : 0;
-            state.input.p2.move.set(axisX, axisY);
-            if (state.input.p2.move.length() > 1) state.input.p2.move.normalize();
-            state.input.p2.attack = gp2.buttons[2].pressed;
-            state.input.p2.charge = canCharge && gp2.buttons[7].pressed;
-        } else {
-            let vx2 = 0, vy2 = 0;
-            if (keys['ArrowUp']) vy2 -= 1;
-            if (keys['ArrowDown']) vy2 += 1;
-            if (keys['ArrowLeft']) vx2 -= 1;
-            if (keys['ArrowRight']) vx2 += 1;
-            state.input.p2.move.set(vx2, vy2).normalize();
-            state.input.p2.attack = keys['Enter'] || keys['Digit2'];
-            state.input.p2.charge = canCharge && keys['ShiftRight'];
-        }
-        if (keys['Digit2']) state.input.p2.attack = true;
+    const getGamepadSlotControls = (slotIndex, gp) => {
+        const player = ['p1', 'p2', 'p3', 'p4'][slotIndex % 4];
+        const axisX = Math.abs(gp.axes[0]) > 0.1 ? gp.axes[0] : 0;
+        const axisY = Math.abs(gp.axes[1]) > 0.1 ? gp.axes[1] : 0;
+        return {
+            player,
+            move: new THREE.Vector2(axisX, axisY),
+            attack: !!(gp.buttons[2] && gp.buttons[2].pressed),
+            charge: !!(gp.buttons[7] && gp.buttons[7].pressed)
+        };
+    };
 
-        // P3 (Gamepad 1)
-        const gp3 = gamepads[1];
-        state.input.p3.charge = false;
-        state.input.p3.attack = false;
-        if (gp3) {
-            const axisX = Math.abs(gp3.axes[0]) > 0.1 ? gp3.axes[0] : 0;
-            const axisY = Math.abs(gp3.axes[1]) > 0.1 ? gp3.axes[1] : 0;
-            state.input.p3.move.set(axisX, axisY);
-            state.input.p3.attack = gp3.buttons[2].pressed;
-            state.input.p3.charge = canCharge && gp3.buttons[7].pressed;
-        } else {
-            let vx3 = 0, vy3 = 0;
-            if (keys['KeyI']) vy3 -= 1;
-            if (keys['KeyK']) vy3 += 1;
-            if (keys['KeyJ']) vx3 -= 1;
-            if (keys['KeyL']) vx3 += 1;
-            state.input.p3.move.set(vx3, vy3).normalize();
-            state.input.p3.attack = keys['Space'];
-            state.input.p3.charge = false;
-        }
-        if (keys['Digit3']) state.input.p3.attack = true;
+    const pollPairingDevices = (gamepads) => {
+        if (!state.pvp || !state.pvp.configuring || typeof window.pvpSetPendingDevice !== 'function') return;
+        gamepads.forEach(gp => {
+            if (!gp) return;
+            const pressed = gp.buttons.some(b => b && b.pressed);
+            const key = `gp:${gp.index}`;
+            const wasPressed = gamepadButtonMemory.get(key) || false;
+            if (pressed && !wasPressed) {
+                window.pvpSetPendingDevice({
+                    type: 'gamepad',
+                    id: key,
+                    index: gp.index,
+                    label: gp.id || `Gamepad ${gp.index + 1}`
+                });
+            }
+            gamepadButtonMemory.set(key, pressed);
+        });
+    };
 
-        // P4 (Gamepad 2)
-        const gp4 = gamepads[2];
-        state.input.p4.charge = false;
-        state.input.p4.attack = false;
-        if (gp4) {
-            const axisX = Math.abs(gp4.axes[0]) > 0.1 ? gp4.axes[0] : 0;
-            const axisY = Math.abs(gp4.axes[1]) > 0.1 ? gp4.axes[1] : 0;
-            state.input.p4.move.set(axisX, axisY);
-            state.input.p4.attack = gp4.buttons[2].pressed;
-            state.input.p4.charge = canCharge && gp4.buttons[7].pressed;
-        } else {
-            let vx4 = 0, vy4 = 0;
-            if (keys['KeyT']) vy4 -= 1;
-            if (keys['KeyG']) vy4 += 1;
-            if (keys['KeyF']) vx4 -= 1;
-            if (keys['KeyH']) vx4 += 1;
-            state.input.p4.move.set(vx4, vy4).normalize();
-            state.input.p4.attack = keys['KeyV'];
-            state.input.p4.charge = false;
-        }
-        if (keys['Digit4']) state.input.p4.attack = true;
+    const applyPvpControls = (gamepads) => {
+        state.pvp.slots.forEach((slot, slotIndex) => {
+            if (!slot || !slot.device) return;
+            const dragon = state.dragons[slotIndex < 4 ? 0 : 1];
+            if (!dragon) return;
+
+            let controls = null;
+            if (slot.device.type === 'keyboard') {
+                controls = getKeyboardSlotControls(slotIndex);
+            } else if (slot.device.type === 'gamepad') {
+                const gp = gamepads[slot.device.index];
+                if (gp) controls = getGamepadSlotControls(slotIndex, gp);
+            }
+            if (!controls) return;
+
+            const input = dragon.input[controls.player];
+            input.move.copy(controls.move);
+            if (input.move.length() > 1) input.move.normalize();
+            input.attack = controls.attack;
+            input.charge = controls.charge;
+            if (controls.pointer && input.pointer) input.pointer.copy(controls.pointer);
+        });
+    };
+
+    state.pollInputs = () => {
+        const gamepads = navigator.getGamepads ? Array.from(navigator.getGamepads()) : [];
+        pollPairingDevices(gamepads);
+
+        state.dragons.forEach(resetDragonInput);
+        if (state.pvp && state.pvp.configuring) return;
+        if (state.pvp && state.pvp.active) applyPvpControls(gamepads);
+        else applyKeyboardTestControls();
     };
 }

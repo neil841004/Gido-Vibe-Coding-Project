@@ -77,9 +77,17 @@ class Vine {
 }
 
 class Gidora {
-    constructor() {
+    // index: 0 = Dragon A (預設配色)、1 = Dragon B (替代配色)
+    // opts.spawn: { x, z, facingY }；可選擇出生位置與面向
+    constructor(index = 0, opts = {}) {
+        this.index = index;
+        this.colors = (index === 1) ? CONFIG.visuals.colorsB : CONFIG.visuals.colors;
+
         this.mesh = new THREE.Group();
         this.velocity = new THREE.Vector3();
+
+        // 每隻龍擁有獨立的 BuffSystem (per-instance)
+        this.buffSystem = new BuffSystem(this);
 
         this.hp = CONFIG.stats.playerHP;
         this.maxHP = CONFIG.stats.playerHP;
@@ -87,6 +95,24 @@ class Gidora {
         this.damageFlashTimer = 0;
 
         this.hpBar = new HealthBar(scene, 4.5, 4.0, 0.2);
+
+        // 每隻龍獨立的輸入槽 (4 名 sub-player)
+        this.input = {
+            p1: { move: new THREE.Vector2(), attack: false, charge: false, pointer: new THREE.Vector2() },
+            p2: { move: new THREE.Vector2(), attack: false, charge: false },
+            p3: { move: new THREE.Vector2(), attack: false, charge: false },
+            p4: { move: new THREE.Vector2(), attack: false, charge: false }
+        };
+
+        // 每隻龍獨立的光束/合體技狀態
+        this.beamCharge = 0;
+        this.beamPhase = 'idle';
+        this.beamPreFireTimer = 0;
+        this.beamFiringTimer = 0;
+        this.beamPostFireTimer = 0;
+        this.beamDotTimer = 0;
+        this.comboCooldown = 0;
+        this.comboCooldownMax = CONFIG.combo.cooldown;
 
         this.cooldowns = { p1: 0, p2: 0, p3: 0, p4: 0 };
         this.attackStates = { p1: 'idle', p2: 'idle', p3: 'idle', p4: 'idle' };
@@ -139,21 +165,28 @@ class Gidora {
         this.buildModel();
         this.buildIndicators();
 
-        this.baseColorP1 = new THREE.Color(CONFIG.visuals.colors.p1);
-        this.baseColorP2 = new THREE.Color(CONFIG.visuals.colors.p2);
-        this.baseColorP3 = new THREE.Color(CONFIG.visuals.colors.p3);
-        this.baseColorP4 = new THREE.Color(CONFIG.visuals.colors.p4);
+        this.baseColorP1 = new THREE.Color(this.colors.p1);
+        this.baseColorP2 = new THREE.Color(this.colors.p2);
+        this.baseColorP3 = new THREE.Color(this.colors.p3);
+        this.baseColorP4 = new THREE.Color(this.colors.p4);
 
         scene.add(this.mesh);
+
+        // 套用出生位置與面向
+        const spawn = opts.spawn || (index === 1
+            ? CONFIG.pvp.dragonBSpawn
+            : CONFIG.pvp.dragonASpawn);
+        this.mesh.position.set(spawn.x, 0, spawn.z);
+        this.mesh.rotation.y = spawn.facingY || 0;
     }
 
     takeDamage(amount, sourcePos, knockbackForce) {
         if (this.isDead) return;
-        if (BuffSystem.isActive('comboInvincible') && state.beamPhase === 'firing') return;
-        if (BuffSystem.blockIncomingDamage(sourcePos)) return;
+        if (this.buffSystem.isActive('comboInvincible') && this.beamPhase === 'firing') return;
+        if (this.buffSystem.blockIncomingDamage(sourcePos)) return;
 
         let finalAmount = amount;
-        if (BuffSystem.isActive('directionalGuard') && sourcePos) {
+        if (this.buffSystem.isActive('directionalGuard') && sourcePos) {
             const toSource = sourcePos.clone().sub(this.mesh.position).normalize();
             const facing = this.getForwardVector().normalize();
             const dot = facing.dot(toSource);
@@ -161,7 +194,7 @@ class Gidora {
                 ? CONFIG.buffs.frontDamageMultiplier
                 : CONFIG.buffs.backDamageMultiplier;
         }
-        if (BuffSystem.isActive('stationaryShield') && this.stationaryTimer >= CONFIG.buffs.stationaryShieldDelay) {
+        if (this.buffSystem.isActive('stationaryShield') && this.stationaryTimer >= CONFIG.buffs.stationaryShieldDelay) {
             finalAmount *= CONFIG.buffs.stationaryShieldMultiplier;
         }
 
@@ -187,7 +220,7 @@ class Gidora {
     }
 
     addStagger(amount, sourcePos) {
-        if (BuffSystem.isActive('staggerImmune') || this.fallTimer > 0 || amount <= 0) return;
+        if (this.buffSystem.isActive('staggerImmune') || this.fallTimer > 0 || amount <= 0) return;
         this.staggerWindowTimer = CONFIG.stagger.playerWindow;
         this.staggerValue = Math.min(CONFIG.stagger.playerThreshold, this.staggerValue + amount);
         if (this.staggerValue >= CONFIG.stagger.playerThreshold) {
@@ -215,6 +248,12 @@ class Gidora {
 
     die() {
         this.isDead = true;
+        // PVP 模式：交給 main.js 顯示勝負畫面，不重新整理。
+        if (state.pvp && (state.pvp.active || (state.dragons || []).filter(d => d).length > 1)) {
+            this.mesh.visible = false;
+            if (typeof onDragonDeath === 'function') onDragonDeath(this);
+            return;
+        }
         alert("GAME OVER");
         location.reload();
     }
@@ -233,9 +272,12 @@ class Gidora {
         }
 
         bullets.forEach(b => {
-            if (b.markedForDeletion || !b.isEnemy) return;
+            if (b.markedForDeletion) return;
+            // PVP：受擊條件擴充為「敵人子彈」或「來自其他龍的子彈」(非自己發射)。
+            const isFromOtherDragon = (b.attackerDragon && b.attackerDragon !== this);
+            if (!b.isEnemy && !isFromOtherDragon) return;
             if (b.mesh.position.distanceTo(pPos) < hitRadius) {
-                if (BuffSystem.reflectProjectile(b, this)) return;
+                if (this.buffSystem.reflectProjectile(b, this)) return;
                 b.markedForDeletion = true;
                 this.takeDamage(b.damage || 10, b.mesh.position, b.knockback);
             }
@@ -243,11 +285,12 @@ class Gidora {
     }
 
     buildModel() {
-        const bodyMat = new THREE.MeshLambertMaterial({ color: CONFIG.visuals.colors.body });
-        const p1Mat = new THREE.MeshLambertMaterial({ color: CONFIG.visuals.colors.p1 });
-        const p2Mat = new THREE.MeshLambertMaterial({ color: CONFIG.visuals.colors.p2 });
-        const p3Mat = new THREE.MeshLambertMaterial({ color: CONFIG.visuals.colors.p3 });
-        const p4Mat = new THREE.MeshLambertMaterial({ color: CONFIG.visuals.colors.p4 });
+        const colors = this.colors;
+        const bodyMat = new THREE.MeshLambertMaterial({ color: colors.body });
+        const p1Mat = new THREE.MeshLambertMaterial({ color: colors.p1 });
+        const p2Mat = new THREE.MeshLambertMaterial({ color: colors.p2 });
+        const p3Mat = new THREE.MeshLambertMaterial({ color: colors.p3 });
+        const p4Mat = new THREE.MeshLambertMaterial({ color: colors.p4 });
 
         // 1. Body (Quad scale)
         const bodyGeo = new THREE.SphereGeometry(1.5, 16, 16);
@@ -356,7 +399,7 @@ class Gidora {
         scene.add(this.beamMesh);
 
         this.beamGlowMesh = new THREE.Mesh(_beamBase(), new THREE.MeshBasicMaterial({
-            color: CONFIG.visuals.colors.beam, transparent: true, opacity: 0.0,
+            color: colors.beam, transparent: true, opacity: 0.0,
             blending: THREE.AdditiveBlending, depthWrite: false
         }));
         this.beamGlowMesh.visible = false;
@@ -372,7 +415,7 @@ class Gidora {
         this.beamImpactMesh.visible = false;
         scene.add(this.beamImpactMesh);
 
-        this.beamOriginLight = new THREE.PointLight(CONFIG.visuals.colors.beam, 0, 12);
+        this.beamOriginLight = new THREE.PointLight(colors.beam, 0, 12);
         scene.add(this.beamOriginLight);
         this.beamImpactLight = new THREE.PointLight(0xffffff, 0, 14);
         scene.add(this.beamImpactLight);
@@ -380,7 +423,7 @@ class Gidora {
         const chargeRingGeo = new THREE.RingGeometry(1.2, 2.2, 32);
         chargeRingGeo.rotateX(-Math.PI / 2);
         const chargeRingMat = new THREE.MeshBasicMaterial({
-            color: CONFIG.visuals.colors.beam,
+            color: colors.beam,
             side: THREE.DoubleSide, transparent: true, opacity: 0.0,
             blending: THREE.AdditiveBlending, depthWrite: false
         });
@@ -502,7 +545,7 @@ class Gidora {
                     const progress = THREE.MathUtils.clamp(1 - (this.attackTimers[p] / totalRecovery), 0, 1);
                     const ease = progress * progress * (3 - 2 * progress);
                     n.pivot.rotation.x = this.getForwardLean(n) * (1 - ease) + n.baseLean * ease;
-                    const targetYaw = this.recoveryBufferedPress[p] && state.input[p].attack
+                    const targetYaw = this.recoveryBufferedPress[p] && this.input[p].attack
                         ? this.headAimYaw[p]
                         : n.baseYaw;
                     n.group.rotation.y = THREE.MathUtils.lerp(n.group.rotation.y, targetYaw, dt * 8);
@@ -588,13 +631,14 @@ class Gidora {
     }
 
     buildIndicators() {
-        this.p1Arrow = new THREE.ArrowHelper(new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 2, 0), CONFIG.visuals.arrowLength, CONFIG.visuals.colors.p1);
+        const colors = this.colors;
+        this.p1Arrow = new THREE.ArrowHelper(new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 2, 0), CONFIG.visuals.arrowLength, colors.p1);
         scene.add(this.p1Arrow);
-        this.p2Arrow = new THREE.ArrowHelper(new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 2, 0), CONFIG.visuals.arrowLength, CONFIG.visuals.colors.p2);
+        this.p2Arrow = new THREE.ArrowHelper(new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 2, 0), CONFIG.visuals.arrowLength, colors.p2);
         scene.add(this.p2Arrow);
-        this.p3Arrow = new THREE.ArrowHelper(new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 2, 0), CONFIG.visuals.arrowLength, CONFIG.visuals.colors.p3);
+        this.p3Arrow = new THREE.ArrowHelper(new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 2, 0), CONFIG.visuals.arrowLength, colors.p3);
         scene.add(this.p3Arrow);
-        this.p4Arrow = new THREE.ArrowHelper(new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 2, 0), CONFIG.visuals.arrowLength, CONFIG.visuals.colors.p4);
+        this.p4Arrow = new THREE.ArrowHelper(new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 2, 0), CONFIG.visuals.arrowLength, colors.p4);
         scene.add(this.p4Arrow);
 
         this.attackLandingIndicators = {};
@@ -602,7 +646,7 @@ class Gidora {
             const geo = new THREE.RingGeometry(0.45, CONFIG.combat.attackRange, 32);
             geo.rotateX(-Math.PI / 2);
             const mat = new THREE.MeshBasicMaterial({
-                color: CONFIG.visuals.colors[p],
+                color: colors[p],
                 side: THREE.DoubleSide,
                 transparent: true,
                 opacity: 0.0,
@@ -635,7 +679,7 @@ class Gidora {
             return;
         }
         if (this.cooldowns[playerIndex] > 0) return;
-        if (BuffSystem.getMeleeForm() === 'flame' && this.canChargeAttack(playerIndex)) {
+        if (this.buffSystem.getMeleeForm() === 'flame' && this.canChargeAttack(playerIndex)) {
             this.resetChargeAim(playerIndex);
             this.attackStates[playerIndex] = 'flamethrower';
             this.attackHoldTimers[playerIndex] = 0;
@@ -699,7 +743,7 @@ class Gidora {
         this.attackTimers[playerIndex] = 0;
         this.attackReleaseQueued[playerIndex] = false;
         this.attackImpactDone[playerIndex] = false;
-        if (this.recoveryBufferedPress[playerIndex] && state.input[playerIndex].attack) {
+        if (this.recoveryBufferedPress[playerIndex] && this.input[playerIndex].attack) {
             this.cooldowns[playerIndex] = 0;
             this.recoveryBufferedPress[playerIndex] = false;
             this.startAttackPress(playerIndex);
@@ -774,7 +818,7 @@ class Gidora {
     }
 
     getChargeAimDistance() {
-        return BuffSystem.getMeleeForm() === 'fireball'
+        return this.buffSystem.getMeleeForm() === 'fireball'
             ? CONFIG.combat.fireballAimDistance
             : CONFIG.combat.chargeDefaultDistance;
     }
@@ -789,8 +833,8 @@ class Gidora {
     }
 
     getRawAimVector(playerIndex) {
-        if (playerIndex === 'p1' && state.input.p1.pointer && window.camera) {
-            const pointer = state.input.p1.pointer;
+        if (playerIndex === 'p1' && this.input.p1.pointer && window.camera) {
+            const pointer = this.input.p1.pointer;
             const ndc = new THREE.Vector2(
                 (pointer.x / window.innerWidth) * 2 - 1,
                 -(pointer.y / window.innerHeight) * 2 + 1
@@ -810,7 +854,7 @@ class Gidora {
             }
         }
 
-        const move = state.input[playerIndex].move;
+        const move = this.input[playerIndex].move;
         if (move && move.lengthSq() > 0.05) return move.clone().normalize();
         return null;
     }
@@ -829,8 +873,8 @@ class Gidora {
         const kind = this.attackKinds[playerIndex] || 'light';
         let damage = this.getMeleeDamage(playerIndex, kind);
         let radius = CONFIG.combat.attackRange;
-        let color = CONFIG.visuals.colors[playerIndex];
-        const form = BuffSystem.getMeleeForm();
+        let color = this.colors[playerIndex];
+        const form = this.buffSystem.getMeleeForm();
 
         const forward = this.getForwardVector();
         const spawnPos = this.mesh.position.clone();
@@ -865,12 +909,12 @@ class Gidora {
     }
 
     getMeleeDamage(playerIndex, kind) {
-        let damage = CONFIG.combat.meleeDamage * BuffSystem.getMeleeMultiplier();
-        if (playerIndex === 'p4' && BuffSystem.isActive('tailPower')) {
+        let damage = CONFIG.combat.meleeDamage * this.buffSystem.getMeleeMultiplier();
+        if (playerIndex === 'p4' && this.buffSystem.isActive('tailPower')) {
             damage *= CONFIG.buffs.tailDamageMultiplier;
         }
         if (kind === 'heavy') damage *= CONFIG.combat.heavyDamageScale;
-        if (BuffSystem.isActive('comboRamp')) {
+        if (this.buffSystem.isActive('comboRamp')) {
             const stacks = this.comboRampStacks || 0;
             damage *= 1 + stacks * CONFIG.buffs.comboDamageStepPct;
         }
@@ -890,6 +934,8 @@ class Gidora {
             const pPos = pos.clone().add(new THREE.Vector3((Math.random() - 0.5) * radius, Math.random() * 2, (Math.random() - 0.5) * radius));
             state.particles.push(new Particle(pPos, color));
         }
+
+        const owner = this; // 命中時用作攻擊者，避免 closure 內 this 指到 particle entry
 
         state.particles.push({
             ring,
@@ -913,19 +959,35 @@ class Gidora {
                     state.enemyManager.enemies.forEach(e => {
                         if (e.isDead || this.hitList.has(e)) return;
                         if (e.mesh.position.distanceTo(ring.position) < radius + 0.5) {
-                            e.takeDamage(damage, window.gidoraInstance.mesh.position, isTail ? 15 : 10);
+                            e.takeDamage(damage, owner.mesh.position, isTail ? 15 : 10);
                             if (e.addStagger) e.addStagger(options.stagger || (options.heavy ? 35 : 0), ring.position);
                             this.hitList.add(e);
-                            BuffSystem.onEffectiveDamage(damage);
-                            window.gidoraInstance.tryMeleeExplosion(e.mesh.position, damage);
+                            owner.buffSystem.onEffectiveDamage(damage);
+                            owner.tryMeleeExplosion(e.mesh.position, damage);
                             if (!isTail && !options.noRecoil) {
-                                const recoilDir = window.gidoraInstance.mesh.position.clone().sub(e.mesh.position).normalize();
+                                const recoilDir = owner.mesh.position.clone().sub(e.mesh.position).normalize();
                                 recoilDir.y = 0;
-                                window.gidoraInstance.knockbackVel.add(recoilDir.multiplyScalar(4));
+                                owner.knockbackVel.add(recoilDir.multiplyScalar(4));
                             }
                         }
                     });
                 }
+
+                // PVP：對其他三頭龍造成傷害
+                state.dragons.forEach(d => {
+                    if (!d || d === owner || d.isDead || this.hitList.has(d)) return;
+                    if (d.mesh.position.distanceTo(ring.position) < radius + 1.0) {
+                        d.takeDamage(damage, owner.mesh.position, isTail ? 15 : 10);
+                        this.hitList.add(d);
+                        owner.buffSystem.onEffectiveDamage(damage);
+                        owner.tryMeleeExplosion(d.mesh.position, damage);
+                        if (!isTail && !options.noRecoil) {
+                            const recoilDir = owner.mesh.position.clone().sub(d.mesh.position).normalize();
+                            recoilDir.y = 0;
+                            owner.knockbackVel.add(recoilDir.multiplyScalar(4));
+                        }
+                    }
+                });
 
                 if (state.levelManager && state.levelManager.blocks) {
                     state.levelManager.blocks.forEach(block => {
@@ -934,11 +996,11 @@ class Gidora {
                         if (block.mesh.position.distanceTo(ring.position) < radius + 2.5) {
                             const didDamage = state.levelManager.damageBlock(block, damage);
                             this.hitList.add(block);
-                            if (didDamage) BuffSystem.onEffectiveDamage(damage);
+                            if (didDamage) owner.buffSystem.onEffectiveDamage(damage);
                             if (!isTail && !options.noRecoil) {
-                                const recoilDir = window.gidoraInstance.mesh.position.clone().sub(block.mesh.position).normalize();
+                                const recoilDir = owner.mesh.position.clone().sub(block.mesh.position).normalize();
                                 recoilDir.y = 0;
-                                window.gidoraInstance.knockbackVel.add(recoilDir.multiplyScalar(5));
+                                owner.knockbackVel.add(recoilDir.multiplyScalar(5));
                             }
                         }
                     });
@@ -979,20 +1041,21 @@ class Gidora {
         const dir = targetPos.clone().sub(startPos).normalize();
         const bullet = new Bullet(playerIndex, startPos, dir, CONFIG.combat.fireballSpeed, 1.4, 0, 0.45, {
             damage,
-            color: CONFIG.visuals.colors[playerIndex],
+            color: this.colors[playerIndex],
             knockback: 16,
             penetration: 0
         });
+        bullet.attackerDragon = this;
         bullet.targetPoint = targetPos.clone();
         bullet.explodeRadius = CONFIG.combat.fireballRadius;
         bullet.onImpact = (b) => {
-            this.createAreaDamage(b.mesh.position.clone(), CONFIG.combat.fireballRadius, damage, CONFIG.visuals.colors[playerIndex], { heavy: true });
+            this.createAreaDamage(b.mesh.position.clone(), CONFIG.combat.fireballRadius, damage, this.colors[playerIndex], { heavy: true });
         };
         state.bullets.push(bullet);
     }
 
     tryMeleeExplosion(pos, sourceDamage) {
-        if (!BuffSystem.isActive('meleeExplosion')) return;
+        if (!this.buffSystem.isActive('meleeExplosion')) return;
         if (Math.random() >= CONFIG.buffs.meleeExplosionChance) return;
         this.createAreaDamage(pos.clone(), 3.5, sourceDamage * 0.6, 0xff6600, { stagger: 45 });
     }
@@ -1004,7 +1067,7 @@ class Gidora {
         origin.y = 1.3;
         const range = CONFIG.combat.flamethrowerRange;
         const halfAngle = CONFIG.combat.flamethrowerAngle;
-        const damage = CONFIG.combat.flamethrowerDamagePerSecond * dt * BuffSystem.getMeleeMultiplier();
+        const damage = CONFIG.combat.flamethrowerDamagePerSecond * dt * this.buffSystem.getMeleeMultiplier();
 
         this.flamethrowerTimers[playerIndex] = (this.flamethrowerTimers[playerIndex] || 0) + dt;
         if (this.flamethrowerTimers[playerIndex] >= 0.035) {
@@ -1039,7 +1102,7 @@ class Gidora {
             state.enemyManager.enemies.forEach(e => {
                 if (e.isDead || !isInCone(e.mesh.position)) return;
                 e.takeDamage(damage, origin, CONFIG.combat.flamethrowerKnockback);
-                BuffSystem.onEffectiveDamage(damage);
+                this.buffSystem.onEffectiveDamage(damage);
             });
         }
 
@@ -1048,26 +1111,34 @@ class Gidora {
                 if (block.isDead || !block.solid || !block.destructible) return;
                 if (!isInCone(block.mesh.position)) return;
                 const didDamage = state.levelManager.damageBlock(block, damage * CONFIG.combat.flamethrowerBlockDamageScale);
-                if (didDamage) BuffSystem.onEffectiveDamage(damage * CONFIG.combat.flamethrowerBlockDamageScale);
+                if (didDamage) this.buffSystem.onEffectiveDamage(damage * CONFIG.combat.flamethrowerBlockDamageScale);
             });
         }
     }
 
     updateRamStagger(dt) {
-        if (!BuffSystem.isActive('ramStagger')) return;
-        if (!state.enemyManager || this.velocity.length() < CONFIG.buffs.ramSpeedThreshold) return;
-        state.enemyManager.enemies.forEach(e => {
-            if (e.isDead) return;
-            const lastHit = this.lastRamHit.get(e) || 0;
+        if (!this.buffSystem.isActive('ramStagger')) return;
+        if (this.velocity.length() < CONFIG.buffs.ramSpeedThreshold) return;
+        const applyRam = (target) => {
+            const lastHit = this.lastRamHit.get(target) || 0;
             if (lastHit > 0) {
-                this.lastRamHit.set(e, lastHit - dt);
+                this.lastRamHit.set(target, lastHit - dt);
                 return;
             }
-            if (e.mesh.position.distanceTo(this.mesh.position) > 2.0) return;
-            e.takeDamage(CONFIG.buffs.ramDamage, this.mesh.position, CONFIG.buffs.ramKnockback);
-            if (e.addStagger) e.addStagger(CONFIG.buffs.ramStagger, this.mesh.position);
-            BuffSystem.onEffectiveDamage(CONFIG.buffs.ramDamage);
-            this.lastRamHit.set(e, 0.8);
+            if (target.mesh.position.distanceTo(this.mesh.position) > 2.0) return;
+            target.takeDamage(CONFIG.buffs.ramDamage, this.mesh.position, CONFIG.buffs.ramKnockback);
+            if (target.addStagger) target.addStagger(CONFIG.buffs.ramStagger, this.mesh.position);
+            this.buffSystem.onEffectiveDamage(CONFIG.buffs.ramDamage);
+            this.lastRamHit.set(target, 0.8);
+        };
+        if (state.enemyManager) {
+            state.enemyManager.enemies.forEach(e => {
+                if (!e.isDead) applyRam(e);
+            });
+        }
+        // PVP：高速衝撞也對其他三頭龍生效
+        state.dragons.forEach(d => {
+            if (d && d !== this && !d.isDead) applyRam(d);
         });
     }
 
@@ -1085,34 +1156,34 @@ class Gidora {
         const beamWidth = beamCfg.width;
         const now = Date.now();
 
-        if (state.beamPhase === 'prefire') {
-            state.beamCharge = maxCharge;
-            state.beamPreFireTimer -= dt;
-            const progress = 1.0 - (state.beamPreFireTimer / beamCfg.preFireDelay);
+        if (this.beamPhase === 'prefire') {
+            this.beamCharge = maxCharge;
+            this.beamPreFireTimer -= dt;
+            const progress = 1.0 - (this.beamPreFireTimer / beamCfg.preFireDelay);
             this.beamChargeRing.position.copy(this.mesh.position);
             this.beamChargeRing.position.y = 0.2;
             const flicker = 0.5 + Math.sin(progress * 40) * 0.5;
             this.beamChargeRing.material.opacity = flicker;
             this.beamChargeRing.scale.setScalar(0.8 + progress * 1.5);
 
-            if (state.beamPreFireTimer <= 0) {
-                state.beamPhase = 'firing';
-                state.beamFiringTimer = beamCfg.firingDuration;
-                state.beamDotTimer = 0;
+            if (this.beamPreFireTimer <= 0) {
+                this.beamPhase = 'firing';
+                this.beamFiringTimer = beamCfg.firingDuration;
+                this.beamDotTimer = 0;
                 this.beamChargeRing.material.opacity = 0;
                 this.beamMesh.visible = true;
                 if (this.beamGlowMesh) this.beamGlowMesh.visible = true;
                 if (this.beamImpactMesh) this.beamImpactMesh.visible = true;
             }
         }
-        else if (state.beamPhase === 'firing') {
-            state.beamFiringTimer -= dt;
-            if (state.beamFiringTimer <= 0) {
-                state.beamCharge = 0;
-                state.beamPhase = 'postfire';
-                state.beamPostFireTimer = beamCfg.postFireDelay;
+        else if (this.beamPhase === 'firing') {
+            this.beamFiringTimer -= dt;
+            if (this.beamFiringTimer <= 0) {
+                this.beamCharge = 0;
+                this.beamPhase = 'postfire';
+                this.beamPostFireTimer = beamCfg.postFireDelay;
                 // Phase 1: 啟動合體技 CD
-                state.comboCooldown = state.comboCooldownMax;
+                this.comboCooldown = this.comboCooldownMax;
                 this._hideBeamFX();
                 return;
             }
@@ -1134,6 +1205,15 @@ class Gidora {
                     if (perp.length() < 1.2 + hitRadius) beamLength = Math.min(beamLength, along);
                 });
             }
+            // PVP：其他三頭龍會擋光束 (但不擋自己)
+            state.dragons.forEach(d => {
+                if (!d || d === this || d.isDead) return;
+                const toD = d.mesh.position.clone().sub(origin);
+                const along = toD.dot(forward);
+                if (along < 0 || along > beamLength) return;
+                const perp = toD.clone().sub(forward.clone().multiplyScalar(along));
+                if (perp.length() < 1.2 + hitRadius) beamLength = Math.min(beamLength, along);
+            });
             if (state.levelManager) {
                 state.levelManager.blocks.forEach(b => {
                     if (b.isDead) return;
@@ -1180,10 +1260,10 @@ class Gidora {
                 this.beamImpactLight.intensity = 3.5 + Math.sin(now * 0.028) * 1.5;
             }
 
-            state.beamDotTimer += dt;
-            if (state.beamDotTimer >= beamCfg.tickInterval) {
-                state.beamDotTimer = 0;
-                const damage = beamCfg.damagePerTick * beamCfg.damageScale * BuffSystem.getComboDamageMultiplier();
+            this.beamDotTimer += dt;
+            if (this.beamDotTimer >= beamCfg.tickInterval) {
+                this.beamDotTimer = 0;
+                const damage = beamCfg.damagePerTick * beamCfg.damageScale * this.buffSystem.getComboDamageMultiplier();
 
                 if (state.enemyManager) {
                     state.enemyManager.enemies.forEach(e => {
@@ -1194,13 +1274,25 @@ class Gidora {
                         const perp = toE.clone().sub(forward.clone().multiplyScalar(along));
                         if (perp.length() < 1.2 + hitRadius) {
                             e.takeDamage(damage, origin, 0);
-                            if (BuffSystem.isActive('beamSlow') && e.applySlow) {
+                            if (this.buffSystem.isActive('beamSlow') && e.applySlow) {
                                 e.applySlow(CONFIG.buffs.beamSlowFactor, CONFIG.buffs.beamSlowDuration);
                             }
-                            BuffSystem.onEffectiveDamage(damage);
+                            this.buffSystem.onEffectiveDamage(damage);
                         }
                     });
                 }
+                // PVP：光束 tick 也對其他龍生效
+                state.dragons.forEach(d => {
+                    if (!d || d === this || d.isDead) return;
+                    const toD = d.mesh.position.clone().sub(origin);
+                    const along = toD.dot(forward);
+                    if (along < 0 || along > beamLength + 1.2) return;
+                    const perp = toD.clone().sub(forward.clone().multiplyScalar(along));
+                    if (perp.length() < 1.2 + hitRadius) {
+                        d.takeDamage(damage, origin, 0);
+                        this.buffSystem.onEffectiveDamage(damage);
+                    }
+                });
                 if (state.levelManager) {
                     state.levelManager.blocks.forEach(b => {
                         if (b.isDead) return;
@@ -1212,19 +1304,19 @@ class Gidora {
                         const hw = (b.mesh.geometry.parameters.width || 2) / 2 + hitRadius;
                         const hd = (b.mesh.geometry.parameters.depth || 2) / 2 + hitRadius;
                         if (Math.abs(perp.x) < hw && Math.abs(perp.z) < hd) {
-                            if (state.levelManager.damageBlock(b, damage)) BuffSystem.onEffectiveDamage(damage);
+                            if (state.levelManager.damageBlock(b, damage)) this.buffSystem.onEffectiveDamage(damage);
                         }
                     });
                 }
             }
         }
-        else if (state.beamPhase === 'postfire') {
+        else if (this.beamPhase === 'postfire') {
             // Phase 1 修正: 後搖期間不再允許再蓄力 (避免「放開時跳到 0%」的視覺異常)
             // 統一在 idle 階段處理蓄力與衰減，後搖只負責倒數計時與衰減顯示
-            state.beamCharge = Math.max(0, state.beamCharge - beamCfg.decayRate * dt);
+            this.beamCharge = Math.max(0, this.beamCharge - beamCfg.decayRate * dt);
 
-            state.beamPostFireTimer -= dt;
-            if (state.beamPostFireTimer <= 0) state.beamPhase = 'idle';
+            this.beamPostFireTimer -= dt;
+            if (this.beamPostFireTimer <= 0) this.beamPhase = 'idle';
         }
     }
 
@@ -1232,7 +1324,7 @@ class Gidora {
         this.updateDragon(dt);
         if (this.hpBar) {
             this.hpBar.update(this.mesh.position, this.hp, this.maxHP, this.staggerValue, CONFIG.stagger.playerThreshold);
-            this.hpBar.setBuffIcons(BuffSystem.getActiveIconEntries());
+            this.hpBar.setBuffIcons(this.buffSystem.getActiveIconEntries());
         }
 
         this.updateStagger(dt);
@@ -1247,9 +1339,7 @@ class Gidora {
             this.fallTimer -= dt;
             this.mesh.rotation.x = THREE.MathUtils.lerp(this.mesh.rotation.x, -0.9, dt * 8);
             this.velocity.multiplyScalar(Math.max(0, 1 - 12 * dt));
-            camera.position.x = this.mesh.position.x;
-            camera.position.z = this.mesh.position.z + 10;
-            camera.lookAt(this.mesh.position.x, 1.2, this.mesh.position.z);
+            // 鏡頭跟隨改由 main.js 集中管理 (PVP 多龍模式需要中點跟隨)
             if (this.fallTimer <= 0) this.mesh.rotation.x = 0;
             return;
         } else if (Math.abs(this.mesh.rotation.x) > 0.001) {
@@ -1267,33 +1357,33 @@ class Gidora {
         const players = ['p1', 'p2', 'p3', 'p4'];
         const beamCfg = CONFIG.beam;
         const maxCharge = beamCfg.maxCharge;
-        const isBeamActive = (state.beamPhase !== 'idle');
+        const isBeamActive = (this.beamPhase !== 'idle');
 
         if (isBeamActive) {
             this.updateBeam(dt);
-            if (state.beamPhase === 'prefire' || state.beamPhase === 'postfire') return;
+            if (this.beamPhase === 'prefire' || this.beamPhase === 'postfire') return;
         }
 
         // Phase 1: Combo CD 倒數 (idle 階段)
-        if (state.beamPhase === 'idle' && state.comboCooldown > 0) {
-            state.comboCooldown = Math.max(0, state.comboCooldown - dt);
+        if (this.beamPhase === 'idle' && this.comboCooldown > 0) {
+            this.comboCooldown = Math.max(0, this.comboCooldown - dt);
         }
 
         // 蓄力邏輯 (idle 階段)；CD 期間禁止蓄力，按住也只會緩慢衰減
-        if (state.beamPhase === 'idle') {
-            const chargeCount = players.filter(p => state.input[p].charge).length;
+        if (this.beamPhase === 'idle') {
+            const chargeCount = players.filter(p => this.input[p].charge).length;
             const rates = beamCfg.chargeRates;
-            const onCooldown = state.comboCooldown > 0;
+            const onCooldown = this.comboCooldown > 0;
             const rate = (chargeCount > 0 && !onCooldown)
                 ? rates[Math.min(chargeCount, rates.length - 1)]
                 : -beamCfg.decayRate;
-            state.beamCharge = Math.min(maxCharge, Math.max(0, state.beamCharge + rate * dt));
+            this.beamCharge = Math.min(maxCharge, Math.max(0, this.beamCharge + rate * dt));
         }
 
-        if (state.beamPhase === 'idle' && state.beamCharge >= maxCharge && state.comboCooldown <= 0) {
-            state.beamCharge = maxCharge;
-            state.beamPhase = 'prefire';
-            state.beamPreFireTimer = beamCfg.preFireDelay;
+        if (this.beamPhase === 'idle' && this.beamCharge >= maxCharge && this.comboCooldown <= 0) {
+            this.beamCharge = maxCharge;
+            this.beamPhase = 'prefire';
+            this.beamPreFireTimer = beamCfg.preFireDelay;
             this.beamChargeRing.position.copy(this.mesh.position);
             return;
         }
@@ -1303,10 +1393,10 @@ class Gidora {
 
         // Attack input
         players.forEach(p => {
-            const isDown = state.input[p].attack;
+            const isDown = this.input[p].attack;
             const isPress = isDown && !this.lastAttackInput[p];
             const isRelease = !isDown && this.lastAttackInput[p];
-            this.lastAttackInput[p] = state.input[p].attack;
+            this.lastAttackInput[p] = this.input[p].attack;
             if (isPress) this.startAttackPress(p);
             if (isRelease) this.releaseAttackPress(p);
         });
@@ -1314,7 +1404,7 @@ class Gidora {
         // Visual: head colors
         players.forEach(p => {
             const headMap = { p1: this.p1HeadPart, p2: this.p2HeadPart, p3: this.p3HeadPart, p4: this.p4HeadPart };
-            const baseMap = { p1: CONFIG.visuals.colors.p1, p2: CONFIG.visuals.colors.p2, p3: CONFIG.visuals.colors.p3, p4: CONFIG.visuals.colors.p4 };
+            const baseMap = { p1: this.colors.p1, p2: this.colors.p2, p3: this.colors.p3, p4: this.colors.p4 };
             const head = headMap[p];
             if (!head) return;
             if (this.cooldowns[p] > 0) {
@@ -1337,9 +1427,9 @@ class Gidora {
         );
 
         players.forEach(p => {
-            const moveInput = state.input[p].move;
+            const moveInput = this.input[p].move;
             const hasInput = moveInput.lengthSq() > 0.01;
-            const isCharging = state.input[p].charge;
+            const isCharging = this.input[p].charge;
             const isMeleeAiming = this.attackStates[p] === 'charging';
 
             const arrowMap = { p1: this.p1Arrow, p2: this.p2Arrow, p3: this.p3Arrow, p4: this.p4Arrow };
@@ -1373,7 +1463,7 @@ class Gidora {
                 if (speedMult > 1.0) break;
             }
         }
-        if (BuffSystem.isActive('teamworkRegen') && speedMult > 1.0) {
+        if (this.buffSystem.isActive('teamworkRegen') && speedMult > 1.0) {
             this.heal(CONFIG.buffs.teamworkRegenPerSecond * dt);
         }
 
@@ -1386,8 +1476,8 @@ class Gidora {
             while (deltaAngle > Math.PI) deltaAngle -= Math.PI * 2;
             while (deltaAngle < -Math.PI) deltaAngle += Math.PI * 2;
 
-            const rotSpeedMult = (state.beamPhase === 'firing') ? 0.35 : 1.0;
-            const rotStep = CONFIG.movement.rotationSpeed * BuffSystem.getTurnMultiplier() * rotSpeedMult * dt;
+            const rotSpeedMult = (this.beamPhase === 'firing') ? 0.35 : 1.0;
+            const rotStep = CONFIG.movement.rotationSpeed * this.buffSystem.getTurnMultiplier() * rotSpeedMult * dt;
             if (Math.abs(deltaAngle) < rotStep) this.mesh.rotation.y = targetAngle;
             else this.mesh.rotation.y += Math.sign(deltaAngle) * rotStep;
 
@@ -1406,7 +1496,7 @@ class Gidora {
 
         const currentSpeed = this.velocity.length();
         const terrainSpeedFactor = state.levelManager ? state.levelManager.getSpeedFactor(this.mesh.position) : 1.0;
-        const maxSpeed = CONFIG.movement.maxSpeed * BuffSystem.getSpeedMultiplier() * terrainSpeedFactor * speedMult * turnPenalty;
+        const maxSpeed = CONFIG.movement.maxSpeed * this.buffSystem.getSpeedMultiplier() * terrainSpeedFactor * speedMult * turnPenalty;
         const forward = this.getForwardVector();
         const isInputting = totalInput.lengthSq() > 0.01 && !blocksMovement;
 
@@ -1419,7 +1509,7 @@ class Gidora {
                 currentDir.lerp(forward, traction).normalize();
                 this.velocity.copy(currentDir.multiplyScalar(currentSpeed));
             }
-            const accel = CONFIG.movement.acceleration * BuffSystem.getSpeedMultiplier() * terrainSpeedFactor * dt;
+            const accel = CONFIG.movement.acceleration * this.buffSystem.getSpeedMultiplier() * terrainSpeedFactor * dt;
             this.velocity.add(forward.multiplyScalar(accel));
             if (this.velocity.length() > maxSpeed) this.velocity.setLength(maxSpeed);
         } else {
@@ -1472,18 +1562,53 @@ class Gidora {
 
         this.updateRamStagger(dt);
 
-        // Camera follow
-        camera.position.x = this.mesh.position.x;
-        camera.position.z = this.mesh.position.z + 10;
-        camera.lookAt(this.mesh.position.x, 1.2, this.mesh.position.z);
-
+        // 鏡頭跟隨改由 main.js 統一管理；單龍 / PVP / 失衡跌倒皆由外部處理。
         if (!this.pulseScale) this.pulseScale = 1.0;
         if (this.pulseScale > 1.0) {
             this.pulseScale -= (this.pulseScale - 1.0) * 10.0 * dt;
             if (this.pulseScale < 1.0) this.pulseScale = 1.0;
         }
-        const buffScale = BuffSystem.getBodyVisualScale ? BuffSystem.getBodyVisualScale() : 1.0;
+        const buffScale = this.buffSystem.getBodyVisualScale ? this.buffSystem.getBodyVisualScale() : 1.0;
         const finalScale = this.pulseScale * buffScale;
         this.mesh.scale.set(finalScale, finalScale, finalScale);
+    }
+
+    destroy() {
+        if (this.buffSystem && this.buffSystem.clearAll) this.buffSystem.clearAll();
+        if (this.hpBar && this.hpBar.destroy) this.hpBar.destroy();
+
+        [
+            this.p1Arrow, this.p2Arrow, this.p3Arrow, this.p4Arrow,
+            this.beamMesh, this.beamGlowMesh, this.beamImpactMesh,
+            this.beamOriginLight, this.beamImpactLight, this.beamChargeRing
+        ].forEach(obj => {
+            if (!obj) return;
+            if (obj.parent) obj.parent.remove(obj);
+            if (obj.traverse) {
+                obj.traverse(child => {
+                    if (child.geometry) child.geometry.dispose();
+                    if (child.material && child.material.map) child.material.map.dispose();
+                    if (child.material) child.material.dispose();
+                });
+            }
+        });
+
+        if (this.attackLandingIndicators) {
+            Object.values(this.attackLandingIndicators).forEach(ring => {
+                if (!ring) return;
+                if (ring.parent) ring.parent.remove(ring);
+                if (ring.geometry) ring.geometry.dispose();
+                if (ring.material) ring.material.dispose();
+            });
+        }
+
+        if (this.mesh && this.mesh.parent) this.mesh.parent.remove(this.mesh);
+        if (this.mesh && this.mesh.traverse) {
+            this.mesh.traverse(child => {
+                if (child.geometry) child.geometry.dispose();
+                if (child.material && child.material.map) child.material.map.dispose();
+                if (child.material) child.material.dispose();
+            });
+        }
     }
 }

@@ -1,6 +1,8 @@
 // =====================================================================
 // buffs.js — Buff 系統
-// classic script；所有資料與系統掛在全域，供 Gidora / UI / Enemy 使用。
+// PVP 重構：BuffSystem 改為 class，每隻三頭龍 (Gidora) 持有自己的 instance。
+// 透過 `this.dragon` 取得目標龍；所有原本 `window.gidoraInstance` /
+// `state.beamPhase` 等 singleton 用法都改為 `this.dragon.xxx`。
 // =====================================================================
 
 const BUFFS = {
@@ -120,19 +122,22 @@ function createBuffIconSprite(id, stack) {
     return sprite;
 }
 
-const BuffSystem = {
-    active: new Map(),
-    timers: {},
-    objects: {
-        poisonPools: [],
-        leafShields: [],
-        poisonClouds: [],
-        missileNest: null
-    },
-    lowHpExplosionUsed: false,
-    lastPoisonDropPos: null,
-    poisonDropTimer: 0,
-    lastStepShockwavePos: null,
+class BuffSystem {
+    constructor(dragon) {
+        this.dragon = dragon;
+        this.active = new Map();
+        this.timers = {};
+        this.objects = {
+            poisonPools: [],
+            leafShields: [],
+            poisonClouds: [],
+            missileNest: null
+        };
+        this.lowHpExplosionUsed = false;
+        this.lastPoisonDropPos = null;
+        this.poisonDropTimer = 0;
+        this.lastStepShockwavePos = null;
+    }
 
     toggle(id) {
         const cfg = BUFFS[id];
@@ -152,14 +157,14 @@ const BuffSystem = {
             this.active.set(id, 1);
         }
         this.refreshPlayerStats();
-    },
+    }
 
     addStack(id) {
         const cfg = BUFFS[id];
         if (!cfg || !cfg.stackable) return;
         this.active.set(id, (this.active.get(id) || 0) + 1);
         this.refreshPlayerStats();
-    },
+    }
 
     removeStack(id) {
         const cfg = BUFFS[id];
@@ -168,7 +173,7 @@ const BuffSystem = {
         if (next > 0) this.active.set(id, next);
         else this.active.delete(id);
         this.refreshPlayerStats();
-    },
+    }
 
     setStack(id, stack) {
         const cfg = BUFFS[id];
@@ -177,88 +182,109 @@ const BuffSystem = {
         if (next > 0) this.active.set(id, next);
         else this.active.delete(id);
         this.refreshPlayerStats();
-    },
+    }
 
     clear(id) {
         this.active.delete(id);
         this.refreshPlayerStats();
-    },
+    }
+
+    clearAll() {
+        const ids = Array.from(this.active.keys());
+        this.active.clear();
+        // 清掉視覺物件
+        this.objects.leafShields.forEach(s => this._disposeMesh(s.mesh));
+        this.objects.leafShields = [];
+        this.objects.poisonPools.forEach(p => this._disposeMesh(p.mesh));
+        this.objects.poisonPools = [];
+        this.objects.poisonClouds.forEach(cloud => {
+            cloud.puffs.forEach(p => this._disposeMesh(p.mesh));
+        });
+        this.objects.poisonClouds = [];
+        if (this.objects.missileNest) {
+            this._disposeMesh(this.objects.missileNest);
+            this.objects.missileNest = null;
+        }
+        this.lowHpExplosionUsed = false;
+        this.refreshPlayerStats();
+        return ids;
+    }
 
     isActive(id) {
         return this.active.has(id);
-    },
+    }
 
     getStack(id) {
         return this.active.get(id) || 0;
-    },
+    }
 
     getActiveIconEntries() {
         return Array.from(this.active.entries()).map(([id, stack]) => ({ id, stack }));
-    },
+    }
 
     getBodyVisualScale() {
         return 1 + this.getStack('hpBoost') * CONFIG.buffs.hpVisualScalePerStack;
-    },
+    }
 
     getMeleeForm() {
         if (this.isActive('meleeFireball')) return 'fireball';
         if (this.isActive('meleeShockwave')) return 'shockwave';
         if (this.isActive('meleeFlame')) return 'flame';
         return 'default';
-    },
+    }
 
     getHpMultiplier() {
         return 1 + CONFIG.buffs.hpBoostPct * this.getStack('hpBoost');
-    },
+    }
 
     getSpeedMultiplier() {
         return 1 + CONFIG.buffs.speedBoostPct * this.getStack('speedBoost');
-    },
+    }
 
     getTurnMultiplier() {
         return this.getSpeedMultiplier();
-    },
+    }
 
     getMeleeMultiplier() {
         return 1 + CONFIG.buffs.meleeBoostPct * this.getStack('meleeBoost');
-    },
+    }
 
     getComboCooldownMultiplier() {
         return this.isActive('comboCd') ? CONFIG.buffs.comboCooldownMultiplier : 1;
-    },
+    }
 
     getComboDamageMultiplier() {
         return this.isActive('comboDamage') ? CONFIG.buffs.comboDamageMultiplier : 1;
-    },
+    }
 
     refreshPlayerStats() {
-        const gidora = window.gidoraInstance;
-        if (!gidora) return;
-        const oldMax = gidora.maxHP || CONFIG.stats.playerHP;
-        gidora.maxHP = CONFIG.stats.playerHP * this.getHpMultiplier();
-        if (gidora.hp > gidora.maxHP) gidora.hp = gidora.maxHP;
-        if (gidora.hp === oldMax && gidora.maxHP > oldMax) gidora.hp = gidora.maxHP;
-        state.comboCooldownMax = CONFIG.combo.cooldown * this.getComboCooldownMultiplier();
-        state.comboCooldown = Math.min(state.comboCooldown, state.comboCooldownMax);
-    },
+        const dragon = this.dragon;
+        if (!dragon) return;
+        const oldMax = dragon.maxHP || CONFIG.stats.playerHP;
+        dragon.maxHP = CONFIG.stats.playerHP * this.getHpMultiplier();
+        if (dragon.hp > dragon.maxHP) dragon.hp = dragon.maxHP;
+        if (dragon.hp === oldMax && dragon.maxHP > oldMax) dragon.hp = dragon.maxHP;
+        dragon.comboCooldownMax = CONFIG.combo.cooldown * this.getComboCooldownMultiplier();
+        dragon.comboCooldown = Math.min(dragon.comboCooldown, dragon.comboCooldownMax);
+    }
 
     onEffectiveDamage(amount) {
-        const gidora = window.gidoraInstance;
-        if (!gidora || amount <= 0) return;
+        const dragon = this.dragon;
+        if (!dragon || amount <= 0) return;
 
         if (this.isActive('lifeSteal')) {
             const healAmount = amount * CONFIG.buffs.lifeStealPct;
-            gidora.heal(healAmount);
-            this._spawnHealCross(gidora);
+            dragon.heal(healAmount);
+            this._spawnHealCross(dragon);
         }
         if (this.isActive('comboRamp')) {
-            gidora.comboRampStacks = Math.min(
+            dragon.comboRampStacks = Math.min(
                 CONFIG.buffs.comboDamageMaxStacks,
-                (gidora.comboRampStacks || 0) + 1
+                (dragon.comboRampStacks || 0) + 1
             );
-            gidora.comboRampTimer = CONFIG.buffs.comboDamageWindow;
+            dragon.comboRampTimer = CONFIG.buffs.comboDamageWindow;
         }
-    },
+    }
 
     blockIncomingDamage(sourcePos) {
         if (!this.isActive('leafShield')) return false;
@@ -268,40 +294,41 @@ const BuffSystem = {
         shield.mesh.visible = false;
         this._spawnRing(sourcePos || shield.mesh.position, 0x99ff55, 2.0);
         return true;
-    },
+    }
 
-    reflectProjectile(bullet, gidora) {
+    reflectProjectile(bullet, dragon) {
         if (!this.isActive('reflectProjectile')) return false;
         if (Math.random() >= CONFIG.buffs.projectileReflectChance) return false;
-        const dir = bullet.mesh.position.clone().sub(gidora.mesh.position).normalize();
+        const dir = bullet.mesh.position.clone().sub(dragon.mesh.position).normalize();
         dir.y = Math.max(0.05, dir.y);
         bullet.isEnemy = false;
         bullet.owner = 'reflected';
+        bullet.attackerDragon = dragon; // 反彈後子彈視為由反彈方發出
         bullet.velocity.copy(dir.multiplyScalar(bullet.speed || 16));
         bullet.damage = Math.max(bullet.damage || 5, 10);
         bullet.knockback = 12;
         bullet.hitEntities = new Set();
         if (bullet.mesh && bullet.mesh.material) bullet.mesh.material.color.setHex(0x99ff55);
         return true;
-    },
+    }
 
     update(dt) {
-        const gidora = window.gidoraInstance;
-        if (!gidora) return;
+        const dragon = this.dragon;
+        if (!dragon) return;
 
         this.refreshPlayerStats();
-        this._updateLeafShields(dt, gidora);
-        this._updatePoisonTrail(dt, gidora);
+        this._updateLeafShields(dt, dragon);
+        this._updatePoisonTrail(dt, dragon);
         this._updatePoisonPools(dt);
-        this._updateMissileNest(dt, gidora);
-        this._updateStepShockwave(gidora);
-        this._updatePoisonCloud(dt, gidora);
+        this._updateMissileNest(dt, dragon);
+        this._updateStepShockwave(dragon);
+        this._updatePoisonCloud(dt, dragon);
         this._updatePoisonClouds(dt);
-        this._updateLowHpExplosion(gidora);
-        this._updateBuffVisuals(dt, gidora);
-    },
+        this._updateLowHpExplosion(dragon);
+        this._updateBuffVisuals(dt, dragon);
+    }
 
-    _updateLeafShields(dt, gidora) {
+    _updateLeafShields(dt, dragon) {
         if (!this.isActive('leafShield')) {
             this.objects.leafShields.forEach(s => this._disposeMesh(s.mesh));
             this.objects.leafShields = [];
@@ -321,23 +348,23 @@ const BuffSystem = {
             s.cooldown = Math.max(0, (s.cooldown || 0) - dt);
             if (s.cooldown <= 0) s.mesh.visible = true;
             s.angle = t + (i / CONFIG.buffs.leafShieldCount) * Math.PI * 2;
-            s.mesh.position.copy(gidora.mesh.position).add(new THREE.Vector3(Math.cos(s.angle) * 2.1, 1.8, Math.sin(s.angle) * 2.1));
+            s.mesh.position.copy(dragon.mesh.position).add(new THREE.Vector3(Math.cos(s.angle) * 2.1, 1.8, Math.sin(s.angle) * 2.1));
             s.mesh.lookAt(camera.position);
         });
-    },
+    }
 
-    _updatePoisonTrail(dt, gidora) {
-        if (!this.isActive('poisonTrail') || gidora.velocity.lengthSq() < 1.0) return;
+    _updatePoisonTrail(dt, dragon) {
+        if (!this.isActive('poisonTrail') || dragon.velocity.lengthSq() < 1.0) return;
         this.poisonDropTimer -= dt;
         if (this.poisonDropTimer > 0) return;
         this.poisonDropTimer = CONFIG.terrain.poisonDropInterval;
 
-        const pos = gidora.mesh.position.clone();
+        const pos = dragon.mesh.position.clone();
         pos.y = 0.03;
         if (this.lastPoisonDropPos && this.lastPoisonDropPos.distanceTo(pos) < 1.0) return;
         this.lastPoisonDropPos = pos.clone();
         this._spawnPoisonPool(pos, 2.1, CONFIG.terrain.poisonLife, true);
-    },
+    }
 
     _spawnPoisonPool(pos, radius, life, slows) {
         const geo = new THREE.CircleGeometry(radius, 24);
@@ -347,7 +374,7 @@ const BuffSystem = {
         mesh.position.copy(pos);
         scene.add(mesh);
         this.objects.poisonPools.push({ mesh, radius, life, maxLife: life, slows, damageTimer: 0 });
-    },
+    }
 
     _updatePoisonPools(dt) {
         for (let i = this.objects.poisonPools.length - 1; i >= 0; i--) {
@@ -357,16 +384,16 @@ const BuffSystem = {
             pool.damageTimer += dt;
             if (pool.damageTimer >= 0.5) {
                 pool.damageTimer = 0;
-                this._damageEnemiesInRadius(pool.mesh.position, pool.radius, CONFIG.terrain.poisonDamagePerSecond * 0.5, pool.slows);
+                this._damageTargetsInRadius(pool.mesh.position, pool.radius, CONFIG.terrain.poisonDamagePerSecond * 0.5, pool.slows);
             }
             if (pool.life <= 0) {
                 this._disposeMesh(pool.mesh);
                 this.objects.poisonPools.splice(i, 1);
             }
         }
-    },
+    }
 
-    _updateMissileNest(dt, gidora) {
+    _updateMissileNest(dt, dragon) {
         if (!this.isActive('missileNest')) {
             if (this.objects.missileNest) {
                 this._disposeMesh(this.objects.missileNest);
@@ -396,20 +423,28 @@ const BuffSystem = {
         }
 
         const bodyScale = this.getBodyVisualScale();
-        this.objects.missileNest.position.copy(gidora.mesh.position);
+        this.objects.missileNest.position.copy(dragon.mesh.position);
         this.objects.missileNest.position.y += 2.35 * bodyScale + 0.35;
-        this.objects.missileNest.quaternion.copy(gidora.mesh.quaternion);
+        this.objects.missileNest.quaternion.copy(dragon.mesh.quaternion);
 
         this.timers.missile = (this.timers.missile || 0) - dt;
         if (this.timers.missile > 0) return;
         this.timers.missile = CONFIG.buffs.missileInterval;
 
-        if (!state.enemyManager) return;
-        const target = state.enemyManager.enemies.find(e => !e.isDead);
+        // 找一個目標：先找敵人，再找另一隻 PVP 三頭龍
+        let target = null;
+        if (state.enemyManager) {
+            target = state.enemyManager.enemies.find(e => !e.isDead);
+        }
+        if (!target) {
+            const otherDragon = state.dragons.find(d => d && d !== dragon && !d.isDead);
+            if (otherDragon) target = { mesh: otherDragon.mesh };
+        }
         if (!target) return;
+
         const startPos = this.objects.missileNest
             ? this.objects.missileNest.position.clone()
-            : gidora.mesh.position.clone();
+            : dragon.mesh.position.clone();
         startPos.y += 0.4;
         const dir = target.mesh.position.clone().sub(startPos).normalize();
         const missile = new Bullet('p1', startPos, dir, CONFIG.buffs.missileSpeed, 4.0, 0, 0.35, {
@@ -420,29 +455,30 @@ const BuffSystem = {
             homingStrength: 3.5,
             knockback: 18
         });
+        missile.attackerDragon = dragon; // 飛彈視為由本龍發出
         state.bullets.push(missile);
-    },
+    }
 
-    _updateStepShockwave(gidora) {
+    _updateStepShockwave(dragon) {
         if (!this.isActive('stepShockwave')) {
-            this.lastStepShockwavePos = gidora.mesh.position.clone();
+            this.lastStepShockwavePos = dragon.mesh.position.clone();
             return;
         }
-        if (!this.lastStepShockwavePos) this.lastStepShockwavePos = gidora.mesh.position.clone();
-        if (this.lastStepShockwavePos.distanceTo(gidora.mesh.position) < CONFIG.buffs.stepShockwaveDistance) return;
-        this.lastStepShockwavePos.copy(gidora.mesh.position);
-        gidora.createShockwaveBlast(gidora.mesh.position.clone(), 4.0, CONFIG.buffs.stepShockwaveDamage, 45);
-    },
+        if (!this.lastStepShockwavePos) this.lastStepShockwavePos = dragon.mesh.position.clone();
+        if (this.lastStepShockwavePos.distanceTo(dragon.mesh.position) < CONFIG.buffs.stepShockwaveDistance) return;
+        this.lastStepShockwavePos.copy(dragon.mesh.position);
+        dragon.createShockwaveBlast(dragon.mesh.position.clone(), 4.0, CONFIG.buffs.stepShockwaveDamage, 45);
+    }
 
-    _updatePoisonCloud(dt, gidora) {
+    _updatePoisonCloud(dt, dragon) {
         if (!this.isActive('poisonCloud')) return;
         this.timers.poisonCloud = (this.timers.poisonCloud || CONFIG.buffs.poisonCloudInterval) - dt;
         if (this.timers.poisonCloud > 0) return;
         this.timers.poisonCloud = CONFIG.buffs.poisonCloudInterval;
-        const pos = gidora.mesh.position.clone();
+        const pos = dragon.mesh.position.clone();
         pos.y = 1.2;
         this._spawnPoisonCloud(pos, CONFIG.buffs.poisonCloudRadius, CONFIG.buffs.poisonCloudDuration);
-    },
+    }
 
     _spawnPoisonCloud(pos, radius, life) {
         const cloud = { pos: pos.clone(), radius, life, maxLife: life, damageTimer: 0, puffs: [] };
@@ -471,7 +507,7 @@ const BuffSystem = {
             });
         }
         this.objects.poisonClouds.push(cloud);
-    },
+    }
 
     _updatePoisonClouds(dt) {
         for (let i = this.objects.poisonClouds.length - 1; i >= 0; i--) {
@@ -487,7 +523,7 @@ const BuffSystem = {
             cloud.damageTimer += dt;
             if (cloud.damageTimer >= 0.5) {
                 cloud.damageTimer = 0;
-                this._damageEnemiesInRadius(cloud.pos, cloud.radius, CONFIG.terrain.poisonDamagePerSecond * 0.5, false);
+                this._damageTargetsInRadius(cloud.pos, cloud.radius, CONFIG.terrain.poisonDamagePerSecond * 0.5, false);
             }
 
             if (cloud.life <= 0) {
@@ -495,44 +531,44 @@ const BuffSystem = {
                 this.objects.poisonClouds.splice(i, 1);
             }
         }
-    },
+    }
 
-    _updateLowHpExplosion(gidora) {
+    _updateLowHpExplosion(dragon) {
         if (!this.isActive('lowHpExplosion') || this.lowHpExplosionUsed) return;
-        if (gidora.hp > gidora.maxHP * 0.5) return;
+        if (dragon.hp > dragon.maxHP * 0.5) return;
         this.lowHpExplosionUsed = true;
-        gidora.createAreaDamage(gidora.mesh.position.clone(), CONFIG.buffs.lowHpExplosionRadius, CONFIG.buffs.lowHpExplosionDamage, 0xffaa00, { stagger: 100 });
-    },
+        dragon.createAreaDamage(dragon.mesh.position.clone(), CONFIG.buffs.lowHpExplosionRadius, CONFIG.buffs.lowHpExplosionDamage, 0xffaa00, { stagger: 100 });
+    }
 
-    _updateBuffVisuals(dt, gidora) {
-        if (gidora.tailGroup) {
+    _updateBuffVisuals(dt, dragon) {
+        if (dragon.tailGroup) {
             const tailScale = this.isActive('tailPower') ? 1.45 : 1.0;
-            gidora.tailGroup.scale.set(tailScale, tailScale, tailScale);
+            dragon.tailGroup.scale.set(tailScale, tailScale, tailScale);
         }
 
         this.timers.visualPulse = (this.timers.visualPulse || 0) - dt;
         if (this.timers.visualPulse > 0) return;
         this.timers.visualPulse = CONFIG.buffs.visualPulseInterval;
 
-        if (this.isActive('speedBoost') && gidora.velocity.lengthSq() > 0.2) {
-            this._spawnFeather(gidora);
+        if (this.isActive('speedBoost') && dragon.velocity.lengthSq() > 0.2) {
+            this._spawnFeather(dragon);
         }
-        if (this.isActive('lifeSteal')) this._spawnBuffParticle(gidora, 0xff3355, 2.4, 0.55);
-        if (this.isActive('meleeBoost')) this._spawnBuffParticle(gidora, 0xffcc33, 2.1, 0.55);
-        if (this.isActive('comboCd') && state.comboCooldown > 0) this._spawnRing(gidora.mesh.position, 0xaaaaaa, 1.1);
-        if (this.isActive('comboDamage')) this._spawnBuffParticle(gidora, 0xff55ff, 2.8, 0.6);
-        if (this.isActive('directionalGuard')) this._spawnGuardArc(gidora);
-        if (this.isActive('reflectProjectile')) this._spawnRing(gidora.mesh.position, 0x99ffdd, 1.4);
-        if (this.isActive('beamSlow')) this._spawnBuffParticle(gidora, 0xaaddff, 2.6, 0.6);
-        if (this.isActive('staggerImmune')) this._spawnBuffParticle(gidora, 0xffffff, 2.7, 0.6);
-        if (this.isActive('stationaryShield') && gidora.stationaryTimer >= CONFIG.buffs.stationaryShieldDelay) this._spawnRing(gidora.mesh.position, 0xd8fff5, 1.6);
-        if (this.isActive('teamworkRegen')) this._spawnBuffParticle(gidora, 0x66ff99, 2.2, 0.5);
-        if (this.isActive('comboInvincible') && state.beamPhase === 'firing') this._spawnRing(gidora.mesh.position, 0xffffff, 2.0);
-    },
+        if (this.isActive('lifeSteal')) this._spawnBuffParticle(dragon, 0xff3355, 2.4, 0.55);
+        if (this.isActive('meleeBoost')) this._spawnBuffParticle(dragon, 0xffcc33, 2.1, 0.55);
+        if (this.isActive('comboCd') && dragon.comboCooldown > 0) this._spawnRing(dragon.mesh.position, 0xaaaaaa, 1.1);
+        if (this.isActive('comboDamage')) this._spawnBuffParticle(dragon, 0xff55ff, 2.8, 0.6);
+        if (this.isActive('directionalGuard')) this._spawnGuardArc(dragon);
+        if (this.isActive('reflectProjectile')) this._spawnRing(dragon.mesh.position, 0x99ffdd, 1.4);
+        if (this.isActive('beamSlow')) this._spawnBuffParticle(dragon, 0xaaddff, 2.6, 0.6);
+        if (this.isActive('staggerImmune')) this._spawnBuffParticle(dragon, 0xffffff, 2.7, 0.6);
+        if (this.isActive('stationaryShield') && dragon.stationaryTimer >= CONFIG.buffs.stationaryShieldDelay) this._spawnRing(dragon.mesh.position, 0xd8fff5, 1.6);
+        if (this.isActive('teamworkRegen')) this._spawnBuffParticle(dragon, 0x66ff99, 2.2, 0.5);
+        if (this.isActive('comboInvincible') && dragon.beamPhase === 'firing') this._spawnRing(dragon.mesh.position, 0xffffff, 2.0);
+    }
 
-    _spawnBuffParticle(gidora, color, height, scale) {
+    _spawnBuffParticle(dragon, color, height, scale) {
         const angle = Math.random() * Math.PI * 2;
-        const pos = gidora.mesh.position.clone().add(new THREE.Vector3(Math.cos(angle) * 1.5, height, Math.sin(angle) * 1.5));
+        const pos = dragon.mesh.position.clone().add(new THREE.Vector3(Math.cos(angle) * 1.5, height, Math.sin(angle) * 1.5));
         const p = new Particle(pos, color);
         p.velocity.multiplyScalar(0.2);
         p.velocity.y = Math.abs(p.velocity.y) + 1.5;
@@ -540,12 +576,12 @@ const BuffSystem = {
         p.maxLife = 0.45;
         p.mesh.scale.setScalar(scale);
         state.particles.push(p);
-    },
+    }
 
-    _spawnFeather(gidora) {
-        const back = gidora.getForwardVector().normalize().negate();
+    _spawnFeather(dragon) {
+        const back = dragon.getForwardVector().normalize().negate();
         const side = new THREE.Vector3(back.z, 0, -back.x).multiplyScalar((Math.random() - 0.5) * 1.8);
-        const pos = gidora.mesh.position.clone().add(back.multiplyScalar(1.8)).add(side);
+        const pos = dragon.mesh.position.clone().add(back.multiplyScalar(1.8)).add(side);
         pos.y = 1.0 + Math.random() * 1.3;
         const p = new Particle(pos, 0xf3f3f3);
         p.velocity.set((Math.random() - 0.5) * 1.5, 1 + Math.random(), (Math.random() - 0.5) * 1.5);
@@ -553,22 +589,22 @@ const BuffSystem = {
         p.maxLife = 0.7;
         p.mesh.scale.set(0.18, 0.5, 0.08);
         state.particles.push(p);
-    },
+    }
 
-    _spawnGuardArc(gidora) {
-        const pos = gidora.mesh.position.clone().add(gidora.getForwardVector().normalize().multiplyScalar(1.6));
+    _spawnGuardArc(dragon) {
+        const pos = dragon.mesh.position.clone().add(dragon.getForwardVector().normalize().multiplyScalar(1.6));
         pos.y = 0.1;
         this._spawnRing(pos, 0x88bbff, 1.0);
-    },
+    }
 
-    _spawnHealCross(gidora) {
+    _spawnHealCross(dragon) {
         const group = new THREE.Group();
         const mat = new THREE.MeshBasicMaterial({ color: 0x66ff88, transparent: true, opacity: 0.95, depthTest: false });
         const v = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.9, 0.08), mat);
         const h = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.18, 0.08), mat.clone());
         group.add(v);
         group.add(h);
-        group.position.copy(gidora.mesh.position);
+        group.position.copy(dragon.mesh.position);
         group.position.y += 3.0 * this.getBodyVisualScale();
         scene.add(group);
         state.particles.push({
@@ -594,17 +630,26 @@ const BuffSystem = {
                 return true;
             }
         });
-    },
+    }
 
-    _damageEnemiesInRadius(pos, radius, damage, slows) {
-        if (!state.enemyManager) return;
-        state.enemyManager.enemies.forEach(e => {
-            if (e.isDead || e.mesh.position.distanceTo(pos) > radius + 0.8) return;
-            e.takeDamage(damage, pos, 0);
+    // 對範圍內的「敵人 + 其他三頭龍」造成傷害；slows 為 true 時順帶緩速
+    _damageTargetsInRadius(pos, radius, damage, slows) {
+        const owner = this.dragon;
+        if (state.enemyManager) {
+            state.enemyManager.enemies.forEach(e => {
+                if (e.isDead || e.mesh.position.distanceTo(pos) > radius + 0.8) return;
+                e.takeDamage(damage, pos, 0);
+                this.onEffectiveDamage(damage);
+                if (slows && e.applySlow) e.applySlow(CONFIG.terrain.poisonSlowFactor, 0.7);
+            });
+        }
+        state.dragons.forEach(d => {
+            if (!d || d === owner || d.isDead) return;
+            if (d.mesh.position.distanceTo(pos) > radius + 0.8) return;
+            d.takeDamage(damage, pos, 0);
             this.onEffectiveDamage(damage);
-            if (slows && e.applySlow) e.applySlow(CONFIG.terrain.poisonSlowFactor, 0.7);
         });
-    },
+    }
 
     _spawnRing(pos, color, expandScale) {
         if (!pos) return;
@@ -632,7 +677,7 @@ const BuffSystem = {
                 return true;
             }
         });
-    },
+    }
 
     _disposeMesh(mesh) {
         if (!mesh) return;
@@ -643,4 +688,4 @@ const BuffSystem = {
             if (obj.material) obj.material.dispose();
         });
     }
-};
+}

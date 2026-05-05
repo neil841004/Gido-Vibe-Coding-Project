@@ -37,7 +37,21 @@
             background: rgba(0, 0, 0, 0.5);
             padding: 10px;
             border-radius: 5px;
-            min-width: 300px;
+            min-width: 190px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            z-index: 15;
+        }
+
+        #info button {
+            pointer-events: auto;
+            color: white;
+            border: 1px solid rgba(255,255,255,0.18);
+            border-radius: 5px;
+            padding: 7px 10px;
+            cursor: pointer;
+            font-weight: 700;
         }
 
         /* 蓄力條樣式 — 移除 width transition 以避免「放開時跳到 0%」的視覺異常 */
@@ -117,14 +131,8 @@
 
 <body>
     <div id="info">
-        <h3>Gidora Dragon Prototype — Ultra (4P)</h3>
-        <p>1P (Red): WASD + Click (Headbutt)</p>
-        <p>2P (Blue): Arrows + Enter (Headbutt)</p>
-        <p>3P (Pink): IJKL + Space (Headbutt)</p>
-        <p>4P (Cyan): TFGH + V (Tail Attack)</p>
-        <div id="debug"></div>
         <button id="spawner-toggle"
-            style="margin-top:10px; pointer-events:auto; background-color: #44aa44; color: white;">Enemy Spawner: OFF</button>
+            style="background-color: #44aa44;">Enemy Spawner: OFF</button>
     </div>
 
     <!-- 蓄力條 UI -->
