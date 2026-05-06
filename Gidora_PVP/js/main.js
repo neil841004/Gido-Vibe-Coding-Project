@@ -54,6 +54,10 @@ function resetDragonForBattle(dragon, index, clearBuffs = false) {
     dragon.staggerValue = 0;
     dragon.staggerWindowTimer = 0;
     dragon.fallTimer = 0;
+    dragon.standUpTimer = 0;
+    dragon.standUpStartRotationX = 0;
+    dragon.slowTimer = 0;
+    dragon.slowFactor = 1.0;
     dragon.beamCharge = 0;
     dragon.beamPhase = 'idle';
     dragon.comboCooldown = 0;
@@ -107,6 +111,8 @@ function clearTransientBattleObjects() {
     }
     state.particles.forEach(p => {
         if (p.mesh && p.mesh.parent) p.mesh.parent.remove(p.mesh);
+        if (p.mesh && p.mesh.geometry) p.mesh.geometry.dispose();
+        if (p.mesh && p.mesh.material) p.mesh.material.dispose();
     });
     state.particles = [];
     state.flyingCorpses.forEach(c => {
@@ -150,6 +156,8 @@ function enterPvpBattle() {
     state.pvp.active = true;
     state.pvp.ended = false;
     state.pvp.winnerIndex = -1;
+    state.pvp.startCountdownTimer = CONFIG.pvp.startCountdownSeconds;
+    state.pvp.startTextTimer = 0;
     resetDragonForBattle(state.dragons[0], 0, true);
     resetDragonForBattle(state.dragons[1], 1, true);
     applyRandomBuffs(state.dragons[0], state.pvp.buffCounts[0]);
@@ -162,6 +170,8 @@ function exitPvpBattle() {
     state.pvp.configuring = false;
     state.pvp.ended = false;
     state.pvp.winnerIndex = -1;
+    state.pvp.startCountdownTimer = 0;
+    state.pvp.startTextTimer = 0;
     state.pvp.slots = [null, null, null, null, null, null, null, null];
     resetDragonForBattle(state.dragons[0], 0, false);
     resetDragonForBattle(state.dragons[1], 1, false);
@@ -175,6 +185,19 @@ function onDragonDeath(dragon) {
     state.pvp.ended = true;
     state.pvp.winnerIndex = living[0] ? living[0].index : -1;
     if (typeof showPvpResultOverlay === 'function') showPvpResultOverlay();
+}
+
+function updatePvpStartCountdown(dt) {
+    if (!state.pvp.active || state.pvp.ended) return;
+    if (state.pvp.startCountdownTimer > 0) {
+        const prev = state.pvp.startCountdownTimer;
+        state.pvp.startCountdownTimer = Math.max(0, state.pvp.startCountdownTimer - dt);
+        if (prev > 0 && state.pvp.startCountdownTimer <= 0) {
+            state.pvp.startTextTimer = CONFIG.pvp.startTextSeconds;
+        }
+    } else if (state.pvp.startTextTimer > 0) {
+        state.pvp.startTextTimer = Math.max(0, state.pvp.startTextTimer - dt);
+    }
 }
 
 function getCameraTargets() {
@@ -228,6 +251,7 @@ function animate(time) {
     state.lastTime = time;
 
     state.pollInputs();
+    updatePvpStartCountdown(dt);
 
     if (!state.pvp.configuring && !state.pvp.ended) {
         state.dragons.forEach(dragon => {

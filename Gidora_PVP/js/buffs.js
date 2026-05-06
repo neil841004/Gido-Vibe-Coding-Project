@@ -15,20 +15,20 @@ const BUFFS = {
     lifeSteal: { name: '有效傷害回血', description: '造成有效傷害時回復少量 HP。', implemented: true, icon: { glyph: 'L', color: '#ff6b7a', bg: '#3d151b' } },
     tailPower: { name: '尾巴攻擊力 +300%', description: '尾巴傷害變為 4 倍。', implemented: true, icon: { glyph: 'T', color: '#60efff', bg: '#12393d' } },
     poisonTrail: { name: '走路留下毒液', description: '毒液殘留 10 秒，緩速並 DOT 敵人。', implemented: true, icon: { glyph: 'P', color: '#8cff5f', bg: '#173a14' } },
-    leafShield: { name: '四片葉子護盾', description: '四片葉子環繞，會阻擋傷害。', implemented: true, icon: { glyph: '4', color: '#a7ff83', bg: '#203714' } },
+    leafShield: { name: '一片葉子護盾', description: '一片葉子環繞，會阻擋傷害。', implemented: true, icon: { glyph: '4', color: '#a7ff83', bg: '#203714' } },
 
     meleeFireball: { name: 'Melee 型態：噴火球', description: '頭部近戰改成落點火球；尾巴不變。', group: 'meleeForm', implemented: true, icon: { glyph: 'F', color: '#ff9f1c', bg: '#3d2410' } },
     meleeShockwave: { name: 'Melee 型態：蓄力震波', description: '蓄力重擊會打出暈眩震波。', group: 'meleeForm', implemented: true, icon: { glyph: '~', color: '#a6c8ff', bg: '#172845' } },
     meleeFlame: { name: 'Melee 型態：噴火', description: '按住頭部攻擊會持續朝前方扇形吐火。', group: 'meleeForm', implemented: true, icon: { glyph: 'W', color: '#ff5e2e', bg: '#40180e' } },
+    meleeExplosion: { name: 'Melee 型態：爆炸', description: '近戰命中有機率引發爆炸。', group: 'meleeForm', implemented: true, icon: { glyph: '*', color: '#ffcf66', bg: '#3f2610' } },
 
     stepShockwave: { name: '落腳震波', description: '每隔幾步，下一次落腳產生震波。', implemented: true, icon: { glyph: 'S', color: '#d9e7ff', bg: '#202d45' } },
     comboRamp: { name: '連擊傷害提高', description: '2 秒內有效攻擊會逐步提高傷害。', implemented: true, icon: { glyph: 'x', color: '#ffe66d', bg: '#383312' } },
     missileNest: { name: '背上飛彈巢', description: '定期發射追蹤飛彈。', implemented: true, icon: { glyph: 'M', color: '#ffb347', bg: '#3d2a10' } },
-    directionalGuard: { name: '正面減傷背面增傷', description: '正面受傷降低，背面受傷提高。', implemented: true, icon: { glyph: 'G', color: '#9ad1ff', bg: '#162f45' } },
+    directionalGuard: { name: '正面減傷', description: '正面受傷降低。', implemented: true, icon: { glyph: 'G', color: '#9ad1ff', bg: '#162f45' } },
     reflectProjectile: { name: '50% 反彈投射物', description: '有機率反彈敵方投射物。', implemented: true, icon: { glyph: 'R', color: '#b7ffdd', bg: '#12382a' } },
     beamSlow: { name: '光束波緩速', description: '組合技命中時使敵方緩速。', implemented: true, icon: { glyph: 'SL', color: '#b7d7ff', bg: '#17283f' } },
     poisonCloud: { name: '定期毒霧', description: '週期性噴出大範圍 DOT 毒霧。', implemented: true, icon: { glyph: 'C', color: '#78ff8f', bg: '#14351c' } },
-    meleeExplosion: { name: 'Melee 爆炸', description: '近戰命中有機率引發爆炸。', implemented: true, icon: { glyph: '*', color: '#ffcf66', bg: '#3f2610' } },
     ramStagger: { name: '高速衝撞', description: '高速移動撞擊敵人，造成大量失衡值。', implemented: true, icon: { glyph: 'R', color: '#66f7ff', bg: '#12373b' } },
     staggerImmune: { name: '免疫失衡', description: '不會因失衡跌倒。', implemented: true, icon: { glyph: 'I', color: '#ffffff', bg: '#303030' } },
     stationaryShield: { name: '停止不動護盾', description: '站定後免疫 30% 傷害。', implemented: true, icon: { glyph: 'D', color: '#d8fff5', bg: '#173631' } },
@@ -131,7 +131,10 @@ class BuffSystem {
             poisonPools: [],
             leafShields: [],
             poisonClouds: [],
-            missileNest: null
+            missileNest: null,
+            guardShield: null,
+            stationaryShield: null,
+            invincibleShield: null
         };
         this.lowHpExplosionUsed = false;
         this.lastPoisonDropPos = null;
@@ -205,6 +208,12 @@ class BuffSystem {
             this._disposeMesh(this.objects.missileNest);
             this.objects.missileNest = null;
         }
+        ['guardShield', 'stationaryShield', 'invincibleShield'].forEach(key => {
+            if (this.objects[key]) {
+                this._disposeMesh(this.objects[key]);
+                this.objects[key] = null;
+            }
+        });
         this.lowHpExplosionUsed = false;
         this.refreshPlayerStats();
         return ids;
@@ -230,6 +239,7 @@ class BuffSystem {
         if (this.isActive('meleeFireball')) return 'fireball';
         if (this.isActive('meleeShockwave')) return 'shockwave';
         if (this.isActive('meleeFlame')) return 'flame';
+        if (this.isActive('meleeExplosion')) return 'explosion';
         return 'default';
     }
 
@@ -257,6 +267,16 @@ class BuffSystem {
         return this.isActive('comboDamage') ? CONFIG.buffs.comboDamageMultiplier : 1;
     }
 
+    getComboRampWindow(stacks) {
+        const maxStacks = Math.max(1, CONFIG.buffs.comboDamageMaxStacks);
+        const minWindow = CONFIG.buffs.comboDamageMinWindow;
+        const baseWindow = CONFIG.buffs.comboDamageWindow;
+        const t = maxStacks <= 1
+            ? 1
+            : THREE.MathUtils.clamp(((stacks || 1) - 1) / (maxStacks - 1), 0, 1);
+        return Math.max(minWindow, THREE.MathUtils.lerp(baseWindow, minWindow, t));
+    }
+
     refreshPlayerStats() {
         const dragon = this.dragon;
         if (!dragon) return;
@@ -282,7 +302,7 @@ class BuffSystem {
                 CONFIG.buffs.comboDamageMaxStacks,
                 (dragon.comboRampStacks || 0) + 1
             );
-            dragon.comboRampTimer = CONFIG.buffs.comboDamageWindow;
+            dragon.comboRampTimer = this.getComboRampWindow(dragon.comboRampStacks);
         }
     }
 
@@ -368,7 +388,13 @@ class BuffSystem {
 
     _spawnPoisonPool(pos, radius, life, slows) {
         const geo = new THREE.CircleGeometry(radius, 24);
-        const mat = new THREE.MeshBasicMaterial({ color: slows ? 0x33aa33 : 0x55cc66, transparent: true, opacity: slows ? 0.45 : 0.25, side: THREE.DoubleSide });
+        const isDragonB = this.dragon && this.dragon.index === 1;
+        const mat = new THREE.MeshBasicMaterial({
+            color: isDragonB ? 0x9b45ff : (slows ? 0x33aa33 : 0x55cc66),
+            transparent: true,
+            opacity: slows ? 0.45 : 0.25,
+            side: THREE.DoubleSide
+        });
         const mesh = new THREE.Mesh(geo, mat);
         mesh.rotation.x = -Math.PI / 2;
         mesh.position.copy(pos);
@@ -487,8 +513,11 @@ class BuffSystem {
             const r = Math.sqrt(Math.random()) * radius;
             const y = pos.y + Math.random() * 2.4;
             const geo = new THREE.SphereGeometry(0.45 + Math.random() * 0.9, 8, 6);
+            const isDragonB = this.dragon && this.dragon.index === 1;
             const mat = new THREE.MeshBasicMaterial({
-                color: Math.random() > 0.5 ? 0x55cc66 : 0x88ff77,
+                color: isDragonB
+                    ? (Math.random() > 0.5 ? 0x9b45ff : 0xc486ff)
+                    : (Math.random() > 0.5 ? 0x55cc66 : 0x88ff77),
                 transparent: true,
                 opacity: 0.22,
                 depthWrite: false
@@ -546,6 +575,10 @@ class BuffSystem {
             dragon.tailGroup.scale.set(tailScale, tailScale, tailScale);
         }
 
+        this._updateGuardShield(dragon);
+        this._updateStationaryShieldVisual(dragon);
+        this._updateInvincibleShieldVisual(dragon);
+
         this.timers.visualPulse = (this.timers.visualPulse || 0) - dt;
         if (this.timers.visualPulse > 0) return;
         this.timers.visualPulse = CONFIG.buffs.visualPulseInterval;
@@ -557,13 +590,7 @@ class BuffSystem {
         if (this.isActive('meleeBoost')) this._spawnBuffParticle(dragon, 0xffcc33, 2.1, 0.55);
         if (this.isActive('comboCd') && dragon.comboCooldown > 0) this._spawnRing(dragon.mesh.position, 0xaaaaaa, 1.1);
         if (this.isActive('comboDamage')) this._spawnBuffParticle(dragon, 0xff55ff, 2.8, 0.6);
-        if (this.isActive('directionalGuard')) this._spawnGuardArc(dragon);
-        if (this.isActive('reflectProjectile')) this._spawnRing(dragon.mesh.position, 0x99ffdd, 1.4);
         if (this.isActive('beamSlow')) this._spawnBuffParticle(dragon, 0xaaddff, 2.6, 0.6);
-        if (this.isActive('staggerImmune')) this._spawnBuffParticle(dragon, 0xffffff, 2.7, 0.6);
-        if (this.isActive('stationaryShield') && dragon.stationaryTimer >= CONFIG.buffs.stationaryShieldDelay) this._spawnRing(dragon.mesh.position, 0xd8fff5, 1.6);
-        if (this.isActive('teamworkRegen')) this._spawnBuffParticle(dragon, 0x66ff99, 2.2, 0.5);
-        if (this.isActive('comboInvincible') && dragon.beamPhase === 'firing') this._spawnRing(dragon.mesh.position, 0xffffff, 2.0);
     }
 
     _spawnBuffParticle(dragon, color, height, scale) {
@@ -589,6 +616,88 @@ class BuffSystem {
         p.maxLife = 0.7;
         p.mesh.scale.set(0.18, 0.5, 0.08);
         state.particles.push(p);
+    }
+
+    _updateGuardShield(dragon) {
+        if (!this.isActive('directionalGuard')) {
+            if (this.objects.guardShield) {
+                this._disposeMesh(this.objects.guardShield);
+                this.objects.guardShield = null;
+            }
+            return;
+        }
+        if (!this.objects.guardShield) {
+            const geo = new THREE.CircleGeometry(1.75, 32);
+            const mat = new THREE.MeshBasicMaterial({
+                color: 0x8ec7ff,
+                transparent: true,
+                opacity: 0.16,
+                side: THREE.DoubleSide,
+                depthWrite: false
+            });
+            this.objects.guardShield = new THREE.Mesh(geo, mat);
+            scene.add(this.objects.guardShield);
+        }
+        const shield = this.objects.guardShield;
+        shield.visible = true;
+        shield.position.copy(dragon.mesh.position).add(dragon.getForwardVector().normalize().multiplyScalar(1.45));
+        shield.position.y += 1.25;
+        shield.quaternion.copy(dragon.mesh.quaternion);
+        shield.scale.set(1.0, 0.72, 1.0);
+    }
+
+    _updateStationaryShieldVisual(dragon) {
+        const active = this.isActive('stationaryShield') && dragon.stationaryTimer >= CONFIG.buffs.stationaryShieldDelay;
+        if (!active) {
+            if (this.objects.stationaryShield) {
+                this._disposeMesh(this.objects.stationaryShield);
+                this.objects.stationaryShield = null;
+            }
+            return;
+        }
+        if (!this.objects.stationaryShield) {
+            const geo = new THREE.SphereGeometry(2.35, 28, 16);
+            const mat = new THREE.MeshBasicMaterial({
+                color: 0xd8fff5,
+                transparent: true,
+                opacity: 0.12,
+                side: THREE.DoubleSide,
+                depthWrite: false
+            });
+            this.objects.stationaryShield = new THREE.Mesh(geo, mat);
+            scene.add(this.objects.stationaryShield);
+        }
+        this.objects.stationaryShield.position.copy(dragon.mesh.position);
+        this.objects.stationaryShield.position.y += 1.25;
+        this.objects.stationaryShield.scale.set(1.05, 0.82, 1.05);
+    }
+
+    _updateInvincibleShieldVisual(dragon) {
+        const active = this.isActive('comboInvincible') && dragon.beamPhase === 'firing';
+        if (!active) {
+            if (this.objects.invincibleShield) {
+                this._disposeMesh(this.objects.invincibleShield);
+                this.objects.invincibleShield = null;
+            }
+            return;
+        }
+        if (!this.objects.invincibleShield) {
+            const geo = new THREE.SphereGeometry(2.85, 32, 18);
+            const mat = new THREE.MeshBasicMaterial({
+                color: 0x2f8cff,
+                transparent: true,
+                opacity: 0.36,
+                side: THREE.DoubleSide,
+                depthWrite: false
+            });
+            this.objects.invincibleShield = new THREE.Mesh(geo, mat);
+            scene.add(this.objects.invincibleShield);
+        }
+        const t = Date.now() * 0.006;
+        this.objects.invincibleShield.position.copy(dragon.mesh.position);
+        this.objects.invincibleShield.position.y += 1.35;
+        this.objects.invincibleShield.scale.setScalar(1.0 + Math.sin(t) * 0.025);
+        this.objects.invincibleShield.material.opacity = 0.32 + Math.sin(t * 1.4) * 0.05;
     }
 
     _spawnGuardArc(dragon) {

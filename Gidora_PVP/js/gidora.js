@@ -98,10 +98,10 @@ class Gidora {
 
         // 每隻龍獨立的輸入槽 (4 名 sub-player)
         this.input = {
-            p1: { move: new THREE.Vector2(), attack: false, charge: false, pointer: new THREE.Vector2() },
-            p2: { move: new THREE.Vector2(), attack: false, charge: false },
-            p3: { move: new THREE.Vector2(), attack: false, charge: false },
-            p4: { move: new THREE.Vector2(), attack: false, charge: false }
+            p1: { move: new THREE.Vector2(), attack: false, charge: false, pointer: new THREE.Vector2(), pointerActive: false },
+            p2: { move: new THREE.Vector2(), attack: false, charge: false, pointer: new THREE.Vector2(), pointerActive: false },
+            p3: { move: new THREE.Vector2(), attack: false, charge: false, pointer: new THREE.Vector2(), pointerActive: false },
+            p4: { move: new THREE.Vector2(), attack: false, charge: false, pointer: new THREE.Vector2(), pointerActive: false }
         };
 
         // 每隻龍獨立的光束/合體技狀態
@@ -157,10 +157,16 @@ class Gidora {
         this.staggerValue = 0;
         this.staggerWindowTimer = 0;
         this.fallTimer = 0;
+        this.standUpTimer = 0;
+        this.standUpStartRotationX = 0;
+        this.slowTimer = 0;
+        this.slowFactor = 1.0;
         this.comboRampStacks = 0;
         this.comboRampTimer = 0;
         this.stationaryTimer = 0;
         this.lastRamHit = new Map();
+        this.ramShockwaveFxTimer = 0;
+        this.teamworkRegenFxTimer = 0;
 
         this.buildModel();
         this.buildIndicators();
@@ -190,9 +196,7 @@ class Gidora {
             const toSource = sourcePos.clone().sub(this.mesh.position).normalize();
             const facing = this.getForwardVector().normalize();
             const dot = facing.dot(toSource);
-            finalAmount *= dot >= 0
-                ? CONFIG.buffs.frontDamageMultiplier
-                : CONFIG.buffs.backDamageMultiplier;
+            if (dot >= 0) finalAmount *= CONFIG.buffs.frontDamageMultiplier;
         }
         if (this.buffSystem.isActive('stationaryShield') && this.stationaryTimer >= CONFIG.buffs.stationaryShieldDelay) {
             finalAmount *= CONFIG.buffs.stationaryShieldMultiplier;
@@ -214,13 +218,18 @@ class Gidora {
         if (this.hp <= 0) this.die();
     }
 
+    applySlow(factor, duration) {
+        this.slowFactor = Math.min(this.slowFactor, factor);
+        this.slowTimer = Math.max(this.slowTimer, duration);
+    }
+
     heal(amount) {
         if (this.isDead || amount <= 0) return;
         this.hp = Math.min(this.maxHP, this.hp + amount);
     }
 
     addStagger(amount, sourcePos) {
-        if (this.buffSystem.isActive('staggerImmune') || this.fallTimer > 0 || amount <= 0) return;
+        if (this.buffSystem.isActive('staggerImmune') || this.fallTimer > 0 || this.standUpTimer > 0 || amount <= 0) return;
         this.staggerWindowTimer = CONFIG.stagger.playerWindow;
         this.staggerValue = Math.min(CONFIG.stagger.playerThreshold, this.staggerValue + amount);
         if (this.staggerValue >= CONFIG.stagger.playerThreshold) {
@@ -359,7 +368,7 @@ class Gidora {
             pivotGroup.add(headMesh);
             this.mesh.add(neckGroup);
 
-            this.necks.push({ group: neckGroup, pivot: pivotGroup, head: headMesh, id: cfg.id, baseLean: leanAngle, baseYaw: cfg.angle });
+            this.necks.push({ group: neckGroup, pivot: pivotGroup, head: headMesh, id: cfg.id, baseLean: leanAngle, baseYaw: cfg.angle, baseZ: cfg.z });
 
             if (cfg.id === 'p1') { this.p1Part = neckGroup; this.p1HeadPart = headMesh; }
             if (cfg.id === 'p2') { this.p2Part = neckGroup; this.p2HeadPart = headMesh; }
@@ -492,8 +501,9 @@ class Gidora {
                     const ease = windupT * (2 - windupT);
                     const backLean = this.getBackLean(n);
                     n.pivot.rotation.x = n.baseLean * (1 - ease) + backLean * ease;
+                    n.group.position.z = THREE.MathUtils.lerp(n.group.position.z, n.baseZ + 0.18, dt * 12);
                     n.group.rotation.y = THREE.MathUtils.lerp(n.group.rotation.y, this.headAimYaw[p], dt * 16);
-                    n.group.rotation.z = Math.sin(t * 18) * 0.02 * Math.min(1, this.attackHoldTimers[p] / CONFIG.combat.heavyChargeTime);
+                    n.group.rotation.z = Math.sin(t * 18) * 0.02 * Math.min(1, this.attackHoldTimers[p] / CONFIG.combat.chargeTime);
                     if (this.attackReleaseQueued[p] && windupT >= 1) {
                         this.beginHeadStrike(p, this.attackQueuedKinds[p]);
                     }
@@ -501,6 +511,7 @@ class Gidora {
                     this.attackHoldTimers[p] += dt;
                     this.updateChargeTarget(p);
                     n.pivot.rotation.x = n.baseLean + 0.2 + Math.sin(t * 30) * 0.06;
+                    n.group.position.z = THREE.MathUtils.lerp(n.group.position.z, n.baseZ, dt * 10);
                     n.group.rotation.y = THREE.MathUtils.lerp(n.group.rotation.y, this.headAimYaw[p], dt * 18);
                     this.updateFlamethrower(p, dt);
                 } else if (currentState === 'strike') {
@@ -510,6 +521,7 @@ class Gidora {
                     const ease = progress * progress * (3 - 2 * progress);
                     n.group.rotation.y = THREE.MathUtils.lerp(n.group.rotation.y, this.headAimYaw[p], dt * 18);
                     n.pivot.rotation.x = this.getBackLean(n) * (1 - ease) + this.getForwardLean(n) * ease;
+                    n.group.position.z = THREE.MathUtils.lerp(n.group.position.z, n.baseZ, dt * 16);
 
                     if (!this.attackImpactDone[p] && progress >= 0.65) {
                         this.attackImpactDone[p] = true;
@@ -528,7 +540,8 @@ class Gidora {
                         : CONFIG.combat.windupTime;
                     const progress = 1 - (this.attackTimers[p] / totalWindup);
                     const ease = progress * (2 - progress);
-                    n.pivot.rotation.x = n.baseLean - (ease * (this.attackKinds[p] === 'heavy' ? 1.2 : 1.0));
+                    n.pivot.rotation.x = n.baseLean * (1 - ease) + this.getBackLean(n) * ease;
+                    n.group.position.z = THREE.MathUtils.lerp(n.group.position.z, n.baseZ + 0.18, dt * 12);
 
                     if (this.attackTimers[p] <= 0) {
                         this.triggerAttackImpact(p);
@@ -545,6 +558,7 @@ class Gidora {
                     const progress = THREE.MathUtils.clamp(1 - (this.attackTimers[p] / totalRecovery), 0, 1);
                     const ease = progress * progress * (3 - 2 * progress);
                     n.pivot.rotation.x = this.getForwardLean(n) * (1 - ease) + n.baseLean * ease;
+                    n.group.position.z = THREE.MathUtils.lerp(n.group.position.z, n.baseZ, dt * 10);
                     const targetYaw = this.recoveryBufferedPress[p] && this.input[p].attack
                         ? this.headAimYaw[p]
                         : n.baseYaw;
@@ -555,7 +569,7 @@ class Gidora {
                     n.group.rotation.z = Math.sin(t * 5 + (p === 'p2' ? 1 : (p === 'p3' ? 2 : 0))) * 0.05 + lag;
                     n.group.rotation.y = THREE.MathUtils.lerp(n.group.rotation.y, n.baseYaw, dt * 8);
                     n.pivot.rotation.x = n.baseLean + Math.sin(t * 8) * 0.05;
-                    n.group.position.z = (p === 'p3' ? 1.0 : 1.1);
+                    n.group.position.z = THREE.MathUtils.lerp(n.group.position.z, n.baseZ, dt * 10);
                 }
             });
         }
@@ -708,7 +722,7 @@ class Gidora {
         }
         if (this.attackStates[playerIndex] !== 'charging') return;
         const holdTime = this.attackHoldTimers[playerIndex];
-        const kind = holdTime >= CONFIG.combat.heavyChargeTime ? 'heavy' : 'light';
+        const kind = holdTime >= CONFIG.combat.chargeTime ? 'heavy' : 'light';
         this.attackQueuedKinds[playerIndex] = kind;
         this.attackReleaseQueued[playerIndex] = true;
         if (holdTime >= CONFIG.combat.windupTime) this.beginHeadStrike(playerIndex, kind);
@@ -753,7 +767,7 @@ class Gidora {
     }
 
     getBackLean(neck) {
-        return neck.baseLean - 1.1;
+        return neck.baseLean - 0.48;
     }
 
     getForwardLean(neck) {
@@ -803,13 +817,13 @@ class Gidora {
         const ring = this.attackLandingIndicators[playerIndex];
         if (ring) {
             const visible = this.attackStates[playerIndex] === 'charging' &&
-                this.attackHoldTimers[playerIndex] >= CONFIG.combat.chargePreviewTime;
+                this.attackHoldTimers[playerIndex] >= CONFIG.combat.chargeTime;
             ring.visible = visible;
             ring.material.opacity = visible
                 ? 0.75
                 : 0.0;
             ring.position.copy(target);
-            const scale = this.attackHoldTimers[playerIndex] >= CONFIG.combat.heavyChargeTime
+            const scale = this.attackHoldTimers[playerIndex] >= CONFIG.combat.chargeTime
                 ? CONFIG.combat.heavyRadiusScale
                 : 1.0;
             ring.scale.setScalar(scale);
@@ -833,8 +847,9 @@ class Gidora {
     }
 
     getRawAimVector(playerIndex) {
-        if (playerIndex === 'p1' && this.input.p1.pointer && window.camera) {
-            const pointer = this.input.p1.pointer;
+        const input = this.input[playerIndex];
+        if (input && input.pointer && input.pointerActive && window.camera) {
+            const pointer = input.pointer;
             const ndc = new THREE.Vector2(
                 (pointer.x / window.innerWidth) * 2 - 1,
                 -(pointer.y / window.innerHeight) * 2 + 1
@@ -855,7 +870,11 @@ class Gidora {
         }
 
         const move = this.input[playerIndex].move;
-        if (move && move.lengthSq() > 0.05) return move.clone().normalize();
+        if (move && move.lengthSq() > 0.05) {
+            const worldDir = new THREE.Vector3(move.x, 0, move.y).normalize();
+            worldDir.applyQuaternion(this.mesh.quaternion.clone().invert());
+            return new THREE.Vector2(worldDir.x, worldDir.z).normalize();
+        }
         return null;
     }
 
@@ -897,7 +916,8 @@ class Gidora {
             const impactPos = this.mesh.position.clone()
                 .add(this.getAttackAimWorldVector(playerIndex).multiplyScalar(CONFIG.combat.fireballAimDistance));
             impactPos.y = 0.5;
-            this.fireHeadFireball(playerIndex, impactPos, damage * CONFIG.combat.fireballDamageScale);
+            const heavyScale = kind === 'heavy' ? CONFIG.combat.fireballHeavyDamageScale : 1;
+            this.fireHeadFireball(playerIndex, impactPos, damage * CONFIG.combat.fireballDamageScale * heavyScale, kind === 'heavy');
             return;
         }
 
@@ -1035,21 +1055,23 @@ class Gidora {
         }
     }
 
-    fireHeadFireball(playerIndex, targetPos, damage) {
+    fireHeadFireball(playerIndex, targetPos, damage, isHeavy = false) {
         const startPos = this.mesh.position.clone();
         startPos.y = 2.2;
         const dir = targetPos.clone().sub(startPos).normalize();
-        const bullet = new Bullet(playerIndex, startPos, dir, CONFIG.combat.fireballSpeed, 1.4, 0, 0.45, {
+        const sizeScale = isHeavy ? CONFIG.combat.fireballHeavySizeScale : 1;
+        const radius = CONFIG.combat.fireballRadius * sizeScale;
+        const bullet = new Bullet(playerIndex, startPos, dir, CONFIG.combat.fireballSpeed, 1.4, 0, CONFIG.combat.fireballProjectileSize * sizeScale, {
             damage,
             color: this.colors[playerIndex],
-            knockback: 16,
+            knockback: isHeavy ? 24 : 16,
             penetration: 0
         });
         bullet.attackerDragon = this;
         bullet.targetPoint = targetPos.clone();
-        bullet.explodeRadius = CONFIG.combat.fireballRadius;
+        bullet.explodeRadius = radius;
         bullet.onImpact = (b) => {
-            this.createAreaDamage(b.mesh.position.clone(), CONFIG.combat.fireballRadius, damage, this.colors[playerIndex], { heavy: true });
+            this.createAreaDamage(b.mesh.position.clone(), radius, damage, this.colors[playerIndex], { heavy: true, stagger: isHeavy ? 70 : 35 });
         };
         state.bullets.push(bullet);
     }
@@ -1088,14 +1110,14 @@ class Gidora {
             }
         }
 
-        const isInCone = (pos) => {
+        const isInCone = (pos, targetRadius = 0.9) => {
             const flatPos = pos.clone();
             flatPos.y = origin.y;
             const toTarget = flatPos.sub(origin);
-            const dist = toTarget.length();
-            if (dist > range || dist < 0.1) return false;
-            const dir = toTarget.normalize();
-            return forward.angleTo(dir) <= halfAngle;
+            const along = toTarget.dot(forward);
+            if (along < 0.2 || along > range + targetRadius) return false;
+            const perp = toTarget.sub(forward.clone().multiplyScalar(along)).length();
+            return perp <= Math.tan(halfAngle) * Math.max(0.6, along) + targetRadius;
         };
 
         if (state.enemyManager) {
@@ -1105,6 +1127,12 @@ class Gidora {
                 this.buffSystem.onEffectiveDamage(damage);
             });
         }
+
+        state.dragons.forEach(d => {
+            if (!d || d === this || d.isDead || !isInCone(d.mesh.position, 1.2)) return;
+            d.takeDamage(damage, origin, CONFIG.combat.flamethrowerKnockback);
+            this.buffSystem.onEffectiveDamage(damage);
+        });
 
         if (state.levelManager && state.levelManager.blocks) {
             state.levelManager.blocks.forEach(block => {
@@ -1119,6 +1147,11 @@ class Gidora {
     updateRamStagger(dt) {
         if (!this.buffSystem.isActive('ramStagger')) return;
         if (this.velocity.length() < CONFIG.buffs.ramSpeedThreshold) return;
+        this.ramShockwaveFxTimer -= dt;
+        if (this.ramShockwaveFxTimer <= 0) {
+            this.ramShockwaveFxTimer = 0.12;
+            this.spawnRamShockwave();
+        }
         const applyRam = (target) => {
             const lastHit = this.lastRamHit.get(target) || 0;
             if (lastHit > 0) {
@@ -1139,6 +1172,37 @@ class Gidora {
         // PVP：高速衝撞也對其他三頭龍生效
         state.dragons.forEach(d => {
             if (d && d !== this && !d.isDead) applyRam(d);
+        });
+    }
+
+    spawnRamShockwave() {
+        const forward = this.getForwardVector().normalize();
+        const pos = this.mesh.position.clone().add(forward.clone().multiplyScalar(2.2));
+        pos.y = 0.55;
+        const geo = new THREE.TorusGeometry(1.25, 0.055, 6, 36, Math.PI);
+        const mat = new THREE.MeshBasicMaterial({ color: 0x9ef7ff, transparent: true, opacity: 0.55, side: THREE.DoubleSide });
+        const mesh = new THREE.Mesh(geo, mat);
+        mesh.position.copy(pos);
+        mesh.rotation.x = Math.PI / 2;
+        mesh.rotation.z = -this.mesh.rotation.y + Math.PI / 2;
+        scene.add(mesh);
+        state.particles.push({
+            life: 0.22,
+            maxLife: 0.22,
+            update(dt) {
+                this.life -= dt;
+                const t = 1 - this.life / this.maxLife;
+                mesh.position.add(forward.clone().multiplyScalar(dt * 4.5));
+                mesh.scale.setScalar(1 + t * 0.8);
+                mesh.material.opacity = Math.max(0, 0.55 * (1 - t));
+                if (this.life <= 0) {
+                    scene.remove(mesh);
+                    mesh.geometry.dispose();
+                    mesh.material.dispose();
+                    return false;
+                }
+                return true;
+            }
         });
     }
 
@@ -1273,7 +1337,7 @@ class Gidora {
                         if (along < 0 || along > beamLength + 1.2) return;
                         const perp = toE.clone().sub(forward.clone().multiplyScalar(along));
                         if (perp.length() < 1.2 + hitRadius) {
-                            e.takeDamage(damage, origin, 0);
+                            e.takeDamage(damage, origin, CONFIG.beam.tickKnockback);
                             if (this.buffSystem.isActive('beamSlow') && e.applySlow) {
                                 e.applySlow(CONFIG.buffs.beamSlowFactor, CONFIG.buffs.beamSlowDuration);
                             }
@@ -1289,7 +1353,10 @@ class Gidora {
                     if (along < 0 || along > beamLength + 1.2) return;
                     const perp = toD.clone().sub(forward.clone().multiplyScalar(along));
                     if (perp.length() < 1.2 + hitRadius) {
-                        d.takeDamage(damage, origin, 0);
+                        d.takeDamage(damage, origin, CONFIG.beam.tickKnockback);
+                        if (this.buffSystem.isActive('beamSlow') && d.applySlow) {
+                            d.applySlow(CONFIG.buffs.beamSlowFactor, CONFIG.buffs.beamSlowDuration);
+                        }
                         this.buffSystem.onEffectiveDamage(damage);
                     }
                 });
@@ -1340,7 +1407,22 @@ class Gidora {
             this.mesh.rotation.x = THREE.MathUtils.lerp(this.mesh.rotation.x, -0.9, dt * 8);
             this.velocity.multiplyScalar(Math.max(0, 1 - 12 * dt));
             // 鏡頭跟隨改由 main.js 集中管理 (PVP 多龍模式需要中點跟隨)
-            if (this.fallTimer <= 0) this.mesh.rotation.x = 0;
+            if (this.fallTimer <= 0) {
+                this.fallTimer = 0;
+                this.standUpTimer = CONFIG.stagger.playerStandUpDuration;
+                this.standUpStartRotationX = this.mesh.rotation.x;
+            }
+            return;
+        }
+
+        if (this.standUpTimer > 0) {
+            const duration = Math.max(0.001, CONFIG.stagger.playerStandUpDuration);
+            this.standUpTimer = Math.max(0, this.standUpTimer - dt);
+            const t = THREE.MathUtils.clamp(1 - this.standUpTimer / duration, 0, 1);
+            const ease = t * t * (3 - 2 * t);
+            this.mesh.rotation.x = THREE.MathUtils.lerp(this.standUpStartRotationX, 0, ease);
+            this.velocity.multiplyScalar(Math.max(0, 1 - 10 * dt));
+            if (this.standUpTimer <= 0) this.mesh.rotation.x = 0;
             return;
         } else if (Math.abs(this.mesh.rotation.x) > 0.001) {
             this.mesh.rotation.x = THREE.MathUtils.lerp(this.mesh.rotation.x, 0, dt * 8);
@@ -1465,6 +1547,15 @@ class Gidora {
         }
         if (this.buffSystem.isActive('teamworkRegen') && speedMult > 1.0) {
             this.heal(CONFIG.buffs.teamworkRegenPerSecond * dt);
+            if (!this.teamworkRegenFxTimer || this.teamworkRegenFxTimer <= 0) {
+                this.teamworkRegenFxTimer = 0.28;
+                if (this.buffSystem && this.buffSystem._spawnHealCross) this.buffSystem._spawnHealCross(this);
+            }
+        }
+        if (this.teamworkRegenFxTimer > 0) this.teamworkRegenFxTimer -= dt;
+        if (this.slowTimer > 0) {
+            this.slowTimer -= dt;
+            if (this.slowTimer <= 0) this.slowFactor = 1.0;
         }
 
         // Rotation
@@ -1496,7 +1587,7 @@ class Gidora {
 
         const currentSpeed = this.velocity.length();
         const terrainSpeedFactor = state.levelManager ? state.levelManager.getSpeedFactor(this.mesh.position) : 1.0;
-        const maxSpeed = CONFIG.movement.maxSpeed * this.buffSystem.getSpeedMultiplier() * terrainSpeedFactor * speedMult * turnPenalty;
+        const maxSpeed = CONFIG.movement.maxSpeed * this.buffSystem.getSpeedMultiplier() * terrainSpeedFactor * this.slowFactor * speedMult * turnPenalty;
         const forward = this.getForwardVector();
         const isInputting = totalInput.lengthSq() > 0.01 && !blocksMovement;
 
@@ -1509,7 +1600,7 @@ class Gidora {
                 currentDir.lerp(forward, traction).normalize();
                 this.velocity.copy(currentDir.multiplyScalar(currentSpeed));
             }
-            const accel = CONFIG.movement.acceleration * this.buffSystem.getSpeedMultiplier() * terrainSpeedFactor * dt;
+            const accel = CONFIG.movement.acceleration * this.buffSystem.getSpeedMultiplier() * terrainSpeedFactor * this.slowFactor * dt;
             this.velocity.add(forward.multiplyScalar(accel));
             if (this.velocity.length() > maxSpeed) this.velocity.setLength(maxSpeed);
         } else {

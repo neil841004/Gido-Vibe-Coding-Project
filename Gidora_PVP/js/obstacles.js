@@ -133,6 +133,7 @@ class LevelManager {
             isDead: false,
             flashTimer: 0,
             hazardTimer: 0,
+            fireParticleTimer: type === 'fire' ? Math.random() * CONFIG.terrain.fireParticleInterval : 0,
             id: Math.random().toString(36).substr(2, 9)
         };
     }
@@ -142,7 +143,7 @@ class LevelManager {
             return { color: 0x2f3640, solid: true, destructible: false };
         }
         if (type === 'slime') {
-            return { color: 0x2ecc71, solid: false, destructible: false, hazard: 'slime', slowFactor: CONFIG.terrain.slimeSlowFactor };
+            return { color: 0x7a4b22, solid: false, destructible: false, hazard: 'slime', slowFactor: CONFIG.terrain.slimeSlowFactor };
         }
         if (type === 'fire') {
             return { color: 0xff5a18, solid: false, destructible: false, hazard: 'fire', damagePerSecond: CONFIG.terrain.fireDamagePerSecond };
@@ -215,6 +216,14 @@ class LevelManager {
             if (b.type === 'fire') {
                 const pulse = 0.55 + Math.sin(Date.now() * 0.01 + b.mesh.position.x) * 0.15;
                 b.mesh.material.opacity = pulse;
+                b.mesh.rotation.z += dt * 0.35;
+                b.fireParticleTimer -= dt;
+                while (b.fireParticleTimer <= 0) {
+                    b.fireParticleTimer += CONFIG.terrain.fireParticleInterval * (0.75 + Math.random() * 0.5);
+                    for (let i = 0; i < CONFIG.terrain.fireParticleBurstCount; i++) {
+                        this.spawnFireParticle(b);
+                    }
+                }
             }
             if (b.type === 'slime') {
                 b.mesh.rotation.z += dt * 0.2;
@@ -327,5 +336,110 @@ class LevelManager {
         for (let i = 0; i < count; i++) {
             state.particles.push(new Particle(pos, 0x555555));
         }
+    }
+
+    spawnFireParticle(block) {
+        if (!block || !block.mesh || block.isDead) return;
+
+        const radiusX = Math.max(0.4, block.width * 0.45);
+        const radiusZ = Math.max(0.4, block.depth * 0.45);
+        const angle = Math.random() * Math.PI * 2;
+        const r = Math.sqrt(Math.random());
+        const pos = block.mesh.position.clone();
+        pos.x += Math.cos(angle) * r * radiusX;
+        pos.z += Math.sin(angle) * r * radiusZ;
+        pos.y = 0.12;
+
+        const height = 0.75 + Math.random() * 0.85;
+        const baseRadius = 0.13 + Math.random() * 0.11;
+        const geo = new THREE.ConeGeometry(baseRadius, height, 5);
+        const colors = [0xfff06a, 0xffb629, 0xff671f, 0xff2d12];
+        const color = colors[Math.floor(Math.random() * colors.length)];
+        const mat = new THREE.MeshBasicMaterial({
+            color,
+            transparent: true,
+            opacity: 0.92,
+            side: THREE.DoubleSide
+        });
+        const mesh = new THREE.Mesh(geo, mat);
+        mesh.position.copy(pos);
+        mesh.position.y += height * 0.5;
+        mesh.rotation.y = Math.random() * Math.PI * 2;
+        scene.add(mesh);
+
+        const life = CONFIG.terrain.fireParticleLife * (0.75 + Math.random() * 0.55);
+        const drift = new THREE.Vector3(
+            (Math.random() - 0.5) * 0.9,
+            1.2 + Math.random() * 1.8,
+            (Math.random() - 0.5) * 0.9
+        );
+        const startScale = 0.75 + Math.random() * 0.45;
+        mesh.scale.set(startScale, startScale, startScale);
+
+        state.particles.push({
+            life,
+            maxLife: life,
+            mesh,
+            update(dt) {
+                this.life -= dt;
+                const t = 1 - this.life / this.maxLife;
+                this.mesh.position.add(drift.clone().multiplyScalar(dt));
+                this.mesh.rotation.y += dt * (2.5 + t * 3.5);
+                this.mesh.scale.set(
+                    startScale * (1.1 - t * 0.45),
+                    startScale * (1 + t * 0.9),
+                    startScale * (1.1 - t * 0.45)
+                );
+                this.mesh.material.opacity = Math.max(0, (1 - t) * 0.92);
+                if (this.life <= 0) {
+                    scene.remove(this.mesh);
+                    this.mesh.geometry.dispose();
+                    this.mesh.material.dispose();
+                    return false;
+                }
+                return true;
+            }
+        });
+
+        if (Math.random() < 0.22) this.spawnFireSmoke(block, pos);
+    }
+
+    spawnFireSmoke(block, pos) {
+        const geo = new THREE.SphereGeometry(0.18 + Math.random() * 0.12, 8, 6);
+        const mat = new THREE.MeshBasicMaterial({
+            color: 0x33251f,
+            transparent: true,
+            opacity: 0.28
+        });
+        const mesh = new THREE.Mesh(geo, mat);
+        mesh.position.copy(pos);
+        mesh.position.y = 0.35 + Math.random() * 0.25;
+        scene.add(mesh);
+
+        const life = 0.8 + Math.random() * 0.5;
+        const drift = new THREE.Vector3(
+            (Math.random() - 0.5) * 0.55,
+            0.7 + Math.random() * 0.5,
+            (Math.random() - 0.5) * 0.55
+        );
+        state.particles.push({
+            life,
+            maxLife: life,
+            mesh,
+            update(dt) {
+                this.life -= dt;
+                const t = 1 - this.life / this.maxLife;
+                this.mesh.position.add(drift.clone().multiplyScalar(dt));
+                this.mesh.scale.setScalar(1 + t * 2.4);
+                this.mesh.material.opacity = Math.max(0, 0.24 * (1 - t));
+                if (this.life <= 0) {
+                    scene.remove(this.mesh);
+                    this.mesh.geometry.dispose();
+                    this.mesh.material.dispose();
+                    return false;
+                }
+                return true;
+            }
+        });
     }
 }

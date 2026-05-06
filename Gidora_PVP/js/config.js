@@ -87,7 +87,7 @@ const CONFIG = {
     // 近戰 / 頭部蓄力攻擊
     // -----------------------------------------------------------------
     combat: {
-        meleeDamage: 22,                    // 基礎近戰傷害
+        meleeDamage: 19,                    // 基礎近戰傷害
         attackRange: 2,                   // 近戰命中半徑
         windupTime: 0.2,                    // 輕攻擊 / 蓄力按下後往後擺的前搖秒數
         recoveryTime: 0.4,                  // 輕攻擊後搖秒數
@@ -96,18 +96,20 @@ const CONFIG = {
         cooldown: 0.6,                      // 攻擊基礎冷卻秒數
         recoilForce: 10,                    // 保留用玩家反作用力
         knockbackBase: 0.2,                 // 傷害轉換為擊退的基礎倍率
-        chargePreviewTime: 0.4,             // 按住多久後顯示落點預判
-        heavyChargeTime: 0.4,               // 按住多久後視為蓄力攻擊完成
-        heavyDamageScale: 2.0,              // 蓄力攻擊傷害倍率
+        chargeTime: 0.4,                    // 按住多久後蓄力完成並顯示落點預判
+        heavyDamageScale: 3.0,              // 蓄力攻擊傷害倍率
         heavyRadiusScale: 1.4,             // 蓄力攻擊範圍倍率
         chargeAimRadius: 6.0,               // 保留用蓄力瞄準最大半徑
         chargeDefaultDistance: 4.2,         // 蓄力落點與身體的固定距離
         chargeAimHalfAngle: Math.PI / 3.5,    // 每顆頭可瞄準扇形半角，Math.PI / 4 = 45 度
         strikeTime: 0.16,                   // 頭部從後方向前攻擊的動畫秒數
         fireballDamageScale: 1.2,           // 火球型態傷害倍率
+        fireballHeavyDamageScale: 1.35,     // 噴火球型態蓄力完成後額外傷害倍率
         fireballAimDistance: 13.0,          // 火球型態固定落點距離，比一般頭槌落點更遠
         fireballSpeed: 24,                  // 火球型態投射物飛行速度
         fireballRadius: 2.4,                // 火球爆炸半徑
+        fireballProjectileSize: 0.59,       // 火球型態投射物顯示尺寸，比原本大約 30%
+        fireballHeavySizeScale: 1.35,       // 噴火球蓄力完成後投射物與爆炸半徑倍率
         flamethrowerDamagePerSecond: 40,    // 噴火型態每秒傷害
         flamethrowerRange: 5.5,             // 噴火型態射程
         flamethrowerAngle: 0.5,            // 噴火型態半角，單位為弧度
@@ -125,6 +127,7 @@ const CONFIG = {
         playerWindow: 3,         // 玩家受傷後延遲多久才開始倒退失衡值
         playerRecoveryRate: 100,    // 玩家未受傷後，每秒倒退的失衡值
         playerFallDuration: 3.5,   // 玩家跌倒不可操作秒數
+        playerStandUpDuration: 0.65, // 玩家跌倒後重新站起來的動畫秒數
         enemyThreshold: 60,        // 敵人失衡條滿值，達到後跌倒
         enemyWindow: 1.0,          // 敵人受傷後延遲多久才開始倒退失衡值
         enemyRecoveryRate: 85,     // 敵人未受傷後，每秒倒退的失衡值
@@ -136,7 +139,10 @@ const CONFIG = {
     // -----------------------------------------------------------------
     terrain: {
         slimeSlowFactor: 0.45,       // 黏液地形速度倍率，越低越慢
-        fireDamagePerSecond: 18,      // 火焰地形每秒傷害
+        fireDamagePerSecond: 30,      // 火焰地形每秒傷害
+        fireParticleInterval: 0.12,   // 火焰地形粒子生成間隔秒數
+        fireParticleLife: 0.55,       // 火焰地形粒子存活秒數
+        fireParticleBurstCount: 2,    // 每次火焰地形噴出的火苗粒子數量
         poisonDamagePerSecond: 7,    // 毒液 / 毒霧每秒傷害
         poisonSlowFactor: 0.5,       // 毒液造成的敵人速度倍率
         poisonLife: 7,              // 毒液殘留秒數
@@ -155,8 +161,8 @@ const CONFIG = {
         spacingPadding: 0.7,       // 關卡物件彼此避免重疊的額外間距
         destructibleCount: 14,     // 每區塊可破壞實體障礙物數量
         solidCount: 12,            // 每區塊不可破壞實體障礙物數量
-        slimeCount: 4,             // 每區塊黏液緩速地面數量
-        fireCount: 7,              // 每區塊火焰 DOT 地面數量
+        slimeCount: 3,             // 每區塊黏液緩速地面數量
+        fireCount: 4,              // 每區塊火焰 DOT 地面數量
         solidSizeMin: 2,           // 實體障礙物最小寬深
         solidSizeRand: 3,          // 實體障礙物寬深隨機增加量
         solidHeightMin: 2,         // 實體障礙物最小高度
@@ -215,6 +221,7 @@ const CONFIG = {
         decayRate: 25,                     // 未蓄力或冷卻時蓄力值衰減速度
         maxCharge: 200,                    // 光束最大蓄力值，原 quad 值
         chargeRates: [0, 50, 150, 250, 500], // 依同時蓄力人數決定每秒蓄力速度
+        tickKnockback: 2.5,                // 光束每次 DOT tick 造成的微量擊退力
         width: 0.8                         // 光束碰撞與視覺寬度
     },
 
@@ -229,24 +236,24 @@ const CONFIG = {
         comboDamageMultiplier: 2.0,       // 組合技傷害 Buff：傷害倍率
         lifeStealPct: 0.12,               // 有效傷害回血 Buff：造成傷害轉換回血比例
         tailDamageMultiplier: 4.0,        // 尾巴攻擊力 Buff：尾巴傷害倍率
-        leafShieldCount: 4,               // 葉子護盾 Buff：護盾葉片數量
-        missileInterval: 2,             // 飛彈巢 Buff：發射間隔秒數
-        missileDamage: 20,                // 飛彈巢 Buff：單發飛彈傷害
-        missileSpeed: 18,                 // 飛彈巢 Buff：飛彈速度
+        leafShieldCount: 1,               // 葉子護盾 Buff：護盾葉片數量
+        missileInterval: 2.5,             // 飛彈巢 Buff：發射間隔秒數
+        missileDamage: 12,                // 飛彈巢 Buff：單發飛彈傷害
+        missileSpeed: 14,                 // 飛彈巢 Buff：飛彈速度
         stepShockwaveDistance: 8,        // 落腳震波 Buff：每移動多少距離觸發
         stepShockwaveDamage: 22,          // 落腳震波 Buff：震波傷害
         comboDamageWindow: 2.0,           // 連擊 Buff：有效攻擊後維持連擊的秒數
+        comboDamageMinWindow: 1.5,        // 連擊 Buff：高 Combo 時最低斷 Combo 倒數秒數
         comboDamageStepPct: 0.18,         // 連擊 Buff：每層傷害增加比例
         comboDamageMaxStacks: 5,          // 連擊 Buff：最高層數
         frontDamageMultiplier: 0.7,      // 正面減傷 Buff：正面受傷倍率
-        backDamageMultiplier: 1.4,       // 正面減傷 Buff：背面受傷倍率
         projectileReflectChance: 0.5,     // 反彈投射物 Buff：反彈機率
         beamSlowDuration: 2.0,            // 光束緩速 Buff：緩速持續秒數
-        beamSlowFactor: 0.5,             // 光束緩速 Buff：敵人速度倍率
+        beamSlowFactor: 0.4,             // 光束緩速 Buff：敵人速度倍率
         poisonCloudInterval: 8.0,         // 毒霧 Buff：噴發間隔秒數
         poisonCloudDuration: 3.5,         // 毒霧 Buff：毒霧持續秒數
         poisonCloudRadius: 8.0,           // 毒霧 Buff：毒霧半徑
-        meleeExplosionChance: 0.25,       // Melee 爆炸 Buff：觸發機率
+        meleeExplosionChance: 0.5,       // Melee 爆炸 Buff：觸發機率
         ramSpeedThreshold: 8.5,           // 高速衝撞 Buff：觸發所需速度
         ramDamage: 45,                    // 高速衝撞 Buff：撞擊傷害
         ramKnockback: 55,                 // 高速衝撞 Buff：撞擊擊退力
@@ -280,6 +287,8 @@ const CONFIG = {
         cameraMargin: 8,                  // PVP 鏡頭跟隨額外邊界，越大鏡頭拉得越遠
         cameraMinDist: 12,                // PVP 鏡頭最小距離，避免過於貼近
         cameraMaxDist: 50,                // PVP 鏡頭最大距離，避免拉得過遠
+        startCountdownSeconds: 3,         // PVP 開場禁止操作並顯示倒數的秒數
+        startTextSeconds: 0.7,            // PVP 倒數結束後 Start 文字停留秒數
         respawnButtonLabel: '重新開始'      // 結束畫面按鈕文字
     },
 
@@ -350,10 +359,12 @@ const state = {
         configuring: false,   // true = 配對介面開啟、世界暫停
         ended: false,         // 對戰結束等待重來
         winnerIndex: -1,      // 勝者三頭龍 index (-1 表示未結束 / 平手)
+        startCountdownTimer: 0, // PVP 開場倒數剩餘秒數，>0 時輸入鎖定
+        startTextTimer: 0,    // PVP Start 文字剩餘顯示秒數
         // 配對結果：8 個 slot，slot[i] = { device } 或 null
         // 索引: 0~3 = Dragon A 的 P1/P2/P3/P4，4~7 = Dragon B 的 P1/P2/P3/P4
         slots: [null, null, null, null, null, null, null, null],
-        buffCounts: [0, 0]    // Dragon A / B 各自的 Buff 數量設定 (-1 表示「隨機」)
+        buffCounts: [-1, -1]  // Dragon A / B 各自的 Buff 數量設定 (-1 表示「隨機」)
     },
 
     lastTime: 0

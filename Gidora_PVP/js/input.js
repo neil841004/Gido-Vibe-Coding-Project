@@ -7,6 +7,7 @@
 function setupInputs() {
     const keys = {};
     const gamepadButtonMemory = new Map();
+    const gamepadSetupNavMemory = new Map();
     let mouseAttack = false;
     let mouseCharge = false;
     let mousePos = new THREE.Vector2(window.innerWidth / 2, window.innerHeight / 2);
@@ -35,7 +36,8 @@ function setupInputs() {
     window.addEventListener('mousedown', (e) => {
         SoundSystem.init();
         mousePos.set(e.clientX, e.clientY);
-        if (state.pvp && state.pvp.configuring && typeof window.pvpSetPendingDevice === 'function') {
+        const isPvpSetupClick = e.target && e.target.closest && e.target.closest('#pvp-setup-overlay');
+        if (!isPvpSetupClick && state.pvp && state.pvp.configuring && typeof window.pvpSetPendingDevice === 'function') {
             window.pvpSetPendingDevice(keyboardDevice);
         }
         if (e.button === 0) mouseAttack = true;
@@ -62,8 +64,8 @@ function setupInputs() {
             dragon.input[p].move.set(0, 0);
             dragon.input[p].attack = false;
             dragon.input[p].charge = false;
+            dragon.input[p].pointerActive = false;
         });
-        if (dragon.input.p1.pointer) dragon.input.p1.pointer.copy(mousePos);
     };
 
     const assignMove = (dragon, player, vx, vy) => {
@@ -85,6 +87,7 @@ function setupInputs() {
             if (keys['KeyD']) vx += 1;
             assignMove(dragonA, 'p1', vx, vy);
             dragonA.input.p1.pointer.copy(mousePos);
+            dragonA.input.p1.pointerActive = true;
             dragonA.input.p1.attack = mouseAttack || !!keys['Digit1'];
             dragonA.input.p2.attack = !!keys['Digit2'];
             dragonA.input.p3.attack = !!keys['Digit3'];
@@ -114,37 +117,65 @@ function setupInputs() {
     };
 
     const getKeyboardSlotControls = (slotIndex) => {
-        const dragonIndex = slotIndex < 4 ? 0 : 1;
         const partOffset = slotIndex % 4;
         const player = ['p1', 'p2', 'p3', 'p4'][partOffset];
 
-        if (dragonIndex === 0) {
-            let vx = 0, vy = 0;
-            if (keys['KeyW']) vy -= 1;
-            if (keys['KeyS']) vy += 1;
-            if (keys['KeyA']) vx -= 1;
-            if (keys['KeyD']) vx += 1;
-            return {
-                player,
-                move: new THREE.Vector2(vx, vy),
-                attack: !!keys[`Digit${partOffset + 1}`] || (partOffset === 0 && mouseAttack),
-                charge: !!keys[`Digit${partOffset + 5}`] || (partOffset === 0 && mouseCharge),
-                pointer: mousePos
-            };
-        }
-
         let vx = 0, vy = 0;
-        if (keys['ArrowUp']) vy -= 1;
-        if (keys['ArrowDown']) vy += 1;
-        if (keys['ArrowLeft']) vx -= 1;
-        if (keys['ArrowRight']) vx += 1;
+        if (keys['KeyW']) vy -= 1;
+        if (keys['KeyS']) vy += 1;
+        if (keys['KeyA']) vx -= 1;
+        if (keys['KeyD']) vx += 1;
         return {
             player,
             move: new THREE.Vector2(vx, vy),
-            attack: !!keys[`Numpad${partOffset + 1}`],
-            charge: !!keys[`Numpad${partOffset + 5}`],
+            attack: mouseAttack,
+            charge: mouseCharge,
             pointer: mousePos
         };
+    };
+
+    const getKeyboardAssignedSlotIndex = () => {
+        if (!state.pvp || !state.pvp.active) return -1;
+        return state.pvp.slots.findIndex(slot => slot && slot.device && slot.device.id === keyboardDevice.id);
+    };
+
+    const applyKeyboardDebugControlsForPvp = () => {
+        const dragonA = state.dragons[0];
+        const dragonB = state.dragons[1];
+        const keyboardAssignedSlot = getKeyboardAssignedSlotIndex();
+        const allowWasdDebug = keyboardAssignedSlot < 0 || keyboardAssignedSlot === 0;
+        const anyMoveA = allowWasdDebug && !!(keys['KeyW'] || keys['KeyS'] || keys['KeyA'] || keys['KeyD']);
+        const anyMoveB = !!(keys['ArrowUp'] || keys['ArrowDown'] || keys['ArrowLeft'] || keys['ArrowRight']);
+
+        if (dragonA) {
+            if (anyMoveA) {
+                let vx = 0, vy = 0;
+                if (keys['KeyW']) vy -= 1;
+                if (keys['KeyS']) vy += 1;
+                if (keys['KeyA']) vx -= 1;
+                if (keys['KeyD']) vx += 1;
+                assignMove(dragonA, 'p1', vx, vy);
+            }
+            ['p1', 'p2', 'p3', 'p4'].forEach((p, i) => {
+                if (keys[`Digit${i + 1}`]) dragonA.input[p].attack = true;
+                if (keys[`Digit${i + 5}`]) dragonA.input[p].charge = true;
+            });
+        }
+
+        if (dragonB) {
+            if (anyMoveB) {
+                let vx = 0, vy = 0;
+                if (keys['ArrowUp']) vy -= 1;
+                if (keys['ArrowDown']) vy += 1;
+                if (keys['ArrowLeft']) vx -= 1;
+                if (keys['ArrowRight']) vx += 1;
+                assignMove(dragonB, 'p1', vx, vy);
+            }
+            ['p1', 'p2', 'p3', 'p4'].forEach((p, i) => {
+                if (keys[`Numpad${i + 1}`]) dragonB.input[p].attack = true;
+                if (keys[`Numpad${i + 5}`]) dragonB.input[p].charge = true;
+            });
+        }
     };
 
     const getGamepadSlotControls = (slotIndex, gp) => {
@@ -159,6 +190,42 @@ function setupInputs() {
         };
     };
 
+    const applyControlsToSlot = (slotIndex, controls) => {
+        if (!controls) return;
+        const dragon = state.dragons[slotIndex < 4 ? 0 : 1];
+        if (!dragon) return;
+        const input = dragon.input[controls.player];
+        if (!input) return;
+
+        input.move.copy(controls.move);
+        if (input.move.length() > 1) input.move.normalize();
+        input.attack = controls.attack;
+        input.charge = controls.charge;
+        if (controls.pointer && input.pointer) {
+            input.pointer.copy(controls.pointer);
+            input.pointerActive = true;
+        }
+    };
+
+    const applyAutoDeviceControls = (gamepads) => {
+        const devices = [{ type: 'keyboard' }];
+        gamepads.forEach(gp => {
+            if (gp) devices.push({ type: 'gamepad', gamepad: gp });
+        });
+
+        devices.slice(0, 8).forEach((device, slotIndex) => {
+            if (slotIndex >= 4 && !state.dragons[1] && typeof window.ensureEnemyDragon === 'function') {
+                window.ensureEnemyDragon();
+                if (typeof refreshAllUI === 'function') refreshAllUI();
+            }
+            if (slotIndex >= 4 && !state.dragons[1]) return;
+            const controls = device.type === 'keyboard'
+                ? getKeyboardSlotControls(slotIndex)
+                : getGamepadSlotControls(slotIndex, device.gamepad);
+            applyControlsToSlot(slotIndex, controls);
+        });
+    };
+
     const pollPairingDevices = (gamepads) => {
         if (!state.pvp || !state.pvp.configuring || typeof window.pvpSetPendingDevice !== 'function') return;
         gamepads.forEach(gp => {
@@ -167,14 +234,75 @@ function setupInputs() {
             const key = `gp:${gp.index}`;
             const wasPressed = gamepadButtonMemory.get(key) || false;
             if (pressed && !wasPressed) {
-                window.pvpSetPendingDevice({
+                const device = {
                     type: 'gamepad',
                     id: key,
                     index: gp.index,
                     label: gp.id || `Gamepad ${gp.index + 1}`
-                });
+                };
+                window.pvpSetPendingDevice(device);
             }
             gamepadButtonMemory.set(key, pressed);
+            if (typeof window.pvpHandleGamepadSetupInput === 'function') {
+                const device = {
+                    type: 'gamepad',
+                    id: key,
+                    index: gp.index,
+                    label: gp.id || `Gamepad ${gp.index + 1}`
+                };
+                const axisX = Math.abs(gp.axes[0]) > 0.55 ? Math.sign(gp.axes[0]) : 0;
+                const axisY = Math.abs(gp.axes[1]) > 0.55 ? Math.sign(gp.axes[1]) : 0;
+                const hasSetupActivity = pressed || axisX || axisY;
+                if (!hasSetupActivity) {
+                    if (gamepadSetupNavMemory.has(key)) {
+                        gamepadSetupNavMemory.set(key, {
+                            dx: 0,
+                            dy: 0,
+                            confirm: false,
+                            clear: false,
+                            start: false,
+                            lastMoveAt: gamepadSetupNavMemory.get(key).lastMoveAt || 0
+                        });
+                    }
+                    return;
+                }
+                const dx = (gp.buttons[15] && gp.buttons[15].pressed ? 1 : 0) -
+                    (gp.buttons[14] && gp.buttons[14].pressed ? 1 : 0) || axisX;
+                const dy = (gp.buttons[13] && gp.buttons[13].pressed ? 1 : 0) -
+                    (gp.buttons[12] && gp.buttons[12].pressed ? 1 : 0) || axisY;
+                const now = performance.now();
+                const nav = gamepadSetupNavMemory.get(key) || {
+                    dx: 0,
+                    dy: 0,
+                    confirm: false,
+                    clear: false,
+                    start: false,
+                    lastMoveAt: 0
+                };
+                const moveReady = (dx || dy) && (
+                    dx !== nav.dx ||
+                    dy !== nav.dy ||
+                    now - nav.lastMoveAt > 220
+                );
+                const confirm = [0, 1, 2, 3].some(index => gp.buttons[index] && gp.buttons[index].pressed);
+                const clear = !!(gp.buttons[8] && gp.buttons[8].pressed);
+                const start = !!((gp.buttons[9] && gp.buttons[9].pressed) || (gp.buttons[7] && gp.buttons[7].pressed));
+                window.pvpHandleGamepadSetupInput(device, {
+                    dx: moveReady ? dx : 0,
+                    dy: moveReady ? dy : 0,
+                    confirm: confirm && !nav.confirm,
+                    clear: clear && !nav.clear,
+                    start: start && !nav.start
+                });
+                gamepadSetupNavMemory.set(key, {
+                    dx,
+                    dy,
+                    confirm,
+                    clear,
+                    start,
+                    lastMoveAt: moveReady ? now : nav.lastMoveAt
+                });
+            }
         });
     };
 
@@ -193,12 +321,7 @@ function setupInputs() {
             }
             if (!controls) return;
 
-            const input = dragon.input[controls.player];
-            input.move.copy(controls.move);
-            if (input.move.length() > 1) input.move.normalize();
-            input.attack = controls.attack;
-            input.charge = controls.charge;
-            if (controls.pointer && input.pointer) input.pointer.copy(controls.pointer);
+            applyControlsToSlot(slotIndex, controls);
         });
     };
 
@@ -208,7 +331,23 @@ function setupInputs() {
 
         state.dragons.forEach(resetDragonInput);
         if (state.pvp && state.pvp.configuring) return;
-        if (state.pvp && state.pvp.active) applyPvpControls(gamepads);
-        else applyKeyboardTestControls();
+        if (state.pvp && state.pvp.active && state.pvp.startCountdownTimer > 0) return;
+        if (state.pvp && state.pvp.active) {
+            applyPvpControls(gamepads);
+            applyKeyboardDebugControlsForPvp();
+        } else {
+            applyKeyboardTestControls();
+            gamepads.forEach((gp, gpIndex) => {
+                if (!gp) return;
+                const slotIndex = gpIndex + 1;
+                if (slotIndex >= 8) return;
+                if (slotIndex >= 4 && !state.dragons[1] && typeof window.ensureEnemyDragon === 'function') {
+                    window.ensureEnemyDragon();
+                    if (typeof refreshAllUI === 'function') refreshAllUI();
+                }
+                if (slotIndex >= 4 && !state.dragons[1]) return;
+                applyControlsToSlot(slotIndex, getGamepadSlotControls(slotIndex, gp));
+            });
+        }
     };
 }
