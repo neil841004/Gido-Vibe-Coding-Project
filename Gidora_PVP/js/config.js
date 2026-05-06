@@ -10,7 +10,7 @@ const CONFIG = {
     // 角色 / 世界基礎數值
     // -----------------------------------------------------------------
     stats: {
-        playerHP: 2000,          // 玩家融合獸基礎最大血量
+        playerHP: 1200,          // 玩家融合獸基礎最大血量
         structureHPBase: 0.5,   // 可破壞障礙物 HP 係數，會乘上體積
         hpDecayRate: 0,         // 開啟敵人生成後，每秒自然扣血量
         hpDecayRateBeam: 6      // 光束施放期間，每秒自然扣血量
@@ -80,14 +80,14 @@ const CONFIG = {
         acceleration: 7,    // 加速度
         friction: 10,       // 無輸入時的減速力
         traction: 100,      // 速度方向貼齊面向方向的速度
-        rotationSpeed: 2.5  // 轉向速度
+        rotationSpeed: 3.1  // 轉向速度
     },
 
     // -----------------------------------------------------------------
     // 近戰 / 頭部蓄力攻擊
     // -----------------------------------------------------------------
     combat: {
-        meleeDamage: 19,                    // 基礎近戰傷害
+        meleeDamage: 16,                    // 基礎近戰傷害
         attackRange: 2,                   // 近戰命中半徑
         windupTime: 0.2,                    // 輕攻擊 / 蓄力按下後往後擺的前搖秒數
         recoveryTime: 0.4,                  // 輕攻擊後搖秒數
@@ -105,7 +105,7 @@ const CONFIG = {
         strikeTime: 0.16,                   // 頭部從後方向前攻擊的動畫秒數
         fireballDamageScale: 1.2,           // 火球型態傷害倍率
         fireballHeavyDamageScale: 1.35,     // 噴火球型態蓄力完成後額外傷害倍率
-        fireballAimDistance: 13.0,          // 火球型態固定落點距離，比一般頭槌落點更遠
+        fireballAimDistance: 17.0,          // 火球型態固定落點距離，比一般頭槌落點更遠
         fireballSpeed: 24,                  // 火球型態投射物飛行速度
         fireballRadius: 2.4,                // 火球爆炸半徑
         fireballProjectileSize: 0.59,       // 火球型態投射物顯示尺寸，比原本大約 30%
@@ -116,18 +116,24 @@ const CONFIG = {
         flamethrowerKnockback: 0.15,        // 噴火型態每次傷害 tick 的擊退力
         flamethrowerBlockDamageScale: 0.7,  // 噴火型態對可破壞關卡物件的傷害倍率
         shockwaveRadius: 3.3,               // 蓄力震波 Buff 的震波半徑
-        shockwaveDamageScale: 0.8           // 蓄力震波 Buff 的震波傷害倍率
+        shockwaveDamageScale: 0.8,          // 蓄力震波 Buff 的震波傷害倍率
+        // P4 尾巴蓄力攻擊
+        tailChargeTime: 0.8,                // P4 蓄力所需按住秒數（比頭部 chargeTime 0.4s 更長）
+        tailSweepDuration: 0.45,            // P4 蓄力重擊旋轉橫掃的動畫持續秒數
+        tailSweepRadius: 4.0,               // P4 尾巴橫掃攻擊半徑
+        tailSweepDamageScale: 2.5,          // P4 蓄力橫掃傷害倍率（疊加在 meleeDamage 與 tailPower 之上）
+        heavyStaggerBonusScale: 0.5         // 蓄力攻擊命中時，額外造成傷害 50% 的失衡值
     },
 
     // -----------------------------------------------------------------
     // 失衡 / 架勢值
     // -----------------------------------------------------------------
     stagger: {
-        playerThreshold: 320,       // 玩家失衡條滿值，達到後跌倒
-        playerWindow: 3,         // 玩家受傷後延遲多久才開始倒退失衡值
-        playerRecoveryRate: 100,    // 玩家未受傷後，每秒倒退的失衡值
-        playerFallDuration: 3.5,   // 玩家跌倒不可操作秒數
-        playerStandUpDuration: 0.65, // 玩家跌倒後重新站起來的動畫秒數
+        playerThreshold: 400,       // 玩家失衡條滿值，達到後跌倒
+        playerWindow: 0,         // 玩家受傷後延遲多久才開始倒退失衡值
+        playerRecoveryRate: 25,    // 玩家未受傷後，每秒倒退的失衡值
+        playerFallDuration: 3.1,   // 玩家跌倒不可操作秒數
+        playerStandUpDuration: 0.5, // 玩家跌倒後重新站起來的動畫秒數
         enemyThreshold: 60,        // 敵人失衡條滿值，達到後跌倒
         enemyWindow: 1.0,          // 敵人受傷後延遲多久才開始倒退失衡值
         enemyRecoveryRate: 85,     // 敵人未受傷後，每秒倒退的失衡值
@@ -236,16 +242,17 @@ const CONFIG = {
         comboDamageMultiplier: 2.0,       // 組合技傷害 Buff：傷害倍率
         lifeStealPct: 0.12,               // 有效傷害回血 Buff：造成傷害轉換回血比例
         tailDamageMultiplier: 4.0,        // 尾巴攻擊力 Buff：尾巴傷害倍率
+        tailPowerSweepRadiusMultiplier: 1.45, // 尾巴攻擊力 Buff：尾巴蓄力橫掃範圍倍率
         leafShieldCount: 1,               // 葉子護盾 Buff：護盾葉片數量
         missileInterval: 2.5,             // 飛彈巢 Buff：發射間隔秒數
         missileDamage: 12,                // 飛彈巢 Buff：單發飛彈傷害
         missileSpeed: 14,                 // 飛彈巢 Buff：飛彈速度
         stepShockwaveDistance: 8,        // 落腳震波 Buff：每移動多少距離觸發
         stepShockwaveDamage: 22,          // 落腳震波 Buff：震波傷害
-        comboDamageWindow: 2.0,           // 連擊 Buff：有效攻擊後維持連擊的秒數
+        comboDamageWindow: 3.0,           // 連擊 Buff：有效攻擊後維持連擊的秒數
         comboDamageMinWindow: 1.5,        // 連擊 Buff：高 Combo 時最低斷 Combo 倒數秒數
         comboDamageStepPct: 0.18,         // 連擊 Buff：每層傷害增加比例
-        comboDamageMaxStacks: 5,          // 連擊 Buff：最高層數
+        comboDamageMaxStacks: 7,          // 連擊 Buff：最高層數
         frontDamageMultiplier: 0.7,      // 正面減傷 Buff：正面受傷倍率
         projectileReflectChance: 0.5,     // 反彈投射物 Buff：反彈機率
         beamSlowDuration: 2.0,            // 光束緩速 Buff：緩速持續秒數
@@ -287,9 +294,14 @@ const CONFIG = {
         cameraMargin: 8,                  // PVP 鏡頭跟隨額外邊界，越大鏡頭拉得越遠
         cameraMinDist: 12,                // PVP 鏡頭最小距離，避免過於貼近
         cameraMaxDist: 50,                // PVP 鏡頭最大距離，避免拉得過遠
-        startCountdownSeconds: 3,         // PVP 開場禁止操作並顯示倒數的秒數
+        matchDuration: 180,               // PVP 對戰計時秒數（3 分鐘），時間到以血量多者獲勝
+        startCountdownSeconds: 5,         // PVP 開場禁止操作並顯示倒數的秒數
         startTextSeconds: 0.7,            // PVP 倒數結束後 Start 文字停留秒數
-        respawnButtonLabel: '重新開始'      // 結束畫面按鈕文字
+        respawnButtonLabel: '重新開始',     // 結束畫面按鈕文字
+        // 兩隻三頭龍之間的碰撞推擠
+        dragonCollisionRadius: 2.1,       // 每隻龍的碰撞半徑，兩龍距離 < 半徑x2 時觸發推擠
+        dragonBounceRestitution: 0,     // 碰撞速度反彈係數，0=完全不反彈，1=完全彈性碰撞
+        dragonPushForce: 2                // 碰撞時額外施加於 knockbackVel 的推力大小，單位/秒
     },
 
     // -----------------------------------------------------------------
@@ -359,6 +371,8 @@ const state = {
         configuring: false,   // true = 配對介面開啟、世界暫停
         ended: false,         // 對戰結束等待重來
         winnerIndex: -1,      // 勝者三頭龍 index (-1 表示未結束 / 平手)
+        timeUpVictory: false, // true = 本局由時間到後比較血量決定勝負
+        matchTimer: 0,        // PVP 對戰剩餘秒數，從 CONFIG.pvp.matchDuration 開始倒數
         startCountdownTimer: 0, // PVP 開場倒數剩餘秒數，>0 時輸入鎖定
         startTextTimer: 0,    // PVP Start 文字剩餘顯示秒數
         // 配對結果：8 個 slot，slot[i] = { device } 或 null

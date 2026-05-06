@@ -18,8 +18,17 @@ function setupInputs() {
         keys[e.code] = isDown;
         if (isDown) {
             SoundSystem.init();
-            if (state.pvp && state.pvp.configuring && typeof window.pvpSetPendingDevice === 'function') {
-                window.pvpSetPendingDevice(keyboardDevice);
+            if (state.pvp && state.pvp.configuring) {
+                if (typeof window.pvpSetPendingDevice === 'function') {
+                    window.pvpSetPendingDevice(keyboardDevice);
+                }
+                if (typeof window.pvpHandleKeyboardSetupInput === 'function') {
+                    const handled = window.pvpHandleKeyboardSetupInput(keyboardDevice, {
+                        code: e.code,
+                        repeat: !!e.repeat
+                    });
+                    if (handled) e.preventDefault();
+                }
             }
         }
     };
@@ -199,8 +208,8 @@ function setupInputs() {
 
         input.move.copy(controls.move);
         if (input.move.length() > 1) input.move.normalize();
-        input.attack = controls.attack;
-        input.charge = controls.charge;
+        input.attack = input.attack || controls.attack;
+        input.charge = input.charge || controls.charge;
         if (controls.pointer && input.pointer) {
             input.pointer.copy(controls.pointer);
             input.pointerActive = true;

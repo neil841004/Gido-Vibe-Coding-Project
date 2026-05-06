@@ -12,7 +12,7 @@ const BUFFS = {
 
     comboCd: { name: '組合技 CD 縮短 60%', description: '光束波冷卻只剩 40%。', implemented: true, icon: { glyph: 'CD', color: '#c4a7ff', bg: '#231a3d' } },
     comboDamage: { name: '組合技傷害 +100%', description: '光束波傷害加倍。', implemented: true, icon: { glyph: 'B', color: '#ff8cff', bg: '#39183c' } },
-    lifeSteal: { name: '有效傷害回血', description: '造成有效傷害時回復少量 HP。', implemented: true, icon: { glyph: 'L', color: '#ff6b7a', bg: '#3d151b' } },
+    lifeSteal: { name: '有效傷害回血', description: '造成有效傷害時回復少量 HP。', implemented: true, pvpExclude: true, icon: { glyph: 'L', color: '#ff6b7a', bg: '#3d151b' } },
     tailPower: { name: '尾巴攻擊力 +300%', description: '尾巴傷害變為 4 倍。', implemented: true, icon: { glyph: 'T', color: '#60efff', bg: '#12393d' } },
     poisonTrail: { name: '走路留下毒液', description: '毒液殘留 10 秒，緩速並 DOT 敵人。', implemented: true, icon: { glyph: 'P', color: '#8cff5f', bg: '#173a14' } },
     leafShield: { name: '一片葉子護盾', description: '一片葉子環繞，會阻擋傷害。', implemented: true, icon: { glyph: '4', color: '#a7ff83', bg: '#203714' } },
@@ -32,7 +32,7 @@ const BUFFS = {
     ramStagger: { name: '高速衝撞', description: '高速移動撞擊敵人，造成大量失衡值。', implemented: true, icon: { glyph: 'R', color: '#66f7ff', bg: '#12373b' } },
     staggerImmune: { name: '免疫失衡', description: '不會因失衡跌倒。', implemented: true, icon: { glyph: 'I', color: '#ffffff', bg: '#303030' } },
     stationaryShield: { name: '停止不動護盾', description: '站定後免疫 30% 傷害。', implemented: true, icon: { glyph: 'D', color: '#d8fff5', bg: '#173631' } },
-    teamworkRegen: { name: '同心協力回血', description: '同向加速時持續回血。', implemented: true, icon: { glyph: 'H', color: '#73ff9a', bg: '#17351e' } },
+    teamworkRegen: { name: '同心協力回血', description: '同向加速時持續回血。', implemented: true, pvpExclude: true, icon: { glyph: 'H', color: '#73ff9a', bg: '#17351e' } },
     lowHpExplosion: { name: '半血超大爆炸', description: '血量低於一半時觸發一次。', implemented: true, icon: { glyph: '!', color: '#ffef73', bg: '#4a2510' } },
     comboInvincible: { name: '組合技期間無敵', description: '光束波施放期間免疫傷害。', implemented: true, icon: { glyph: 'V', color: '#f7f2ff', bg: '#2b1f42' } }
 };
@@ -140,6 +140,9 @@ class BuffSystem {
         this.lastPoisonDropPos = null;
         this.poisonDropTimer = 0;
         this.lastStepShockwavePos = null;
+        this.suspendedActive = null;
+        this.suspendedTimer = 0;
+        this.suspendedLowHpExplosionUsed = false;
     }
 
     toggle(id) {
@@ -192,7 +195,8 @@ class BuffSystem {
         this.refreshPlayerStats();
     }
 
-    clearAll() {
+    clearAll(options = {}) {
+        const clearSuspended = options.clearSuspended !== false;
         const ids = Array.from(this.active.keys());
         this.active.clear();
         // 清掉視覺物件
@@ -215,8 +219,25 @@ class BuffSystem {
             }
         });
         this.lowHpExplosionUsed = false;
+        if (clearSuspended) {
+            this.suspendedActive = null;
+            this.suspendedTimer = 0;
+            this.suspendedLowHpExplosionUsed = false;
+        }
         this.refreshPlayerStats();
         return ids;
+    }
+
+    suspendAll(duration) {
+        if (this.suspendedActive) {
+            this.suspendedTimer = Math.max(this.suspendedTimer, duration);
+            return;
+        }
+        if (this.active.size === 0) return;
+        this.suspendedActive = new Map(this.active);
+        this.suspendedTimer = Math.max(0, duration);
+        this.suspendedLowHpExplosionUsed = this.lowHpExplosionUsed;
+        this.clearAll({ clearSuspended: false });
     }
 
     isActive(id) {
@@ -336,6 +357,7 @@ class BuffSystem {
         const dragon = this.dragon;
         if (!dragon) return;
 
+        this._updateSuspendedBuffs(dt);
         this.refreshPlayerStats();
         this._updateLeafShields(dt, dragon);
         this._updatePoisonTrail(dt, dragon);
@@ -346,6 +368,17 @@ class BuffSystem {
         this._updatePoisonClouds(dt);
         this._updateLowHpExplosion(dragon);
         this._updateBuffVisuals(dt, dragon);
+    }
+
+    _updateSuspendedBuffs(dt) {
+        if (!this.suspendedActive) return;
+        this.suspendedTimer = Math.max(0, this.suspendedTimer - dt);
+        if (this.suspendedTimer > 0) return;
+        this.active = new Map(this.suspendedActive);
+        this.suspendedActive = null;
+        this.lowHpExplosionUsed = this.suspendedLowHpExplosionUsed;
+        this.suspendedLowHpExplosionUsed = false;
+        this.refreshPlayerStats();
     }
 
     _updateLeafShields(dt, dragon) {
@@ -452,6 +485,8 @@ class BuffSystem {
         this.objects.missileNest.position.copy(dragon.mesh.position);
         this.objects.missileNest.position.y += 2.35 * bodyScale + 0.35;
         this.objects.missileNest.quaternion.copy(dragon.mesh.quaternion);
+
+        if (state.pvp && state.pvp.active && state.pvp.startCountdownTimer > 0) return;
 
         this.timers.missile = (this.timers.missile || 0) - dt;
         if (this.timers.missile > 0) return;
@@ -571,7 +606,7 @@ class BuffSystem {
 
     _updateBuffVisuals(dt, dragon) {
         if (dragon.tailGroup) {
-            const tailScale = this.isActive('tailPower') ? 1.45 : 1.0;
+            const tailScale = this.isActive('tailPower') ? CONFIG.buffs.tailPowerSweepRadiusMultiplier : 1.0;
             dragon.tailGroup.scale.set(tailScale, tailScale, tailScale);
         }
 

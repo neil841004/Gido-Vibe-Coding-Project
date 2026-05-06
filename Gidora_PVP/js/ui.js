@@ -177,7 +177,7 @@ function setupBuffUI() {
         row.style.padding = '7px 6px';
         row.style.marginBottom = '4px';
         row.style.borderRadius = '7px';
-        row.style.background = 'rgba(255,255,255,0.05)';
+        row.style.background = cfg.pvpExclude ? 'rgba(180,40,40,0.18)' : 'rgba(255,255,255,0.05)';
         row.style.cursor = 'pointer';
         row.classList.toggle('buff-incomplete', !isBuffImplemented(id));
 
@@ -308,7 +308,10 @@ function refreshBuffUI() {
         const title = row.querySelector('.buff-title');
         const stack = dragon && dragon.buffSystem ? dragon.buffSystem.getStack(id) : 0;
         input.checked = stack > 0;
-        row.style.background = stack > 0 ? 'rgba(84, 255, 175, 0.16)' : 'rgba(255,255,255,0.05)';
+        const isPvpExclude = !!(BUFFS[id] && BUFFS[id].pvpExclude);
+        row.style.background = stack > 0
+            ? (isPvpExclude ? 'rgba(200,60,60,0.30)' : 'rgba(84, 255, 175, 0.16)')
+            : (isPvpExclude ? 'rgba(180,40,40,0.18)' : 'rgba(255,255,255,0.05)');
         title.textContent = BUFFS[id].name + (BUFFS[id].stackable && stack > 0 ? ` x${stack}` : '');
         title.style.color = isBuffImplemented(id) ? '#ffffff' : '#ff5a5a';
     });
@@ -355,14 +358,14 @@ function openPvpSetupOverlay() {
     selectedPvpDeviceId = null;
     pvpDeviceFocus = {};
     pvpNewDeviceConfirmBlock = {};
-    upsertPvpDevice(PVP_KEYBOARD_DEVICE);
+    upsertPvpDevice(PVP_KEYBOARD_DEVICE, true);
 
     if (!pvpOverlay) buildPvpSetupOverlay();
     pvpOverlay.style.display = 'flex';
     refreshPvpOverlay();
 }
 
-function upsertPvpDevice(device) {
+function upsertPvpDevice(device, selectForMouse = false) {
     if (!device || !device.id) return null;
     const normalized = { ...device };
     const existingIndex = pvpDevices.findIndex(d => d.id === normalized.id);
@@ -374,8 +377,10 @@ function upsertPvpDevice(device) {
     if (pvpDeviceFocus[normalized.id] === undefined) {
         pvpDeviceFocus[normalized.id] = getFirstFocusablePvpSlotIndex(normalized);
     }
-    selectedPvpDeviceId = normalized.id;
-    pendingDevice = normalized;
+    if (selectForMouse || !selectedPvpDeviceId) {
+        selectedPvpDeviceId = normalized.id;
+        pendingDevice = normalized;
+    }
     return normalized;
 }
 
@@ -597,7 +602,7 @@ function createPvpDeviceColumn() {
     column.appendChild(heading);
 
     const hint = document.createElement('div');
-    hint.textContent = '鍵鼠會自動加入；手把按任意鍵加入。每個手把各自用方向鍵/左搖桿選位置，ABXY 確定，已被選走的位置會自動跳過，Start 開戰。';
+    hint.textContent = '鍵鼠會自動加入；手把按任意鍵加入。每個裝置各自用 WASD/方向鍵/左搖桿選位置，Space/Enter/ABXY 確定，已被選走的位置會自動跳過。';
     hint.style.fontSize = '12px';
     hint.style.color = '#a9bfd6';
     hint.style.lineHeight = '1.45';
@@ -690,8 +695,8 @@ function refreshPvpOverlay() {
     if (line) {
         const selected = getSelectedPvpDevice();
         line.textContent = selected
-            ? `目前裝置：${selected.label}。每個控制器都只會替自己選位；已被選走的位置會鎖定並跳過。`
-            : '鍵鼠已可加入；手把按任意按鈕會出現在中間。';
+            ? `滑鼠點選目標：${selected.label}。所有裝置可同時移動自己的選位並確認。`
+            : '鍵鼠已可加入；手把按任意按鈕會出現在中間，所有裝置可同時選位。';
     }
     const list = document.getElementById('pvp-device-list');
     if (list) {
@@ -727,8 +732,8 @@ function refreshPvpOverlay() {
             card.style.background = assignedIndex >= 0
                 ? `linear-gradient(135deg, ${colorToRgba(assignedColor, 0.38)}, rgba(18,28,38,0.9))`
                 : (selectedPvpDeviceId === deviceInfo.id
-                    ? `linear-gradient(135deg, ${colorToRgba(focusColor, 0.24)}, rgba(18,28,38,0.9))`
-                    : 'rgba(255,255,255,0.09)');
+                    ? `linear-gradient(135deg, ${colorToRgba(focusColor, 0.30)}, rgba(18,28,38,0.9))`
+                    : `linear-gradient(135deg, ${colorToRgba(focusColor, 0.16)}, rgba(18,28,38,0.9))`);
             card.style.border = assignedIndex >= 0
                 ? `1px solid ${colorToRgba(assignedColor, 0.82)}`
                 : (selectedPvpDeviceId === deviceInfo.id
@@ -766,9 +771,10 @@ function refreshPvpOverlay() {
         const device = slotEl.querySelector('.pvp-slot-device');
         const accent = slotEl.querySelector('.pvp-slot-accent');
         const selected = getSelectedPvpDevice();
-        const focusedBySelected = selected && getPvpDeviceFocusIndex(selected) === slotIndex && canDeviceFocusPvpSlot(slotIndex, selected);
-        const focusedByAny = pvpDevices.some(deviceInfo =>
+        const focusDevices = pvpDevices.filter(deviceInfo =>
             getPvpDeviceFocusIndex(deviceInfo) === slotIndex && canDeviceFocusPvpSlot(slotIndex, deviceInfo));
+        const focusedBySelected = selected && getPvpDeviceFocusIndex(selected) === slotIndex && canDeviceFocusPvpSlot(slotIndex, selected);
+        const focusedByAny = focusDevices.length > 0;
         const lockedByOther = slot && selected && slot.device && slot.device.id !== selected.id;
         const color = getPvpSlotColor(slotIndex);
         slotEl.style.background = slot
@@ -778,16 +784,22 @@ function refreshPvpOverlay() {
                 : `linear-gradient(135deg, ${colorToRgba(color, 0.13)}, rgba(16,24,34,0.78))`);
         slotEl.style.border = focusedBySelected
             ? `2px solid ${colorToRgba(color, 0.95)}`
-            : `1px solid ${colorToRgba(color, slot ? 0.9 : 0.42)}`;
+            : (focusedByAny
+                ? `2px solid ${colorToRgba(color, 0.72)}`
+                : `1px solid ${colorToRgba(color, slot ? 0.9 : 0.42)}`);
         slotEl.style.boxShadow = focusedBySelected
             ? `0 0 18px ${colorToRgba(color, 0.38)}`
-            : (focusedByAny && !slot ? `0 0 10px ${colorToRgba(color, 0.18)}` : 'none');
+            : (focusedByAny && !slot ? `0 0 14px ${colorToRgba(color, 0.26)}` : 'none');
         slotEl.style.opacity = lockedByOther ? '0.72' : '1';
         slotEl.style.cursor = lockedByOther ? 'not-allowed' : 'pointer';
         if (accent) accent.style.background = colorToRgba(color, slot ? 0.95 : 0.78);
-        device.textContent = slot && slot.device ? getPvpPlayerLabel(slotIndex) : 'Empty';
+        device.textContent = slot && slot.device
+            ? getPvpPlayerLabel(slotIndex)
+            : (focusDevices.length > 0
+                ? `選擇中：${focusDevices.map(d => d.label.split(' ')[0]).join(', ')}`
+                : 'Empty');
         device.style.color = slot ? '#ffffff' : '#adc1d8';
-        device.style.fontSize = slot ? '20px' : '12px';
+        device.style.fontSize = slot ? '20px' : (focusDevices.length > 0 ? '11px' : '12px');
         device.style.fontWeight = slot ? '1000' : '700';
     });
     document.querySelectorAll('[data-pvp-buff-count]').forEach(select => {
@@ -819,13 +831,13 @@ function assignDeviceToPvpSlot(device, slotIndex) {
 }
 
 function pvpSetPendingDevice(device) {
-    upsertPvpDevice(device);
+    upsertPvpDevice(device, device && device.type === 'keyboard');
     refreshPvpOverlay();
 }
 
 function pvpHandleGamepadSetupInput(device, action) {
     if (!state.pvp || !state.pvp.configuring) return;
-    const selected = upsertPvpDevice(device);
+    const selected = upsertPvpDevice(device, false);
     if (!selected) return;
 
     if (action.dx || action.dy) pvpNewDeviceConfirmBlock[selected.id] = false;
@@ -837,6 +849,37 @@ function pvpHandleGamepadSetupInput(device, action) {
     if (action.clear) clearPvpFocusedSlot(selected);
     if (action.start) startPvpFromSetup();
     refreshPvpOverlay();
+}
+
+function pvpHandleKeyboardSetupInput(device, action) {
+    if (!state.pvp || !state.pvp.configuring) return false;
+    const selected = upsertPvpDevice(device, false);
+    if (!selected || !action || action.repeat) return false;
+
+    let dx = 0;
+    let dy = 0;
+    let confirm = false;
+    let clear = false;
+
+    if (action.code === 'KeyA' || action.code === 'ArrowLeft') dx = -1;
+    if (action.code === 'KeyD' || action.code === 'ArrowRight') dx = 1;
+    if (action.code === 'KeyW' || action.code === 'ArrowUp') dy = -1;
+    if (action.code === 'KeyS' || action.code === 'ArrowDown') dy = 1;
+    if (action.code === 'Space' || action.code === 'Enter' || action.code === 'NumpadEnter') confirm = true;
+    if (action.code === 'Backspace' || action.code === 'Delete') clear = true;
+
+    if (!dx && !dy && !confirm && !clear) return false;
+    if (dx || dy) {
+        pvpNewDeviceConfirmBlock[selected.id] = false;
+        movePvpDeviceFocus(selected, dx, dy);
+    }
+    if (confirm && !pvpNewDeviceConfirmBlock[selected.id]) {
+        assignDeviceToPvpSlot(selected, getPvpDeviceFocusIndex(selected));
+    }
+    if (confirm) pvpNewDeviceConfirmBlock[selected.id] = false;
+    if (clear) clearPvpFocusedSlot(selected);
+    refreshPvpOverlay();
+    return true;
 }
 
 function showPvpResultOverlay() {
@@ -879,9 +922,11 @@ function showPvpResultOverlay() {
     }
 
     const title = document.getElementById('pvp-result-title');
-    title.textContent = state.pvp.winnerIndex === 0
+    const timeUp = state.pvp.timeUpVictory;
+    const winText = state.pvp.winnerIndex === 0
         ? 'Dragon A Wins'
         : (state.pvp.winnerIndex === 1 ? 'Dragon B Wins' : 'Draw');
+    title.textContent = timeUp ? `時間到！${winText}` : winText;
     pvpResultOverlay.style.display = 'flex';
 }
 
@@ -994,6 +1039,25 @@ function ensurePvpBattleHud() {
 
             document.body.appendChild(panel);
         });
+    }
+
+    if (!document.getElementById('pvp-match-timer')) {
+        const timerEl = document.createElement('div');
+        timerEl.id = 'pvp-match-timer';
+        timerEl.style.position = 'absolute';
+        timerEl.style.top = '18px';
+        timerEl.style.left = '50%';
+        timerEl.style.transform = 'translateX(-50%)';
+        timerEl.style.zIndex = '20';
+        timerEl.style.display = 'none';
+        timerEl.style.color = 'white';
+        timerEl.style.fontSize = '28px';
+        timerEl.style.fontWeight = '900';
+        timerEl.style.letterSpacing = '3px';
+        timerEl.style.textShadow = '0 0 10px #000, 0 0 20px rgba(255,255,255,0.4)';
+        timerEl.style.pointerEvents = 'none';
+        timerEl.style.fontFamily = 'monospace';
+        document.body.appendChild(timerEl);
     }
 
     if (!document.getElementById('pvp-start-countdown')) {
@@ -1207,9 +1271,32 @@ function updateUI() {
     updatePvpComboRampSummary('pvp-combo-ramp-a', state.dragons[0]);
     updatePvpComboRampSummary('pvp-combo-ramp-b', state.dragons[1]);
     updatePvpCountdownUI();
+    updatePvpTimerUI();
+}
+
+function updatePvpTimerUI() {
+    const el = document.getElementById('pvp-match-timer');
+    if (!el) return;
+    const show = state.pvp.active && !state.pvp.ended && !state.pvp.configuring &&
+                 state.pvp.startCountdownTimer <= 0;
+    el.style.display = show ? 'block' : 'none';
+    if (!show) return;
+    const secs = Math.ceil(Math.max(0, state.pvp.matchTimer));
+    const mm = String(Math.floor(secs / 60)).padStart(2, '0');
+    const ss = String(secs % 60).padStart(2, '0');
+    el.textContent = `${mm}:${ss}`;
+    // 最後 30 秒文字變紅並加大
+    if (secs <= 30) {
+        el.style.color = secs <= 10 ? '#ff4444' : '#ffaa44';
+        el.style.fontSize = secs <= 10 ? '34px' : '30px';
+    } else {
+        el.style.color = 'white';
+        el.style.fontSize = '28px';
+    }
 }
 
 window.pvpSetPendingDevice = pvpSetPendingDevice;
 window.pvpHandleGamepadSetupInput = pvpHandleGamepadSetupInput;
+window.pvpHandleKeyboardSetupInput = pvpHandleKeyboardSetupInput;
 window.showPvpResultOverlay = showPvpResultOverlay;
 window.refreshAllUI = refreshAllUI;

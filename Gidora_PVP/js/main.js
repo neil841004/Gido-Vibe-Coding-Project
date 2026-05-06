@@ -39,6 +39,30 @@ function createDragon(index) {
     return dragon;
 }
 
+function disposeSceneObject(obj) {
+    if (!obj) return;
+    if (obj.parent) obj.parent.remove(obj);
+    if (obj.traverse) {
+        obj.traverse(child => {
+            if (child.geometry) child.geometry.dispose();
+            if (child.material) {
+                if (Array.isArray(child.material)) {
+                    child.material.forEach(mat => {
+                        if (mat.map) mat.map.dispose();
+                        mat.dispose();
+                    });
+                } else {
+                    if (child.material.map) child.material.map.dispose();
+                    child.material.dispose();
+                }
+            }
+        });
+        return;
+    }
+    if (obj.geometry) obj.geometry.dispose();
+    if (obj.material) obj.material.dispose();
+}
+
 function resetDragonForBattle(dragon, index, clearBuffs = false) {
     if (!dragon) return;
     const spawn = index === 1 ? CONFIG.pvp.dragonBSpawn : CONFIG.pvp.dragonASpawn;
@@ -64,7 +88,22 @@ function resetDragonForBattle(dragon, index, clearBuffs = false) {
     dragon.comboCooldownMax = CONFIG.combo.cooldown;
     dragon.cooldowns = { p1: 0, p2: 0, p3: 0, p4: 0 };
     dragon.attackStates = { p1: 'idle', p2: 'idle', p3: 'idle', p4: 'idle' };
+    dragon.attackKinds = { p1: 'light', p2: 'light', p3: 'light', p4: 'light' };
+    dragon.attackTimers = { p1: 0, p2: 0, p3: 0, p4: 0 };
+    dragon.attackHoldTimers = { p1: 0, p2: 0, p3: 0, p4: 0 };
+    dragon.attackReleaseQueued = { p1: false, p2: false, p3: false, p4: false };
+    dragon.attackQueuedKinds = { p1: 'light', p2: 'light', p3: 'light', p4: 'light' };
+    dragon.attackImpactDone = { p1: false, p2: false, p3: false, p4: false };
+    dragon.recoveryBufferedPress = { p1: false, p2: false, p3: false, p4: false };
     dragon.lastAttackInput = { p1: false, p2: false, p3: false, p4: false };
+    dragon.tailSweepStartY = dragon.mesh.rotation.y;
+    dragon.tailSweepImpactDone = false;
+    if (dragon.speedLines) {
+        dragon.speedLines.forEach(line => disposeSceneObject(line.mesh));
+        dragon.speedLines = [];
+    }
+    if (dragon.hideAllChargeIndicators) dragon.hideAllChargeIndicators();
+    if (dragon.hideAllFlamethrowerIndicators) dragon.hideAllFlamethrowerIndicators();
     dragon._hideBeamFX();
     if (clearBuffs && dragon.buffSystem) dragon.buffSystem.clearAll();
     if (dragon.buffSystem) dragon.buffSystem.refreshPlayerStats();
@@ -110,24 +149,33 @@ function clearTransientBattleObjects() {
         state.enemyManager.bossSpawned = false;
     }
     state.particles.forEach(p => {
-        if (p.mesh && p.mesh.parent) p.mesh.parent.remove(p.mesh);
-        if (p.mesh && p.mesh.geometry) p.mesh.geometry.dispose();
-        if (p.mesh && p.mesh.material) p.mesh.material.dispose();
+        disposeSceneObject(p.mesh);
+        disposeSceneObject(p.ring);
+        disposeSceneObject(p.shadowMesh);
     });
     state.particles = [];
     state.flyingCorpses.forEach(c => {
-        if (c.mesh && c.mesh.parent) c.mesh.parent.remove(c.mesh);
-        if (c.shadowMesh && c.shadowMesh.parent) c.shadowMesh.parent.remove(c.shadowMesh);
+        disposeSceneObject(c.mesh);
+        disposeSceneObject(c.shadowMesh);
     });
     state.flyingCorpses = [];
     state.meatChunks.forEach(m => {
-        if (m.mesh && m.mesh.parent) m.mesh.parent.remove(m.mesh);
+        disposeSceneObject(m.mesh);
     });
     state.meatChunks = [];
 }
 
+function resetLevelForBattle() {
+    if (!state.levelManager || !state.levelManager.generateLevel) return;
+    state.levelManager.generateLevel();
+}
+
 function getRandomBuffCount(setting) {
-    if (setting === -1) return Math.floor(Math.random() * (CONFIG.pvp.maxBuffsPerDragon + 1));
+    if (setting === -1) {
+        const minRandomBuffs = Math.min(3, CONFIG.pvp.maxBuffsPerDragon);
+        const randomRange = CONFIG.pvp.maxBuffsPerDragon - minRandomBuffs + 1;
+        return minRandomBuffs + Math.floor(Math.random() * Math.max(1, randomRange));
+    }
     return THREE.MathUtils.clamp(Number(setting) || 0, 0, CONFIG.pvp.maxBuffsPerDragon);
 }
 
@@ -135,12 +183,33 @@ function applyRandomBuffs(dragon, countSetting) {
     if (!dragon || !dragon.buffSystem) return;
     dragon.buffSystem.clearAll();
     const count = getRandomBuffCount(countSetting);
-    const ids = Object.keys(BUFFS);
+    // PVP 模式不抽 pvpExclude 的 Buff（同心協力回血、有效傷害回血）
+    const ids = Object.keys(BUFFS).filter(id => !BUFFS[id].pvpExclude);
+    const meleeFormIds = ids.filter(id => BUFFS[id].group === 'meleeForm');
+    const nonMeleeFormIds = ids.filter(id => BUFFS[id].group !== 'meleeForm');
     for (let i = ids.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
         [ids[i], ids[j]] = [ids[j], ids[i]];
     }
-    ids.slice(0, count).forEach(id => {
+    const selectedIds = [];
+    if (count > 5 && meleeFormIds.length > 0) {
+        const meleeIds = shuffleArray(meleeFormIds.slice());
+        selectedIds.push(meleeIds[0]);
+        shuffleArray(nonMeleeFormIds.slice()).some(id => {
+            selectedIds.push(id);
+            return selectedIds.length >= count;
+        });
+    } else {
+        let hasMeleeForm = false;
+        ids.some(id => {
+            const isMeleeForm = BUFFS[id].group === 'meleeForm';
+            if (isMeleeForm && hasMeleeForm) return false;
+            if (isMeleeForm) hasMeleeForm = true;
+            selectedIds.push(id);
+            return selectedIds.length >= count;
+        });
+    }
+    selectedIds.forEach(id => {
         if (BUFFS[id].stackable) dragon.buffSystem.setStack(id, 1);
         else dragon.buffSystem.toggle(id);
     });
@@ -149,6 +218,7 @@ function applyRandomBuffs(dragon, countSetting) {
 function enterPvpBattle() {
     ensureEnemyDragon();
     clearTransientBattleObjects();
+    resetLevelForBattle();
     state.spawnerEnabled = false;
     state.hpDecayEnabled = false;
     state.dummyEnabled = false;
@@ -156,6 +226,8 @@ function enterPvpBattle() {
     state.pvp.active = true;
     state.pvp.ended = false;
     state.pvp.winnerIndex = -1;
+    state.pvp.matchTimer = CONFIG.pvp.matchDuration;
+    state.pvp.timeUpVictory = false;
     state.pvp.startCountdownTimer = CONFIG.pvp.startCountdownSeconds;
     state.pvp.startTextTimer = 0;
     resetDragonForBattle(state.dragons[0], 0, true);
@@ -170,12 +242,35 @@ function exitPvpBattle() {
     state.pvp.configuring = false;
     state.pvp.ended = false;
     state.pvp.winnerIndex = -1;
+    state.pvp.matchTimer = 0;
     state.pvp.startCountdownTimer = 0;
     state.pvp.startTextTimer = 0;
     state.pvp.slots = [null, null, null, null, null, null, null, null];
     resetDragonForBattle(state.dragons[0], 0, false);
     resetDragonForBattle(state.dragons[1], 1, false);
     if (typeof refreshAllUI === 'function') refreshAllUI();
+}
+
+function onPvpTimeUp() {
+    if (!state.pvp.active || state.pvp.ended) return;
+    state.pvp.ended = true;
+    state.pvp.timeUpVictory = true;
+    const a = state.dragons[0];
+    const b = state.dragons[1];
+    const hpA = (a && !a.isDead) ? a.hp : 0;
+    const hpB = (b && !b.isDead) ? b.hp : 0;
+    if (hpA > hpB) state.pvp.winnerIndex = 0;
+    else if (hpB > hpA) state.pvp.winnerIndex = 1;
+    else state.pvp.winnerIndex = -1;
+    if (typeof showPvpResultOverlay === 'function') showPvpResultOverlay();
+}
+
+function updatePvpMatchTimer(dt) {
+    if (!state.pvp.active || state.pvp.ended) return;
+    if (state.pvp.startCountdownTimer > 0) return;
+    if (state.pvp.matchTimer <= 0) return;
+    state.pvp.matchTimer = Math.max(0, state.pvp.matchTimer - dt);
+    if (state.pvp.matchTimer <= 0) onPvpTimeUp();
 }
 
 function onDragonDeath(dragon) {
@@ -197,6 +292,53 @@ function updatePvpStartCountdown(dt) {
         }
     } else if (state.pvp.startTextTimer > 0) {
         state.pvp.startTextTimer = Math.max(0, state.pvp.startTextTimer - dt);
+    }
+}
+
+function checkDragonDragonCollisions() {
+    const r = CONFIG.pvp.dragonCollisionRadius;
+    const minDist = r * 2;
+    for (let i = 0; i < state.dragons.length; i++) {
+        const a = state.dragons[i];
+        if (!a || a.isDead || !a.mesh.visible) continue;
+        for (let j = i + 1; j < state.dragons.length; j++) {
+            const b = state.dragons[j];
+            if (!b || b.isDead || !b.mesh.visible) continue;
+
+            const dx = b.mesh.position.x - a.mesh.position.x;
+            const dz = b.mesh.position.z - a.mesh.position.z;
+            const distSq = dx * dx + dz * dz;
+            if (distSq >= minDist * minDist || distSq < 0.0001) continue;
+
+            const dist = Math.sqrt(distSq);
+            const pen = minDist - dist;
+            const nx = dx / dist;
+            const nz = dz / dist;
+
+            // 推開重疊部分（各退一半）
+            a.mesh.position.x -= nx * pen * 0.5;
+            a.mesh.position.z -= nz * pen * 0.5;
+            b.mesh.position.x += nx * pen * 0.5;
+            b.mesh.position.z += nz * pen * 0.5;
+
+            // 計算相對速度在碰撞法線方向的分量；只在兩龍靠近時施加衝量
+            const relVx = b.velocity.x - a.velocity.x;
+            const relVz = b.velocity.z - a.velocity.z;
+            const relVn = relVx * nx + relVz * nz;
+            if (relVn < 0) {
+                const impulse = relVn * CONFIG.pvp.dragonBounceRestitution;
+                a.velocity.x -= nx * impulse;
+                a.velocity.z -= nz * impulse;
+                b.velocity.x += nx * impulse;
+                b.velocity.z += nz * impulse;
+                // 額外推力確保有明顯彈開感
+                const push = CONFIG.pvp.dragonPushForce;
+                a.knockbackVel.x -= nx * push;
+                a.knockbackVel.z -= nz * push;
+                b.knockbackVel.x += nx * push;
+                b.knockbackVel.z += nz * push;
+            }
+        }
     }
 }
 
@@ -252,6 +394,7 @@ function animate(time) {
 
     state.pollInputs();
     updatePvpStartCountdown(dt);
+    updatePvpMatchTimer(dt);
 
     if (!state.pvp.configuring && !state.pvp.ended) {
         state.dragons.forEach(dragon => {
@@ -268,6 +411,8 @@ function animate(time) {
                 if (dragon.hp <= 0) dragon.die();
             });
         }
+
+        checkDragonDragonCollisions();
 
         state.dragons.forEach(dragon => {
             if (dragon) dragon.checkCollisions(state.bullets);
