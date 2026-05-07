@@ -359,7 +359,7 @@ function setupInputs() {
         if (state.pvp && state.pvp.active && state.pvp.startCountdownTimer > 0) return;
         if (state.pvp && state.pvp.active) {
             applyPvpControls(gamepads);
-            applyKeyboardDebugControlsForPvp();
+            if (!state.pve || !state.pve.active) applyKeyboardDebugControlsForPvp();
         } else {
             applyKeyboardTestControls();
             gamepads.forEach((gp, gpIndex) => {

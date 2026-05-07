@@ -36,6 +36,7 @@ function setupUI() {
         if (state.spawnerEnabled) {
             state.hpDecayEnabled = true;
             state.pvp.active = false;
+            state.pve.active = false;
         }
         if (!state.spawnerEnabled && state.enemyManager) state.enemyManager.killAll();
         refreshTopLeftUI();
@@ -71,6 +72,13 @@ function setupUI() {
     styleTopButton(pvpBtn, '#5c55c8');
     info.appendChild(pvpBtn);
     pvpBtn.addEventListener('click', openPvpSetupOverlay);
+
+    const pveBtn = document.createElement('button');
+    pveBtn.id = 'pve-mode-button';
+    pveBtn.textContent = 'Enter PVE Mode';
+    styleTopButton(pveBtn, '#2f8f9c');
+    info.appendChild(pveBtn);
+    pveBtn.addEventListener('click', openPveSetupOverlay);
 
     setupBuffUI();
     refreshTopLeftUI();
@@ -354,6 +362,8 @@ function openPvpSetupOverlay() {
     state.pvp.configuring = true;
     state.pvp.active = false;
     state.pvp.ended = false;
+    state.pve.active = false;
+    state.pve.configuring = false;
     pendingDevice = null;
     selectedPvpDeviceId = null;
     pvpDeviceFocus = {};
@@ -362,7 +372,30 @@ function openPvpSetupOverlay() {
         upsertPvpDevice(PVP_KEYBOARD_DEVICE, true);
     }
 
-    if (!pvpOverlay) buildPvpSetupOverlay();
+    destroyPvpSetupOverlay();
+    buildPvpSetupOverlay();
+    pvpOverlay.style.display = 'flex';
+    refreshPvpOverlay();
+}
+
+function openPveSetupOverlay() {
+    window.ensureEnemyDragon();
+    state.pvp.configuring = true;
+    state.pvp.active = false;
+    state.pvp.ended = false;
+    state.pve.active = false;
+    state.pve.configuring = true;
+    state.pvp.slots = [null, null, null, null, null, null, null, null];
+    pendingDevice = null;
+    selectedPvpDeviceId = null;
+    pvpDeviceFocus = {};
+    pvpNewDeviceConfirmBlock = {};
+    if (!state.pvp.disableKeyboard) {
+        upsertPvpDevice(PVP_KEYBOARD_DEVICE, true);
+    }
+
+    destroyPvpSetupOverlay();
+    buildPvpSetupOverlay();
     pvpOverlay.style.display = 'flex';
     refreshPvpOverlay();
 }
@@ -397,6 +430,12 @@ function getSelectedPvpDevice() {
 }
 
 function getSlotGridPosition(slotIndex) {
+    if (state.pve && state.pve.configuring) {
+        return {
+            col: slotIndex % 2,
+            row: Math.floor(slotIndex / 2)
+        };
+    }
     const team = slotIndex < 4 ? 0 : 1;
     const part = slotIndex % 4;
     return {
@@ -406,6 +445,11 @@ function getSlotGridPosition(slotIndex) {
 }
 
 function getSlotIndexFromGrid(col, row) {
+    if (state.pve && state.pve.configuring) {
+        const safeCol = (col + 2) % 2;
+        const safeRow = (row + 2) % 2;
+        return safeRow * 2 + safeCol;
+    }
     const safeCol = (col + 4) % 4;
     const safeRow = (row + 2) % 2;
     const team = safeCol < 2 ? 0 : 1;
@@ -419,14 +463,20 @@ function getAssignedSlotIndexForDevice(device) {
 }
 
 function canDeviceFocusPvpSlot(slotIndex, device) {
+    if (slotIndex < 0 || slotIndex >= getPvpSetupSlotLimit()) return false;
     const slot = state.pvp.slots[slotIndex];
     return !slot || (device && slot.device && slot.device.id === device.id);
+}
+
+function getPvpSetupSlotLimit() {
+    return state.pve && state.pve.configuring ? 4 : state.pvp.slots.length;
 }
 
 function getFirstFocusablePvpSlotIndex(device) {
     const assignedIndex = getAssignedSlotIndexForDevice(device);
     if (assignedIndex >= 0) return assignedIndex;
-    const emptyIndex = state.pvp.slots.findIndex((slot, index) => !slot && canDeviceFocusPvpSlot(index, device));
+    const emptyIndex = state.pvp.slots.findIndex((slot, index) =>
+        index < getPvpSetupSlotLimit() && !slot && canDeviceFocusPvpSlot(index, device));
     return emptyIndex >= 0 ? emptyIndex : 0;
 }
 
@@ -447,7 +497,8 @@ function movePvpDeviceFocus(device, dx, dy) {
     if (!device || (!dx && !dy)) return;
     const startIndex = getPvpDeviceFocusIndex(device);
     const startPos = getSlotGridPosition(startIndex);
-    for (let step = 1; step <= state.pvp.slots.length; step++) {
+    const limit = getPvpSetupSlotLimit();
+    for (let step = 1; step <= limit; step++) {
         const nextIndex = getSlotIndexFromGrid(startPos.col + dx * step, startPos.row + dy * step);
         if (canDeviceFocusPvpSlot(nextIndex, device)) {
             pvpDeviceFocus[device.id] = nextIndex;
@@ -481,7 +532,7 @@ function autoAssignUnassignedPvpDevices() {
         .map(device => ({ ...device })));
     const emptySlots = shuffleArray(state.pvp.slots
         .map((slot, index) => slot ? -1 : index)
-        .filter(index => index >= 0));
+        .filter(index => index >= 0 && index < getPvpSetupSlotLimit()));
 
     unassigned.forEach(device => {
         const slotIndex = emptySlots.pop();
@@ -492,9 +543,19 @@ function autoAssignUnassignedPvpDevices() {
 
 function startPvpFromSetup() {
     autoAssignUnassignedPvpDevices();
+    state.pve.active = false;
+    state.pve.configuring = false;
     if (pvpOverlay) pvpOverlay.style.display = 'none';
     if (pvpResultOverlay) pvpResultOverlay.style.display = 'none';
     window.enterPvpBattle();
+}
+
+function startPveFromSetup() {
+    autoAssignUnassignedPvpDevices();
+    for (let i = 4; i < state.pvp.slots.length; i++) state.pvp.slots[i] = null;
+    if (pvpOverlay) pvpOverlay.style.display = 'none';
+    if (pvpResultOverlay) pvpResultOverlay.style.display = 'none';
+    window.enterPveBattle();
 }
 
 function createPvpTeamColumn(dragonName, dragonIndex) {
@@ -657,7 +718,74 @@ function createPvpDeviceColumn() {
     return column;
 }
 
+function createPveCpuColumn() {
+    const column = document.createElement('div');
+    column.style.border = '1px solid rgba(136,255,68,0.28)';
+    column.style.borderRadius = '8px';
+    column.style.padding = '12px';
+    column.style.background = 'rgba(80,160,80,0.08)';
+
+    const heading = document.createElement('div');
+    heading.textContent = 'CPU Dragon';
+    heading.style.fontSize = '18px';
+    heading.style.fontWeight = '900';
+    heading.style.marginBottom = '10px';
+    column.appendChild(heading);
+
+    const status = document.createElement('div');
+    status.textContent = 'Dragon B 由四個鬆散 CPU 部位控制';
+    status.style.minHeight = '70px';
+    status.style.border = '1px solid rgba(136,255,68,0.22)';
+    status.style.borderRadius = '7px';
+    status.style.padding = '10px';
+    status.style.color = '#d8ffd0';
+    status.style.background = 'linear-gradient(135deg, rgba(136,255,68,0.18), rgba(16,24,18,0.82))';
+    status.style.fontSize = '13px';
+    status.style.fontWeight = '800';
+    status.style.lineHeight = '1.45';
+    column.appendChild(status);
+
+    const buffRow = document.createElement('label');
+    buffRow.style.display = 'flex';
+    buffRow.style.alignItems = 'center';
+    buffRow.style.gap = '8px';
+    buffRow.style.marginTop = '12px';
+    buffRow.style.fontSize = '13px';
+    buffRow.textContent = 'CPU Buff 數';
+    const select = document.createElement('select');
+    select.dataset.pvpBuffCount = '1';
+    select.style.pointerEvents = 'auto';
+    select.style.flex = '1';
+    select.style.background = '#172333';
+    select.style.color = 'white';
+    select.style.border = '1px solid rgba(255,255,255,0.22)';
+    select.style.borderRadius = '6px';
+    select.style.padding = '7px';
+    for (let i = 0; i <= CONFIG.pvp.maxBuffsPerDragon; i++) {
+        const opt = document.createElement('option');
+        opt.value = String(i);
+        opt.textContent = String(i);
+        select.appendChild(opt);
+    }
+    const randomOpt = document.createElement('option');
+    randomOpt.value = '-1';
+    randomOpt.textContent = '隨機';
+    select.appendChild(randomOpt);
+    select.addEventListener('change', () => {
+        state.pvp.buffCounts[1] = Number(select.value);
+    });
+    buffRow.appendChild(select);
+    column.appendChild(buffRow);
+    return column;
+}
+
+function destroyPvpSetupOverlay() {
+    if (pvpOverlay && pvpOverlay.parentNode) pvpOverlay.parentNode.removeChild(pvpOverlay);
+    pvpOverlay = null;
+}
+
 function buildPvpSetupOverlay() {
+    const isPve = state.pve && state.pve.configuring;
     pvpOverlay = document.createElement('div');
     pvpOverlay.id = 'pvp-setup-overlay';
     pvpOverlay.style.position = 'absolute';
@@ -682,7 +810,7 @@ function buildPvpSetupOverlay() {
     pvpOverlay.appendChild(panel);
 
     const title = document.createElement('div');
-    title.textContent = 'PVP Mode';
+    title.textContent = isPve ? 'PVE Mode' : 'PVP Mode';
     title.style.fontSize = '24px';
     title.style.fontWeight = '900';
     title.style.marginBottom = '6px';
@@ -701,9 +829,9 @@ function buildPvpSetupOverlay() {
     grid.style.gap = '14px';
     panel.appendChild(grid);
 
-    grid.appendChild(createPvpTeamColumn('Dragon A', 0));
+    grid.appendChild(createPvpTeamColumn(isPve ? 'Player Dragon' : 'Dragon A', 0));
     grid.appendChild(createPvpDeviceColumn());
-    grid.appendChild(createPvpTeamColumn('Dragon B', 1));
+    grid.appendChild(isPve ? createPveCpuColumn() : createPvpTeamColumn('Dragon B', 1));
 
     const actions = document.createElement('div');
     actions.style.display = 'flex';
@@ -715,13 +843,15 @@ function buildPvpSetupOverlay() {
     const cancel = makeOverlayButton('Cancel', 'rgba(255,255,255,0.12)');
     cancel.addEventListener('click', () => {
         state.pvp.configuring = false;
+        state.pve.configuring = false;
         pvpOverlay.style.display = 'none';
     });
     actions.appendChild(cancel);
 
-    const start = makeOverlayButton('Start PVP', '#2f9c67');
+    const start = makeOverlayButton(isPve ? 'Start PVE' : 'Start PVP', '#2f9c67');
     start.addEventListener('click', () => {
-        startPvpFromSetup();
+        if (isPve) startPveFromSetup();
+        else startPvpFromSetup();
     });
     actions.appendChild(start);
 
@@ -889,7 +1019,10 @@ function pvpHandleGamepadSetupInput(device, action) {
     }
     if (action.confirm) pvpNewDeviceConfirmBlock[selected.id] = false;
     if (action.clear) clearPvpFocusedSlot(selected);
-    if (action.start) startPvpFromSetup();
+    if (action.start) {
+        if (state.pve && state.pve.configuring) startPveFromSetup();
+        else startPvpFromSetup();
+    }
     refreshPvpOverlay();
 }
 
@@ -956,7 +1089,8 @@ function showPvpResultOverlay() {
         const restart = makeOverlayButton(CONFIG.pvp.respawnButtonLabel, '#2f9c67');
         restart.addEventListener('click', () => {
             pvpResultOverlay.style.display = 'none';
-            window.enterPvpBattle();
+            if (state.pve && state.pve.active) window.enterPveBattle();
+            else window.enterPvpBattle();
         });
         panel.appendChild(restart);
 
@@ -965,9 +1099,10 @@ function showPvpResultOverlay() {
 
     const title = document.getElementById('pvp-result-title');
     const timeUp = state.pvp.timeUpVictory;
+    const isPve = state.pve && state.pve.active;
     const winText = state.pvp.winnerIndex === 0
-        ? 'Dragon A Wins'
-        : (state.pvp.winnerIndex === 1 ? 'Dragon B Wins' : 'Draw');
+        ? (isPve ? 'Player Wins' : 'Dragon A Wins')
+        : (state.pvp.winnerIndex === 1 ? (isPve ? 'CPU Wins' : 'Dragon B Wins') : 'Draw');
     title.textContent = timeUp ? `時間到！${winText}` : winText;
     pvpResultOverlay.style.display = 'flex';
 }

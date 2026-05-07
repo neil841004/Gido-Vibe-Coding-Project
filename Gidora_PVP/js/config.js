@@ -121,7 +121,7 @@ const CONFIG = {
         tailChargeTime: 0.8,                // P4 蓄力所需按住秒數（比頭部 chargeTime 0.4s 更長）
         tailSweepDuration: 0.45,            // P4 蓄力重擊旋轉橫掃的動畫持續秒數
         tailSweepRadius: 5,               // P4 尾巴橫掃攻擊半徑
-        tailSweepDamageScale: 2.5,          // P4 蓄力橫掃傷害倍率（疊加在 meleeDamage 與 tailPower 之上）
+        tailSweepDamageScale: 2.1,          // P4 蓄力橫掃傷害倍率（疊加在 meleeDamage 與 tailPower 之上）
         heavyStaggerBonusScale: 0.5         // 蓄力攻擊命中時，額外造成傷害 50% 的失衡值
     },
 
@@ -241,7 +241,7 @@ const CONFIG = {
         comboCooldownMultiplier: 0.4,     // 組合技 CD 縮短 Buff：冷卻倍率
         comboDamageMultiplier: 2.0,       // 組合技傷害 Buff：傷害倍率
         lifeStealPct: 0.12,               // 有效傷害回血 Buff：造成傷害轉換回血比例
-        tailDamageMultiplier: 4.0,        // 尾巴攻擊力 Buff：尾巴傷害倍率
+        tailDamageMultiplier: 3.0,        // 尾巴攻擊力 Buff：尾巴傷害倍率
         tailPowerSweepRadiusMultiplier: 1.45, // 尾巴攻擊力 Buff：尾巴蓄力橫掃範圍倍率
         leafShieldCount: 1,               // 葉子護盾 Buff：護盾葉片數量
         missileInterval: 2.5,             // 飛彈巢 Buff：發射間隔秒數
@@ -302,6 +302,67 @@ const CONFIG = {
         dragonCollisionRadius: 2.1,       // 每隻龍的碰撞半徑，兩龍距離 < 半徑x2 時觸發推擠
         dragonBounceRestitution: 0,     // 碰撞速度反彈係數，0=完全不反彈，1=完全彈性碰撞
         dragonPushForce: 2                // 碰撞時額外施加於 knockbackVel 的推力大小，單位/秒
+    },
+
+    // -----------------------------------------------------------------
+    // PVE CPU 對手行為
+    // -----------------------------------------------------------------
+    pve: {
+        cpuDecisionIntervalMin: 0.45,     // CPU 每個部位重新判斷行動的最短間隔秒數
+        cpuDecisionIntervalMax: 0.95,     // CPU 每個部位重新判斷行動的最長間隔秒數
+        cpuTeamIntentMinSeconds: 1.7,     // CPU 整體戰術意圖維持的最短秒數
+        cpuTeamIntentMaxSeconds: 3.2,     // CPU 整體戰術意圖維持的最長秒數
+        cpuPreferredRange: 5.2,           // CPU 偏好的交戰距離，單位為世界座標距離
+        cpuRetreatRange: 2.8,             // CPU 覺得過近而想後退的距離
+        cpuChaseRange: 7.5,               // CPU 超過此距離時傾向追擊
+        cpuMeleeRange: 5.4,               // CPU 三顆頭嘗試近戰的距離
+        cpuTailMeleeRange: 6.4,           // CPU 尾巴嘗試掃擊的距離
+        cpuMoveNoiseAngle: 0.22,          // CPU 正常移動方向最大隨機偏角，弧度
+        cpuConfusedMoveNoiseAngle: 1.15,  // CPU 混亂事件中的移動方向最大隨機偏角，弧度
+        cpuIdleMoveChance: 0.05,          // CPU 單一部位本次決策故意不移動的機率
+        cpuConfusionChance: 0.13,         // CPU 單一部位在非集氣時進入混亂操作事件的機率
+        cpuConfusionDurationMin: 2.0,     // CPU 混亂操作事件最短持續秒數
+        cpuConfusionDurationMax: 3.0,     // CPU 混亂操作事件最長持續秒數
+        cpuTargetOffsetRadius: 2.4,       // CPU 判斷玩家位置時的最大誤差半徑，世界座標距離
+        cpuTargetOffsetMinSeconds: 1.1,   // CPU 目標位置誤差維持的最短秒數
+        cpuTargetOffsetMaxSeconds: 2.4,   // CPU 目標位置誤差維持的最長秒數
+        cpuRetreatHpRatio: 0.32,          // CPU 血量低於此比例時更常後退
+        cpuRetreatChance: 0.42,           // CPU 低血量且距離偏近時選擇後退的機率
+        cpuPressureIntentChance: 0.7,     // CPU 距離適中時選擇壓迫而非繞行的機率
+        cpuAttackChance: 0.52,            // CPU 進入攻擊距離時，本次決策嘗試近戰的基礎機率
+        cpuHeavyAttackChance: 0.34,       // CPU 嘗試近戰時改成蓄力攻擊的機率
+        cpuAttackPressSeconds: 0.1,       // CPU 輕攻擊按鍵維持秒數
+        cpuInitialAttackDelayMin: 0.25,   // CPU 開局後同一部位最早可嘗試攻擊的延遲秒數
+        cpuAttackIntervalMin: 0.6,        // CPU 同一部位兩次攻擊嘗試的最短間隔秒數
+        cpuAttackIntervalMax: 1.65,       // CPU 同一部位兩次攻擊嘗試的最長間隔秒數
+        cpuHeavyHoldExtraMin: 0.08,       // CPU 蓄力攻擊達標後額外按住的最短秒數
+        cpuHeavyHoldExtraMax: 0.42,       // CPU 蓄力攻擊達標後額外按住的最長秒數
+        cpuOrbitBlend: 0.26,              // CPU 一般部位繞行玩家的側向權重
+        cpuSideOrbitBlend: 0.42,          // CPU 側邊部位繞行玩家的側向權重
+        cpuOrbitApproachWeight: 0.66,     // CPU 距離足夠時朝玩家靠近的前向權重
+        cpuOrbitApproachMultiplier: 0.55, // CPU 繞行意圖下，前向靠近權重的倍率
+        cpuOrbitBackoffWeight: -0.15,     // CPU 距離偏近時遠離玩家的前向權重
+        cpuObstacleAvoidRange: 5.2,       // CPU 提前避開關卡物件的感知距離
+        cpuObstacleAvoidPadding: 1.4,     // CPU 判斷關卡物件碰撞邊界時額外加上的距離
+        cpuObstacleDefaultSize: 2.0,      // CPU 讀不到物件尺寸時使用的預設寬深
+        cpuSolidAvoidWeight: 1.25,        // CPU 避開實體障礙物的方向權重
+        cpuHazardAvoidWeight: 0.85,       // CPU 避開火焰 / 黏液地形的方向權重
+        cpuObstacleAheadDot: -0.15,       // CPU 只避開大致在行進方向前方的障礙物，內積門檻
+        cpuObstacleMoveAwayDot: 0.95,     // CPU 已明顯遠離障礙物時略過避障的內積門檻
+        cpuConfusionMoveBlend: 0.8,       // CPU 混亂事件中，混亂方向覆蓋正常方向的比例
+        cpuComboPlanIntervalMin: 10,      // CPU 兩次合體技企圖之間的最短間隔秒數
+        cpuComboPlanIntervalMax: 22,      // CPU 兩次合體技企圖之間的最長間隔秒數
+        cpuComboPlanDurationMin: 2.2,     // CPU 一次合體技企圖持續的最短秒數
+        cpuComboPlanDurationMax: 4.0,     // CPU 一次合體技企圖持續的最長秒數
+        cpuComboRangeFactor: 1.05,        // CPU 判斷可嘗試合體技時，相對 beam.range 的射程倍率
+        cpuComboBaseChance: 0.78,         // CPU 條件合適時啟動合體技企圖的基礎機率
+        cpuComboLowHpBonusChance: 0.22,   // CPU 低血量時合體技企圖額外機率
+        cpuComboMaxChance: 0.95,          // CPU 合體技企圖機率上限
+        cpuComboParticipantChance: 0.84,  // CPU 每個部位參與本次合體技集氣的機率
+        cpuComboAimMoveBlend: 0.9,        // CPU 合體技企圖期間，非集氣部位朝真實玩家方向校正的權重
+        cpuComboJoinDelayMin: 0.05,       // CPU 部位加入合體技集氣的最短延遲秒數
+        cpuComboJoinDelayMax: 0.85,       // CPU 部位加入合體技集氣的最長延遲秒數
+        cpuComboFacingDot: 0.05           // CPU 面向玩家且內積高於此值時較可能放合體技
     },
 
     // -----------------------------------------------------------------
@@ -380,6 +441,13 @@ const state = {
         slots: [null, null, null, null, null, null, null, null],
         buffCounts: [-1, -1], // Dragon A / B 各自的 Buff 數量設定 (-1 表示「隨機」)
         disableKeyboard: false // 是否禁用鍵鼠裝置
+    },
+
+    // PVE 對戰狀態；實際雙龍戰鬥 HUD / 勝負沿用 PVP 對戰基礎，這裡只記錄 CPU 模式差異
+    pve: {
+        active: false,        // true = Dragon B 由 CPU 控制
+        configuring: false,   // true = PVE 配對介面開啟
+        cpu: null             // CpuDragonController instance，由 main.js 建立
     },
 
     lastTime: 0

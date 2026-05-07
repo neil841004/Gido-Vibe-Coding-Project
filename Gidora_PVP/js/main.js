@@ -219,6 +219,8 @@ function enterPvpBattle() {
     ensureEnemyDragon();
     clearTransientBattleObjects();
     resetLevelForBattle();
+    state.pve.active = false;
+    state.pve.configuring = false;
     state.spawnerEnabled = false;
     state.hpDecayEnabled = false;
     state.dummyEnabled = false;
@@ -237,6 +239,34 @@ function enterPvpBattle() {
     if (typeof refreshAllUI === 'function') refreshAllUI();
 }
 
+function enterPveBattle() {
+    ensureEnemyDragon();
+    clearTransientBattleObjects();
+    resetLevelForBattle();
+    state.spawnerEnabled = false;
+    state.hpDecayEnabled = false;
+    state.dummyEnabled = false;
+    state.pvp.configuring = false;
+    state.pvp.active = true;
+    state.pvp.ended = false;
+    state.pvp.winnerIndex = -1;
+    state.pvp.matchTimer = CONFIG.pvp.matchDuration;
+    state.pvp.timeUpVictory = false;
+    state.pvp.startCountdownTimer = CONFIG.pvp.startCountdownSeconds;
+    state.pvp.startTextTimer = 0;
+    state.pve.active = true;
+    state.pve.configuring = false;
+    resetDragonForBattle(state.dragons[0], 0, true);
+    resetDragonForBattle(state.dragons[1], 1, true);
+    applyRandomBuffs(state.dragons[0], state.pvp.buffCounts[0]);
+    applyRandomBuffs(state.dragons[1], state.pvp.buffCounts[1]);
+    if (!state.pve.cpu && typeof CpuDragonController === 'function') {
+        state.pve.cpu = new CpuDragonController(1, 0);
+    }
+    if (state.pve.cpu) state.pve.cpu.reset();
+    if (typeof refreshAllUI === 'function') refreshAllUI();
+}
+
 function exitPvpBattle() {
     state.pvp.active = false;
     state.pvp.configuring = false;
@@ -246,6 +276,8 @@ function exitPvpBattle() {
     state.pvp.startCountdownTimer = 0;
     state.pvp.startTextTimer = 0;
     state.pvp.slots = [null, null, null, null, null, null, null, null];
+    state.pve.active = false;
+    state.pve.configuring = false;
     resetDragonForBattle(state.dragons[0], 0, false);
     resetDragonForBattle(state.dragons[1], 1, false);
     if (typeof refreshAllUI === 'function') refreshAllUI();
@@ -373,6 +405,9 @@ function updateCamera(dt) {
 
 // --- Game Objects ---
 createDragon(0);
+if (typeof CpuDragonController === 'function') {
+    state.pve.cpu = new CpuDragonController(1, 0);
+}
 
 state.levelManager = new LevelManager(scene);
 state.enemyManager = new EnemyManager(scene);
@@ -395,6 +430,11 @@ function animate(time) {
     state.pollInputs();
     updatePvpStartCountdown(dt);
     updatePvpMatchTimer(dt);
+    if (state.pve.active && state.pve.cpu &&
+        !state.pvp.configuring && !state.pvp.ended &&
+        state.pvp.startCountdownTimer <= 0) {
+        state.pve.cpu.update(dt);
+    }
 
     if (!state.pvp.configuring && !state.pvp.ended) {
         state.dragons.forEach(dragon => {
@@ -462,5 +502,6 @@ window.addEventListener('resize', () => {
 window.ensureEnemyDragon = ensureEnemyDragon;
 window.removeEnemyDragon = removeEnemyDragon;
 window.enterPvpBattle = enterPvpBattle;
+window.enterPveBattle = enterPveBattle;
 window.exitPvpBattle = exitPvpBattle;
 window.onDragonDeath = onDragonDeath;
