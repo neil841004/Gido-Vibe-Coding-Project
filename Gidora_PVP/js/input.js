@@ -187,6 +187,22 @@ function setupInputs() {
         }
     };
 
+    // 已知標準手把（Xbox / PlayStation）使用 West (button 2) 作為 Melee；
+    // 雜牌手把可能改成 South (button 0)，故對未識別手把同時接受兩顆按鍵。
+    const isKnownController = (gpId) => {
+        if (!gpId) return false;
+        const id = gpId.toLowerCase();
+        return id.includes('xbox') || id.includes('045e') ||
+               id.includes('dualsense') || id.includes('dualshock') ||
+               id.includes('054c') || id.includes('wireless controller');
+    };
+
+    const getGamepadMeleePressed = (gp) => {
+        const west  = !!(gp.buttons[2] && gp.buttons[2].pressed);
+        const south = !!(gp.buttons[3] && gp.buttons[3].pressed);
+        return isKnownController(gp.id) ? west : (west || south);
+    };
+
     const getGamepadSlotControls = (slotIndex, gp) => {
         const player = ['p1', 'p2', 'p3', 'p4'][slotIndex % 4];
         const axisX = Math.abs(gp.axes[0]) > 0.1 ? gp.axes[0] : 0;
@@ -194,7 +210,7 @@ function setupInputs() {
         return {
             player,
             move: new THREE.Vector2(axisX, axisY),
-            attack: !!(gp.buttons[2] && gp.buttons[2].pressed),
+            attack: getGamepadMeleePressed(gp),
             charge: !!(gp.buttons[7] && gp.buttons[7].pressed)
         };
     };
