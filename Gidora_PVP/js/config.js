@@ -120,7 +120,7 @@ const CONFIG = {
         // P4 尾巴蓄力攻擊
         tailChargeTime: 0.8,                // P4 蓄力所需按住秒數（比頭部 chargeTime 0.4s 更長）
         tailSweepDuration: 0.45,            // P4 蓄力重擊旋轉橫掃的動畫持續秒數
-        tailSweepRadius: 4.0,               // P4 尾巴橫掃攻擊半徑
+        tailSweepRadius: 5,               // P4 尾巴橫掃攻擊半徑
         tailSweepDamageScale: 2.5,          // P4 蓄力橫掃傷害倍率（疊加在 meleeDamage 與 tailPower 之上）
         heavyStaggerBonusScale: 0.5         // 蓄力攻擊命中時，額外造成傷害 50% 的失衡值
     },
@@ -217,7 +217,7 @@ const CONFIG = {
     // 合體技光束炮
     // -----------------------------------------------------------------
     beam: {
-        damagePerTick: 7,                  // 光束每次 tick 基礎傷害
+        damagePerTick: 8,                  // 光束每次 tick 基礎傷害
         damageScale: 1.6,                  // 光束傷害倍率
         tickInterval: 0.1,                 // 光束傷害 tick 間隔秒數
         range: 25,                         // 光束最大射程
@@ -378,7 +378,8 @@ const state = {
         // 配對結果：8 個 slot，slot[i] = { device } 或 null
         // 索引: 0~3 = Dragon A 的 P1/P2/P3/P4，4~7 = Dragon B 的 P1/P2/P3/P4
         slots: [null, null, null, null, null, null, null, null],
-        buffCounts: [-1, -1]  // Dragon A / B 各自的 Buff 數量設定 (-1 表示「隨機」)
+        buffCounts: [-1, -1], // Dragon A / B 各自的 Buff 數量設定 (-1 表示「隨機」)
+        disableKeyboard: false // 是否禁用鍵鼠裝置
     },
 
     lastTime: 0

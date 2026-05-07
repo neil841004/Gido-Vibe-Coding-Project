@@ -616,11 +616,14 @@ class Gidora {
                         this.tailSweepImpactDone = false;
                         this.cooldowns.p4 = CONFIG.combat.tailSweepDuration + CONFIG.combat.heavyRecoveryTime;
                     } else {
-                        // 輕攻擊：直接進入 windup 揮動
+                        // 輕攻擊：直接進入 recovery 揮動（跳過 windup）
                         this.attackKinds.p4 = 'light';
-                        this.attackStates.p4 = 'windup';
-                        this.attackTimers.p4 = CONFIG.combat.windupTime;
+                        this.triggerAttackImpact('p4');
+                        this.attackStates.p4 = 'recovery';
+                        this.attackTimers.p4 = CONFIG.combat.recoveryTime;
                         this.cooldowns.p4 = CONFIG.combat.cooldown;
+                        const windupT = Math.min(1, this.attackHoldTimers.p4 / CONFIG.combat.windupTime);
+                        this.tailStartRecoveryY = (windupT * (2 - windupT)) * 1.8;
                     }
                 }
             } else if (currentState === 'tailSweep') {
@@ -631,8 +634,12 @@ class Gidora {
                 const progress = THREE.MathUtils.clamp(1 - (this.attackTimers.p4 / totalSweep), 0, 1);
                 const sweepEase = progress * progress * (3 - 2 * progress);
                 this.mesh.rotation.y = this.tailSweepStartY + Math.PI * sweepEase;
-                this.tailGroup.rotation.y = Math.sin(progress * Math.PI * 2) * 2.2;
-                this.tailGroup.rotation.x = Math.sin(progress * Math.PI) * -0.4;
+                
+                // 優化尾巴動態：使用 easeOutCubic 讓甩尾初段極具爆發力，並擴大揮動角度至約 250 度 (4.4 rad)
+                const tailEase = 1 - Math.pow(1 - progress, 3);
+                this.tailGroup.rotation.y = 1.8 * (1 - tailEase) + (-2.6) * tailEase;
+                this.tailGroup.rotation.x = Math.sin(progress * Math.PI) * -0.5;
+                
                 // 在 40% 進度時觸發全圓傷害
                 if (!this.tailSweepImpactDone && progress >= 0.4) {
                     this.tailSweepImpactDone = true;
@@ -642,6 +649,7 @@ class Gidora {
                     this.attackStates.p4 = 'recovery';
                     this.attackTimers.p4 = CONFIG.combat.heavyRecoveryTime;
                     this.tailGroup.rotation.x = 0;
+                    this.tailStartRecoveryY = -2.6;
                 }
             } else if (currentState === 'windup') {
                 this.hideChargeIndicator(p);
@@ -653,18 +661,29 @@ class Gidora {
                     this.triggerAttackImpact(p);
                     this.attackStates[p] = 'recovery';
                     this.attackTimers[p] = CONFIG.combat.recoveryTime;
+                    this.tailStartRecoveryY = 1.2;
                 }
             } else if (currentState === 'recovery') {
                 this.hideChargeIndicator(p);
                 this.attackTimers[p] -= dt;
-                const progress = 1 - (this.attackTimers[p] / CONFIG.combat.recoveryTime);
-                if (progress < 0.3) {
-                    const p2 = progress / 0.3;
-                    this.tailGroup.rotation.y = 1.2 * (1 - p2) + (-1.5) * p2;
+                const duration = this.attackKinds.p4 === 'heavy' ? CONFIG.combat.heavyRecoveryTime : CONFIG.combat.recoveryTime;
+                const progress = 1 - (this.attackTimers[p] / duration);
+                const startY = this.tailStartRecoveryY !== undefined ? this.tailStartRecoveryY : 1.8;
+                
+                if (this.attackKinds.p4 === 'heavy') {
+                    // 對於蓄力重擊，後搖只是緩慢讓尾巴平穩回正
+                    const ease = progress * (2 - progress); // ease-out
+                    this.tailGroup.rotation.y = startY * (1 - ease);
                 } else {
-                    const p2 = (progress - 0.3) / 0.7;
-                    const ease = p2 * p2;
-                    this.tailGroup.rotation.y = -1.5 * (1 - ease);
+                    // 輕攻擊：從 startY 快速揮到 -1.5 再回正
+                    if (progress < 0.3) {
+                        const p2 = progress / 0.3;
+                        this.tailGroup.rotation.y = startY * (1 - p2) + (-1.5) * p2;
+                    } else {
+                        const p2 = (progress - 0.3) / 0.7;
+                        const ease = p2 * p2; // ease-in
+                        this.tailGroup.rotation.y = -1.5 * (1 - ease);
+                    }
                 }
                 this.tailGroup.rotation.x = THREE.MathUtils.lerp(this.tailGroup.rotation.x, 0, dt * 8);
                 if (this.attackTimers[p] <= 0) {
@@ -809,6 +828,28 @@ class Gidora {
             const ring = new THREE.Mesh(geo, mat);
             ring.visible = false;
             ring.position.y = 0.08;
+
+            if (p === 'p4') {
+                const arrowGroup = new THREE.Group();
+                for (let i = 0; i < 4; i++) {
+                    const angle = (Math.PI / 2) * i;
+                    const r = innerRadius - 0.9;
+                    const shape = new THREE.Shape();
+                    shape.moveTo(0, 0);
+                    shape.lineTo(-0.7, -1.4);
+                    shape.lineTo(0.7, -1.4);
+                    shape.lineTo(0, 0);
+                    const arrowGeo = new THREE.ShapeGeometry(shape);
+                    arrowGeo.rotateX(-Math.PI / 2);
+                    const arrowMesh = new THREE.Mesh(arrowGeo, mat);
+                    arrowMesh.position.set(Math.cos(angle) * r, 0, -Math.sin(angle) * r);
+                    arrowMesh.rotation.y = -angle;
+                    arrowGroup.add(arrowMesh);
+                }
+                ring.add(arrowGroup);
+                ring.userData.arrowGroup = arrowGroup;
+            }
+
             scene.add(ring);
             this.attackLandingIndicators[p] = ring;
         });
@@ -1175,6 +1216,10 @@ class Gidora {
         ring.material.opacity = 0.48 + pulse * 0.24;
         const radiusScale = this.getTailSweepRadius() / (CONFIG.combat.tailSweepRadius * CONFIG.buffs.tailPowerSweepRadiusMultiplier);
         ring.scale.setScalar(radiusScale * (1 + pulse * 0.035));
+        
+        if (ring.userData.arrowGroup) {
+            ring.userData.arrowGroup.rotation.y = Date.now() * 0.0035;
+        }
     }
 
     getTailSweepRadius() {
@@ -1767,6 +1812,7 @@ class Gidora {
             this.fallTimer -= dt;
             this.mesh.rotation.x = THREE.MathUtils.lerp(this.mesh.rotation.x, -0.9, dt * 8);
             this.velocity.multiplyScalar(Math.max(0, 1 - 12 * dt));
+            this.knockbackVel.set(0, 0, 0);
             // 鏡頭跟隨改由 main.js 集中管理 (PVP 多龍模式需要中點跟隨)
             if (this.fallTimer <= 0) {
                 this.fallTimer = 0;
@@ -1783,6 +1829,7 @@ class Gidora {
             const ease = t * t * (3 - 2 * t);
             this.mesh.rotation.x = THREE.MathUtils.lerp(this.standUpStartRotationX, 0, ease);
             this.velocity.multiplyScalar(Math.max(0, 1 - 10 * dt));
+            this.knockbackVel.set(0, 0, 0);
             if (this.standUpTimer <= 0) this.mesh.rotation.x = 0;
             return;
         } else if (Math.abs(this.mesh.rotation.x) > 0.001) {

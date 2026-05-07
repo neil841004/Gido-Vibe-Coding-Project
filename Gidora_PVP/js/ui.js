@@ -358,7 +358,9 @@ function openPvpSetupOverlay() {
     selectedPvpDeviceId = null;
     pvpDeviceFocus = {};
     pvpNewDeviceConfirmBlock = {};
-    upsertPvpDevice(PVP_KEYBOARD_DEVICE, true);
+    if (!state.pvp.disableKeyboard) {
+        upsertPvpDevice(PVP_KEYBOARD_DEVICE, true);
+    }
 
     if (!pvpOverlay) buildPvpSetupOverlay();
     pvpOverlay.style.display = 'flex';
@@ -367,6 +369,7 @@ function openPvpSetupOverlay() {
 
 function upsertPvpDevice(device, selectForMouse = false) {
     if (!device || !device.id) return null;
+    if (state.pvp.disableKeyboard && device.type === 'keyboard') return null;
     const normalized = { ...device };
     const existingIndex = pvpDevices.findIndex(d => d.id === normalized.id);
     if (existingIndex >= 0) pvpDevices[existingIndex] = { ...pvpDevices[existingIndex], ...normalized };
@@ -609,6 +612,42 @@ function createPvpDeviceColumn() {
     hint.style.marginBottom = '10px';
     column.appendChild(hint);
 
+    const toggleRow = document.createElement('label');
+    toggleRow.style.display = 'flex';
+    toggleRow.style.alignItems = 'center';
+    toggleRow.style.gap = '8px';
+    toggleRow.style.fontSize = '13px';
+    toggleRow.style.marginBottom = '10px';
+    toggleRow.style.color = '#c9d7e8';
+    toggleRow.style.cursor = 'pointer';
+
+    const kbdToggle = document.createElement('input');
+    kbdToggle.id = 'pvp-kbd-toggle';
+    kbdToggle.type = 'checkbox';
+    kbdToggle.checked = state.pvp.disableKeyboard;
+    kbdToggle.addEventListener('change', () => {
+        state.pvp.disableKeyboard = kbdToggle.checked;
+        if (state.pvp.disableKeyboard) {
+            const kbdIndex = pvpDevices.findIndex(d => d.type === 'keyboard');
+            if (kbdIndex >= 0) pvpDevices.splice(kbdIndex, 1);
+            state.pvp.slots.forEach((slot, i) => {
+                if (slot && slot.device && slot.device.type === 'keyboard') {
+                    state.pvp.slots[i] = null;
+                }
+            });
+            if (selectedPvpDeviceId === 'keyboard') selectedPvpDeviceId = null;
+            if (pendingDevice && pendingDevice.type === 'keyboard') pendingDevice = null;
+            if (pvpDeviceFocus['keyboard'] !== undefined) delete pvpDeviceFocus['keyboard'];
+        } else {
+            upsertPvpDevice(PVP_KEYBOARD_DEVICE, true);
+        }
+        refreshPvpOverlay();
+    });
+
+    toggleRow.appendChild(kbdToggle);
+    toggleRow.appendChild(document.createTextNode('禁用鍵鼠裝置'));
+    column.appendChild(toggleRow);
+
     const list = document.createElement('div');
     list.id = 'pvp-device-list';
     list.style.display = 'flex';
@@ -691,6 +730,9 @@ function buildPvpSetupOverlay() {
 
 function refreshPvpOverlay() {
     if (!pvpOverlay) return;
+    const kbdToggle = document.getElementById('pvp-kbd-toggle');
+    if (kbdToggle) kbdToggle.checked = state.pvp.disableKeyboard;
+
     const line = document.getElementById('pvp-device-line');
     if (line) {
         const selected = getSelectedPvpDevice();
