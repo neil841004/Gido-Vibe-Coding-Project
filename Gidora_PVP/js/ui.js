@@ -358,7 +358,9 @@ function openPvpSetupOverlay() {
     selectedPvpDeviceId = null;
     pvpDeviceFocus = {};
     pvpNewDeviceConfirmBlock = {};
-    upsertPvpDevice(PVP_KEYBOARD_DEVICE, true);
+    if (state.pvp.keyboardEnabled !== false) {
+        upsertPvpDevice(PVP_KEYBOARD_DEVICE, true);
+    }
 
     if (!pvpOverlay) buildPvpSetupOverlay();
     pvpOverlay.style.display = 'flex';
@@ -595,10 +597,51 @@ function createPvpDeviceColumn() {
     column.style.minHeight = '220px';
 
     const heading = document.createElement('div');
-    heading.textContent = 'Joined Devices';
-    heading.style.fontSize = '16px';
-    heading.style.fontWeight = '900';
+    heading.style.display = 'flex';
+    heading.style.justifyContent = 'space-between';
+    heading.style.alignItems = 'center';
     heading.style.marginBottom = '8px';
+
+    const title = document.createElement('div');
+    title.textContent = 'Joined Devices';
+    title.style.fontSize = '16px';
+    title.style.fontWeight = '900';
+    heading.appendChild(title);
+
+    const kbToggleLabel = document.createElement('label');
+    kbToggleLabel.style.fontSize = '12px';
+    kbToggleLabel.style.display = 'flex';
+    kbToggleLabel.style.alignItems = 'center';
+    kbToggleLabel.style.gap = '4px';
+    kbToggleLabel.style.cursor = 'pointer';
+
+    const kbToggle = document.createElement('input');
+    kbToggle.type = 'checkbox';
+    kbToggle.id = 'pvp-keyboard-toggle';
+    kbToggle.checked = state.pvp.keyboardEnabled !== false;
+    kbToggle.addEventListener('change', (e) => {
+        state.pvp.keyboardEnabled = e.target.checked;
+        if (!state.pvp.keyboardEnabled) {
+            pvpDevices = pvpDevices.filter(d => d.id !== PVP_KEYBOARD_DEVICE.id);
+            state.pvp.slots.forEach((slot, idx) => {
+                if (slot && slot.device && slot.device.id === PVP_KEYBOARD_DEVICE.id) {
+                    state.pvp.slots[idx] = null;
+                }
+            });
+            if (selectedPvpDeviceId === PVP_KEYBOARD_DEVICE.id) {
+                selectedPvpDeviceId = null;
+                pendingDevice = null;
+            }
+        } else {
+            upsertPvpDevice(PVP_KEYBOARD_DEVICE, true);
+        }
+        refreshPvpOverlay();
+    });
+
+    kbToggleLabel.appendChild(kbToggle);
+    kbToggleLabel.appendChild(document.createTextNode('啟用鍵鼠'));
+    heading.appendChild(kbToggleLabel);
+
     column.appendChild(heading);
 
     const hint = document.createElement('div');
@@ -691,6 +734,9 @@ function buildPvpSetupOverlay() {
 
 function refreshPvpOverlay() {
     if (!pvpOverlay) return;
+    const kbToggle = document.getElementById('pvp-keyboard-toggle');
+    if (kbToggle) kbToggle.checked = state.pvp.keyboardEnabled !== false;
+
     const line = document.getElementById('pvp-device-line');
     if (line) {
         const selected = getSelectedPvpDevice();

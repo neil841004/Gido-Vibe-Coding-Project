@@ -1,0 +1,5 @@
+# Add SDL controller mapping lines here for generic controllers that are not
+# recognized by SDL's built-in database.
+#
+# Format:
+# GUID,Controller Name,a:b0,b:b1,x:b2,y:b3,back:b8,start:b9,leftx:a0,lefty:a1,...

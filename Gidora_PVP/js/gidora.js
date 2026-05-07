@@ -1773,6 +1773,7 @@ class Gidora {
                 this.standUpTimer = CONFIG.stagger.playerStandUpDuration;
                 this.standUpStartRotationX = this.mesh.rotation.x;
             }
+            this.applyPhysicsAndCollision(dt);
             return;
         }
 
@@ -1784,6 +1785,7 @@ class Gidora {
             this.mesh.rotation.x = THREE.MathUtils.lerp(this.standUpStartRotationX, 0, ease);
             this.velocity.multiplyScalar(Math.max(0, 1 - 10 * dt));
             if (this.standUpTimer <= 0) this.mesh.rotation.x = 0;
+            this.applyPhysicsAndCollision(dt);
             return;
         } else if (Math.abs(this.mesh.rotation.x) > 0.001) {
             this.mesh.rotation.x = THREE.MathUtils.lerp(this.mesh.rotation.x, 0, dt * 8);
@@ -1995,6 +1997,10 @@ class Gidora {
             }
         }
 
+        this.applyPhysicsAndCollision(dt);
+    }
+
+    applyPhysicsAndCollision(dt) {
         this.mesh.position.add(this.velocity.clone().multiplyScalar(dt));
 
         if (this.knockbackVel.lengthSq() > 0.001) {

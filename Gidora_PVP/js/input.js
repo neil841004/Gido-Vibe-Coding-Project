@@ -18,7 +18,7 @@ function setupInputs() {
         keys[e.code] = isDown;
         if (isDown) {
             SoundSystem.init();
-            if (state.pvp && state.pvp.configuring) {
+            if (state.pvp && state.pvp.configuring && state.pvp.keyboardEnabled !== false) {
                 if (typeof window.pvpSetPendingDevice === 'function') {
                     window.pvpSetPendingDevice(keyboardDevice);
                 }
@@ -46,7 +46,7 @@ function setupInputs() {
         SoundSystem.init();
         mousePos.set(e.clientX, e.clientY);
         const isPvpSetupClick = e.target && e.target.closest && e.target.closest('#pvp-setup-overlay');
-        if (!isPvpSetupClick && state.pvp && state.pvp.configuring && typeof window.pvpSetPendingDevice === 'function') {
+        if (!isPvpSetupClick && state.pvp && state.pvp.configuring && state.pvp.keyboardEnabled !== false && typeof window.pvpSetPendingDevice === 'function') {
             window.pvpSetPendingDevice(keyboardDevice);
         }
         if (e.button === 0) mouseAttack = true;
@@ -215,6 +215,34 @@ function setupInputs() {
         };
     };
 
+    const getGamepadDeviceKey = (gp) => {
+        if (!gp) return '';
+        if (gp.uid) return `gp:${gp.uid}`;
+        return `gp:${gp.index}`;
+    };
+
+    const getGamepadLabel = (gp) => {
+        if (!gp) return 'Gamepad';
+        return gp.label || gp.id || `Gamepad ${gp.index + 1}`;
+    };
+
+    const getPolledGamepads = () => {
+        const native = window.nativeGamepads && typeof window.nativeGamepads.snapshot === 'function'
+            ? window.nativeGamepads.snapshot()
+            : null;
+        if (Array.isArray(native) && native.some(gp => gp && gp.connected !== false)) {
+            return native;
+        }
+        return navigator.getGamepads ? Array.from(navigator.getGamepads()) : [];
+    };
+
+    const findGamepadForDevice = (gamepads, device) => {
+        if (!device) return null;
+        const byKey = gamepads.find(gp => gp && getGamepadDeviceKey(gp) === device.id);
+        if (byKey) return byKey;
+        return gamepads[device.index] || null;
+    };
+
     const applyControlsToSlot = (slotIndex, controls) => {
         if (!controls) return;
         const dragon = state.dragons[slotIndex < 4 ? 0 : 1];
@@ -256,14 +284,14 @@ function setupInputs() {
         gamepads.forEach(gp => {
             if (!gp) return;
             const pressed = gp.buttons.some(b => b && b.pressed);
-            const key = `gp:${gp.index}`;
+            const key = getGamepadDeviceKey(gp);
             const wasPressed = gamepadButtonMemory.get(key) || false;
             if (pressed && !wasPressed) {
                 const device = {
                     type: 'gamepad',
                     id: key,
                     index: gp.index,
-                    label: gp.id || `Gamepad ${gp.index + 1}`
+                    label: getGamepadLabel(gp)
                 };
                 window.pvpSetPendingDevice(device);
             }
@@ -273,7 +301,7 @@ function setupInputs() {
                     type: 'gamepad',
                     id: key,
                     index: gp.index,
-                    label: gp.id || `Gamepad ${gp.index + 1}`
+                    label: getGamepadLabel(gp)
                 };
                 const axisX = Math.abs(gp.axes[0]) > 0.55 ? Math.sign(gp.axes[0]) : 0;
                 const axisY = Math.abs(gp.axes[1]) > 0.55 ? Math.sign(gp.axes[1]) : 0;
@@ -341,7 +369,7 @@ function setupInputs() {
             if (slot.device.type === 'keyboard') {
                 controls = getKeyboardSlotControls(slotIndex);
             } else if (slot.device.type === 'gamepad') {
-                const gp = gamepads[slot.device.index];
+                const gp = findGamepadForDevice(gamepads, slot.device);
                 if (gp) controls = getGamepadSlotControls(slotIndex, gp);
             }
             if (!controls) return;
@@ -351,7 +379,7 @@ function setupInputs() {
     };
 
     state.pollInputs = () => {
-        const gamepads = navigator.getGamepads ? Array.from(navigator.getGamepads()) : [];
+        const gamepads = getPolledGamepads();
         pollPairingDevices(gamepads);
 
         state.dragons.forEach(resetDragonInput);

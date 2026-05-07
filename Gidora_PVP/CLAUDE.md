@@ -16,6 +16,24 @@ open index.html
 THREE.js 0.160.0 由 CDN 載入 (`https://unpkg.com/three@0.160.0/build/three.min.js`，UMD 全域 build)，需要網路。
 **注意：採用「classic script」(`<script src>`) 而非 ES Module，因此 `file://` 協定即可運作，不需本機 server。**
 
+## Production Desktop Build (Electron + SDL2)
+
+正式發佈路線改為 Electron 桌面 App，以突破瀏覽器 Gamepad API 在多手把情境下的限制。`index.html` 雙擊開玩仍保留為 dev fallback；正式測試與出包請使用 Electron。
+
+```
+npm install
+npm start
+npm run dist:mac
+```
+
+- Electron main process 在 `electron/main.js` 啟動 `electron/gamepad-bridge.js`。
+- `gamepad-bridge.js` 透過 `@kmamal/sdl` 優先使用 `sdl.controller` 取得 Xbox-style standard controller layout；SDL 不認得 mapping 的裝置才 fallback 到 raw `sdl.joystick`。
+- `electron/preload.js` 暴露 `window.nativeGamepads.snapshot()`；`js/input.js` 會優先使用此 native snapshot，沒有資料時自動 fallback 回 `navigator.getGamepads()`。
+- 自訂雜牌手把 mapping 放在 `electron/gamecontrollerdb.txt`，每行一筆 SDL controller mapping；此檔可在實機測試時追加，不需改程式。
+- 緊急退回瀏覽器手把 API 可用 `npm run start:no-gamepad-bridge` 或 `electron . --no-gamepad-bridge`。
+- macOS 打包由 `electron-builder` 產出 `.dmg` / `.zip`；`package.json` 已設定 `asarUnpack` 釋放 `@kmamal/sdl` 的 native `.node` 檔，避免打包後載入失敗。
+- `@kmamal/sdl` 的 npm prebuilt 可在一般 Node 載入，但 Electron runtime 需要針對 Electron ABI 重建；`npm install` 會執行 `electron/rebuild-sdl.js`，必要時也可手動跑 `npm run rebuild:sdl`。macOS 開發機需有 Xcode Command Line Tools。
+
 ## Modular Architecture (PVP Refactor)
 
 > 設計目標：對於熟悉 Unity C# 的開發者，提供類似 GameObject + MonoBehaviour 的拆檔。

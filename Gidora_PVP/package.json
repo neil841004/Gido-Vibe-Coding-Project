@@ -1,0 +1,60 @@
+{
+  "name": "gidora-pvp",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Gidora PVP desktop prototype with Electron and SDL gamepad input.",
+  "main": "electron/main.js",
+  "scripts": {
+    "postinstall": "node electron/rebuild-sdl.js",
+    "start": "electron .",
+    "start:no-gamepad-bridge": "electron . --no-gamepad-bridge",
+    "rebuild:sdl": "node electron/rebuild-sdl.js",
+    "check": "node --check electron/main.js && node --check electron/preload.js && node --check electron/gamepad-bridge.js && node --check electron/rebuild-sdl.js",
+    "dist": "electron-builder",
+    "dist:mac": "electron-builder --mac"
+  },
+  "dependencies": {
+    "@kmamal/sdl": "^0.11.13"
+  },
+  "devDependencies": {
+    "@electron/rebuild": "^4.0.4",
+    "electron": "^31.0.0",
+    "electron-builder": "^24.13.0",
+    "node-addon-api": "^7.1.1"
+  },
+  "build": {
+    "appId": "com.gidora.pvp",
+    "productName": "Gidora PVP",
+    "files": [
+      "index.html",
+      "js/**/*",
+      "electron/**/*",
+      "docs/**/*",
+      "package.json"
+    ],
+    "asarUnpack": [
+      "**/*.node",
+      "node_modules/@kmamal/sdl/**"
+    ],
+    "mac": {
+      "category": "public.app-category.games",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "universal"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "universal"
+          ]
+        }
+      ],
+      "extendInfo": {
+        "NSBluetoothAlwaysUsageDescription": "Gidora PVP uses Bluetooth game controllers for local multiplayer."
+      }
+    }
+  }
+}
