@@ -144,6 +144,7 @@ class GamepadBridge {
         this.indexByKey = new Map();
         this.nextIndex = 0;
         this.latestSnapshot = [];
+        this.lastDeviceListSignature = '';
         this.pollTimer = null;
         this.refreshTimer = null;
         this.boundRefresh = () => this.scheduleRefresh();
@@ -258,6 +259,26 @@ class GamepadBridge {
         const failedControllerIds = new Set();
         const controllerDevices = this.sdl.controller ? this.sdl.controller.devices || [] : [];
         const joystickDevices = this.sdl.joystick ? this.sdl.joystick.devices || [] : [];
+        const deviceListSignature = JSON.stringify({
+            controllers: controllerDevices.map(device => ({
+                id: device.id,
+                name: device.name,
+                guid: device.guid,
+                vendor: device.vendor,
+                product: device.product
+            })),
+            joysticks: joystickDevices.map(device => ({
+                id: device.id,
+                name: device.name,
+                guid: device.guid,
+                vendor: device.vendor,
+                product: device.product
+            }))
+        });
+        if (deviceListSignature !== this.lastDeviceListSignature) {
+            this.lastDeviceListSignature = deviceListSignature;
+            this.logger.info('[gamepad] SDL devices refreshed.', JSON.parse(deviceListSignature));
+        }
         const controllerIds = new Set(controllerDevices.map(device => device.id));
 
         controllerDevices.forEach(device => {

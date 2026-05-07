@@ -31,7 +31,7 @@ npm run dist:mac
 - `electron/preload.js` 暴露 `window.nativeGamepads.snapshot()`；`js/input.js` 會優先使用此 native snapshot，沒有資料時自動 fallback 回 `navigator.getGamepads()`。
 - 自訂雜牌手把 mapping 放在 `electron/gamecontrollerdb.txt`，每行一筆 SDL controller mapping；此檔可在實機測試時追加，不需改程式。
 - 緊急退回瀏覽器手把 API 可用 `npm run start:no-gamepad-bridge` 或 `electron . --no-gamepad-bridge`。
-- macOS 打包由 `electron-builder` 產出 `.dmg` / `.zip`；`package.json` 已設定 `asarUnpack` 釋放 `@kmamal/sdl` 的 native `.node` 檔，避免打包後載入失敗。
+- macOS 打包由 `electron-builder` 產出 Apple Silicon `arm64` 的 `.dmg` / `.zip`；`package.json` 已設定 `asarUnpack` 釋放 `@kmamal/sdl` 的 native `.node` 檔，避免打包後載入失敗。Intel Mac 需另外做 x64 native rebuild，不可直接沿用 arm64 產物。
 - `@kmamal/sdl` 的 npm prebuilt 可在一般 Node 載入，但 Electron runtime 需要針對 Electron ABI 重建；`npm install` 會執行 `electron/rebuild-sdl.js`，必要時也可手動跑 `npm run rebuild:sdl`。macOS 開發機需有 Xcode Command Line Tools。
 
 ## Modular Architecture (PVP Refactor)

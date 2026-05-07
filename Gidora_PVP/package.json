@@ -6,6 +6,8 @@
   "main": "electron/main.js",
   "scripts": {
     "postinstall": "node electron/rebuild-sdl.js",
+    "predist": "node electron/rebuild-sdl.js",
+    "predist:mac": "node electron/rebuild-sdl.js",
     "start": "electron .",
     "start:no-gamepad-bridge": "electron . --no-gamepad-bridge",
     "rebuild:sdl": "node electron/rebuild-sdl.js",
@@ -25,12 +27,14 @@
   "build": {
     "appId": "com.gidora.pvp",
     "productName": "Gidora PVP",
+    "npmRebuild": false,
     "files": [
       "index.html",
       "js/**/*",
       "electron/**/*",
       "docs/**/*",
-      "package.json"
+      "package.json",
+      "node_modules/@kmamal/sdl/**/*"
     ],
     "asarUnpack": [
       "**/*.node",
@@ -42,13 +46,13 @@
         {
           "target": "dmg",
           "arch": [
-            "universal"
+            "arm64"
           ]
         },
         {
           "target": "zip",
           "arch": [
-            "universal"
+            "arm64"
           ]
         }
       ],
