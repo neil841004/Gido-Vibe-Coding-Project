@@ -245,7 +245,11 @@ class Gidora {
     }
 
     addStagger(amount, sourcePos) {
-        if (this.buffSystem.isActive('staggerImmune') || this.fallTimer > 0 || this.standUpTimer > 0 || amount <= 0) return;
+        if (this.fallTimer > 0 || this.standUpTimer > 0 || amount <= 0) return;
+        if (this.buffSystem.isActive('staggerImmune')) {
+            amount *= CONFIG.buffs.staggerImmuneIncomingMultiplier;
+        }
+        if (amount <= 0) return;
         this.staggerWindowTimer = CONFIG.stagger.playerWindow;
         this.staggerValue = Math.min(CONFIG.stagger.playerThreshold, this.staggerValue + amount);
         if (this.staggerValue >= CONFIG.stagger.playerThreshold) {
@@ -282,7 +286,10 @@ class Gidora {
             return;
         }
         if (this.staggerValue > 0) {
-            this.staggerValue = Math.max(0, this.staggerValue - CONFIG.stagger.playerRecoveryRate * dt);
+            const recoveryMultiplier = this.buffSystem.isActive('staggerImmune')
+                ? CONFIG.buffs.staggerImmuneRecoveryMultiplier
+                : 1;
+            this.staggerValue = Math.max(0, this.staggerValue - CONFIG.stagger.playerRecoveryRate * recoveryMultiplier * dt);
         }
     }
 
@@ -1537,7 +1544,7 @@ class Gidora {
                         if (block.isDead || this.hitList.has(block)) return;
                         if (!block.solid) return;
                         if (block.mesh.position.distanceTo(ring.position) < radius + 2.5) {
-                            const didDamage = state.levelManager.damageBlock(block, damage);
+                            const didDamage = state.levelManager.damageBlock(block, damage, owner);
                             this.hitList.add(block);
                             if (didDamage) owner.buffSystem.onEffectiveDamage(damage);
                             if (!isTail && !options.noRecoil) {
@@ -1713,7 +1720,7 @@ class Gidora {
             state.levelManager.blocks.forEach(block => {
                 if (block.isDead || !block.solid || !block.destructible) return;
                 if (!isInCone(block.mesh.position)) return;
-                const didDamage = state.levelManager.damageBlock(block, damage * CONFIG.combat.flamethrowerBlockDamageScale);
+                const didDamage = state.levelManager.damageBlock(block, damage * CONFIG.combat.flamethrowerBlockDamageScale, this);
                 if (didDamage) this.buffSystem.onEffectiveDamage(damage * CONFIG.combat.flamethrowerBlockDamageScale);
             });
         }
@@ -1956,7 +1963,7 @@ class Gidora {
                 const dz = block.mesh.position.z - origin.z;
                 const dist = Math.sqrt(dx * dx + dz * dz);
                 if (dist > radius + 2.5) return;
-                const didDamage = state.levelManager.damageBlock(block, damage);
+                const didDamage = state.levelManager.damageBlock(block, damage, this);
                 if (didDamage) this.buffSystem.onEffectiveDamage(damage);
             });
         }
@@ -2239,6 +2246,9 @@ class Gidora {
             if (moveVec.lengthSq() > 0.01) {
                 moveVec.normalize().multiplyScalar(CONFIG.combo.pteroAimSpeed * dt);
                 this.comboTargetPos.add(moveVec);
+            }
+            if (state.levelManager && state.levelManager.clampPositionToArena) {
+                state.levelManager.clampPositionToArena(this.comboTargetPos, CONFIG.level.playerBoundaryPadding);
             }
             this.comboTargetPos.y = 0.1;
             this.pteroComboRing.position.copy(this.comboTargetPos);
@@ -2523,7 +2533,7 @@ class Gidora {
             state.levelManager.blocks.forEach(b => {
                 if (b.isDead || !b.solid) return;
                 if (!this._isPointNearRefractPath(b.mesh.position, hitRadius + 2.0, points)) return;
-                if (state.levelManager.damageBlock(b, damage)) this.buffSystem.onEffectiveDamage(damage);
+                if (state.levelManager.damageBlock(b, damage, this)) this.buffSystem.onEffectiveDamage(damage);
             });
         }
     }
@@ -2683,7 +2693,7 @@ class Gidora {
                         const hw = (b.mesh.geometry.parameters.width || 2) / 2 + hitRadius;
                         const hd = (b.mesh.geometry.parameters.depth || 2) / 2 + hitRadius;
                         if (Math.abs(perp.x) < hw && Math.abs(perp.z) < hd) {
-                            if (state.levelManager.damageBlock(b, damage)) this.buffSystem.onEffectiveDamage(damage);
+                            if (state.levelManager.damageBlock(b, damage, this)) this.buffSystem.onEffectiveDamage(damage);
                         }
                     });
                 }
@@ -2964,6 +2974,18 @@ class Gidora {
         if (this.knockbackVel.lengthSq() > 0.001) {
             this.mesh.position.add(this.knockbackVel.clone().multiplyScalar(dt));
             this.knockbackVel.multiplyScalar(0.9);
+        }
+
+        if (state.levelManager && state.levelManager.clampPositionToArena) {
+            const clamped = state.levelManager.clampPositionToArena(this.mesh.position, CONFIG.level.playerBoundaryPadding);
+            if (clamped.x) {
+                this.velocity.x = 0;
+                this.knockbackVel.x = 0;
+            }
+            if (clamped.z) {
+                this.velocity.z = 0;
+                this.knockbackVel.z = 0;
+            }
         }
 
         // Player-Block Collision

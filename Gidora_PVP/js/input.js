@@ -125,6 +125,31 @@ function setupInputs() {
         }
     };
 
+    const applyKeyboardTestControlsForPveDragonA = () => {
+        const dragonA = state.dragons[0];
+        if (!dragonA) return;
+        let vx = 0, vy = 0;
+        if (keys['ArrowUp']) vy -= 1;
+        if (keys['ArrowDown']) vy += 1;
+        if (keys['ArrowLeft']) vx -= 1;
+        if (keys['ArrowRight']) vx += 1;
+        // 方向鍵移動同步套用到四個部位，等同四位玩家同時推同方向
+        assignMove(dragonA, 'p1', vx, vy);
+        assignMove(dragonA, 'p2', vx, vy);
+        assignMove(dragonA, 'p3', vx, vy);
+        assignMove(dragonA, 'p4', vx, vy);
+        dragonA.input.p1.pointer.copy(mousePos);
+        dragonA.input.p1.pointerActive = true;
+        dragonA.input.p1.attack = mouseAttack || !!keys['Digit1'];
+        dragonA.input.p2.attack = !!keys['Digit2'];
+        dragonA.input.p3.attack = !!keys['Digit3'];
+        dragonA.input.p4.attack = !!keys['Digit4'];
+        dragonA.input.p1.charge = mouseCharge || !!keys['Digit5'];
+        dragonA.input.p2.charge = !!keys['Digit6'];
+        dragonA.input.p3.charge = !!keys['Digit7'];
+        dragonA.input.p4.charge = !!keys['Digit8'];
+    };
+
     const getKeyboardSlotControls = (slotIndex) => {
         const partOffset = slotIndex % 4;
         const player = ['p1', 'p2', 'p3', 'p4'][partOffset];
@@ -358,8 +383,13 @@ function setupInputs() {
         if (state.pvp && state.pvp.configuring) return;
         if (state.pvp && state.pvp.active && state.pvp.startCountdownTimer > 0) return;
         if (state.pvp && state.pvp.active) {
-            applyPvpControls(gamepads);
-            if (!state.pve || !state.pve.active) applyKeyboardDebugControlsForPvp();
+            const pveTestKb = state.pve && state.pve.active && state.pve.testKeyboardEnabled;
+            if (pveTestKb) {
+                applyKeyboardTestControlsForPveDragonA();
+            } else {
+                applyPvpControls(gamepads);
+                if (!state.pve || !state.pve.active) applyKeyboardDebugControlsForPvp();
+            }
         } else {
             applyKeyboardTestControls();
             gamepads.forEach((gp, gpIndex) => {

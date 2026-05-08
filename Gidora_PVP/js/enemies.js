@@ -744,6 +744,9 @@ class EnemyManager {
                             const angle = Math.random() * Math.PI * 2;
                             const r = 5 + Math.random() * 15;
                             spawnPos.set(Math.sin(angle) * r, 1, Math.cos(angle) * r);
+                            if (state.levelManager && state.levelManager.clampPositionToArena) {
+                                state.levelManager.clampPositionToArena(spawnPos, CONFIG.level.arenaSpawnMargin);
+                            }
                             attempts++;
                         }
                     }
@@ -754,16 +757,25 @@ class EnemyManager {
             }
         }
 
-        this.enemies.forEach(e => e.update(dt, playerPos));
+        this.enemies.forEach(e => {
+            e.update(dt, playerPos);
+            if (state.levelManager && state.levelManager.clampPositionToArena) {
+                state.levelManager.clampPositionToArena(e.mesh.position, 0.8);
+            }
+        });
         this.enemies = this.enemies.filter(e => !e.isDead);
     }
 
     spawnEnemy(playerPos) {
         const angle = Math.random() * Math.PI * 2;
         const dist = 25 + Math.random() * 10;
-        const x = Math.sin(angle) * dist;
-        const z = Math.cos(angle) * dist;
+        const origin = playerPos || new THREE.Vector3();
+        const x = origin.x + Math.sin(angle) * dist;
+        const z = origin.z + Math.cos(angle) * dist;
         const pos = new THREE.Vector3(x, 1, z);
+        if (state.levelManager && state.levelManager.clampPositionToArena) {
+            state.levelManager.clampPositionToArena(pos, CONFIG.level.arenaSpawnMargin);
+        }
 
         const weights = [
             { type: 'melee', weight: CONFIG.enemy.melee.spawnWeight },
@@ -799,6 +811,9 @@ class EnemyManager {
             spawnPos = new THREE.Vector3(0, 1, -10);
         }
         spawnPos.y = 1;
+        if (state.levelManager && state.levelManager.clampPositionToArena) {
+            state.levelManager.clampPositionToArena(spawnPos, CONFIG.level.arenaSpawnMargin);
+        }
 
         const dummy = new DummyEnemy(this, spawnPos);
         this.enemies.push(dummy);

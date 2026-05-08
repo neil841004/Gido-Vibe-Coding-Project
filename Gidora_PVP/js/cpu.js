@@ -18,6 +18,8 @@ class CpuDragonController {
         this.teamTangentSign = 1;
         this.targetOffset = new THREE.Vector2();
         this.nextTargetOffsetAt = 0;
+        this.teamConfusedUntil = 0;
+        this.teamConfusionMove = new THREE.Vector2();
         this.reset();
     }
 
@@ -30,16 +32,17 @@ class CpuDragonController {
         this.teamTangentSign = Math.random() < 0.5 ? -1 : 1;
         this.targetOffset.set(0, 0);
         this.nextTargetOffsetAt = 0;
+        this.teamConfusedUntil = 0;
+        this.teamConfusionMove.set(0, 0);
         this.players.forEach(player => {
             this.partBrains[player] = {
                 nextDecisionAt: this.rand(0, CONFIG.pve.cpuDecisionIntervalMax),
                 nextAttackAt: this.rand(CONFIG.pve.cpuInitialAttackDelayMin, CONFIG.pve.cpuAttackIntervalMax),
                 attackUntil: 0,
+                meleeAlignUntil: 0,
                 move: new THREE.Vector2(),
                 comboJoinAt: 0,
-                comboParticipates: Math.random() < CONFIG.pve.cpuComboParticipantChance,
-                confusedUntil: 0,
-                confusionMove: new THREE.Vector2()
+                comboParticipates: Math.random() < CONFIG.pve.cpuComboParticipantChance
             };
         });
     }
@@ -108,6 +111,38 @@ class CpuDragonController {
 
         this.nextTeamIntentAt = this.time +
             this.rand(cfg.cpuTeamIntentMinSeconds, cfg.cpuTeamIntentMaxSeconds);
+
+        if (this.time >= this.teamConfusedUntil && Math.random() < cfg.cpuTeamConfusionChance) {
+            const angle = Math.random() * Math.PI * 2;
+            this.teamConfusionMove.set(Math.cos(angle), Math.sin(angle));
+            this.teamConfusedUntil = this.time +
+                this.rand(cfg.cpuTeamConfusionDurationMin, cfg.cpuTeamConfusionDurationMax);
+        }
+    }
+
+    findHealItemDirection(cpuDragon) {
+        const cfg = CONFIG.pve;
+        const level = state.levelManager;
+        if (!level || !level.healItems || level.healItems.length === 0) return null;
+        const hpRatio = cpuDragon.maxHP > 0 ? cpuDragon.hp / cpuDragon.maxHP : 1;
+        if (hpRatio > cfg.cpuHealItemSeekHpRatio) return null;
+
+        const pos = cpuDragon.mesh.position;
+        let bestDistSq = cfg.cpuHealItemSeekRange * cfg.cpuHealItemSeekRange;
+        let best = null;
+        level.healItems.forEach(item => {
+            if (!item || item.isDead || !item.group) return;
+            const dx = item.group.position.x - pos.x;
+            const dz = item.group.position.z - pos.z;
+            const distSq = dx * dx + dz * dz;
+            if (distSq < bestDistSq) {
+                bestDistSq = distSq;
+                best = new THREE.Vector2(dx, dz);
+            }
+        });
+        if (!best) return null;
+        if (best.lengthSq() > 0.001) best.normalize();
+        return best;
     }
 
     shouldStartCombo(cpuDragon, targetDragon, distance, toTarget) {
@@ -179,19 +214,7 @@ class CpuDragonController {
         return avoidance;
     }
 
-    maybeStartConfusion(player, baseDir) {
-        const cfg = CONFIG.pve;
-        const brain = this.partBrains[player];
-        if (this.time < brain.confusedUntil) return;
-        if (Math.random() > cfg.cpuConfusionChance) return;
-
-        const seed = baseDir.lengthSq() > 0.001 ? baseDir.clone().normalize() : new THREE.Vector2(0, 1);
-        const angle = this.rand(-cfg.cpuConfusedMoveNoiseAngle, cfg.cpuConfusedMoveNoiseAngle);
-        brain.confusionMove.copy(this.rotateVector2(seed, angle));
-        brain.confusedUntil = this.time + this.rand(cfg.cpuConfusionDurationMin, cfg.cpuConfusionDurationMax);
-    }
-
-    chooseMove(player, cpuDragon, distance, toTarget, comboAimDir = null) {
+    chooseMove(player, cpuDragon, distance, toTarget, comboAimDir = null, healDir = null) {
         const cfg = CONFIG.pve;
         const brain = this.partBrains[player];
         const playerTangentSign = player === 'p1' || player === 'p4' ? -1 : 1;
@@ -201,6 +224,8 @@ class CpuDragonController {
 
         if (comboAimDir && comboAimDir.lengthSq() > 0.001) {
             desired.copy(toTarget).lerp(comboAimDir, cfg.cpuComboAimMoveBlend);
+        } else if (healDir && healDir.lengthSq() > 0.001) {
+            desired.copy(toTarget).lerp(healDir, cfg.cpuHealItemSeekBlend);
         } else if (Math.random() < cfg.cpuIdleMoveChance) {
             desired.set(0, 0);
         } else if (this.teamIntent === 'retreat') {
@@ -218,15 +243,13 @@ class CpuDragonController {
             desired.add(tangent.multiplyScalar(orbitBlend));
         }
 
-        if (!comboAimDir) this.maybeStartConfusion(player, desired);
-        if (!comboAimDir && this.time < brain.confusedUntil) {
-            desired.lerp(brain.confusionMove, cfg.cpuConfusionMoveBlend);
+        const teamConfused = !comboAimDir && !healDir && this.time < this.teamConfusedUntil;
+        if (teamConfused) {
+            desired.lerp(this.teamConfusionMove, cfg.cpuConfusionMoveBlend);
         }
 
         if (desired.lengthSq() > 0.001) {
-            const noiseAngle = !comboAimDir && this.time < brain.confusedUntil
-                ? cfg.cpuConfusedMoveNoiseAngle
-                : cfg.cpuMoveNoiseAngle;
+            const noiseAngle = teamConfused ? cfg.cpuConfusedMoveNoiseAngle : cfg.cpuMoveNoiseAngle;
             const noise = this.rand(-noiseAngle, noiseAngle);
             desired.copy(this.rotateVector2(desired.normalize(), noise));
         }
@@ -253,11 +276,12 @@ class CpuDragonController {
             ? chargeTime + this.rand(cfg.cpuHeavyHoldExtraMin, cfg.cpuHeavyHoldExtraMax)
             : cfg.cpuAttackPressSeconds;
         brain.attackUntil = this.time + holdSeconds;
+        brain.meleeAlignUntil = this.time + holdSeconds + cfg.cpuMeleeAlignDuration;
         brain.nextAttackAt = this.time + holdSeconds +
             this.rand(cfg.cpuAttackIntervalMin, cfg.cpuAttackIntervalMax);
     }
 
-    updatePart(player, cpuDragon, distance, toTarget, comboAimDir = null) {
+    updatePart(player, cpuDragon, distance, toTarget, trueTargetDir, comboAimDir = null, healDir = null) {
         const brain = this.partBrains[player];
         const input = cpuDragon.input[player];
         if (!input) return;
@@ -274,7 +298,7 @@ class CpuDragonController {
         }
 
         if (this.time >= brain.nextDecisionAt) {
-            this.chooseMove(player, cpuDragon, distance, toTarget, comboAimDir);
+            this.chooseMove(player, cpuDragon, distance, toTarget, comboAimDir, healDir);
             if (!comboAimDir) this.maybeStartAttack(player, distance);
             brain.nextDecisionAt = this.time +
                 this.rand(CONFIG.pve.cpuDecisionIntervalMin, CONFIG.pve.cpuDecisionIntervalMax);
@@ -282,6 +306,8 @@ class CpuDragonController {
 
         if (comboAimDir) {
             brain.move.copy(comboAimDir);
+        } else if (this.time < brain.meleeAlignUntil && trueTargetDir && trueTargetDir.lengthSq() > 0.001) {
+            brain.move.copy(trueTargetDir);
         }
         input.move.copy(brain.move);
         input.attack = comboAimDir ? false : this.time < brain.attackUntil;
@@ -305,9 +331,12 @@ class CpuDragonController {
             this.startComboPlan();
         }
 
+        const healDir = this.comboPlanRemaining > 0 ? null : this.findHealItemDirection(cpuDragon);
         this.players.forEach(player => {
             this.updatePart(player, cpuDragon, distance, toTarget,
-                this.comboPlanRemaining > 0 ? trueTarget.toTarget : null);
+                trueTarget.toTarget,
+                this.comboPlanRemaining > 0 ? trueTarget.toTarget : null,
+                healDir);
         });
     }
 }

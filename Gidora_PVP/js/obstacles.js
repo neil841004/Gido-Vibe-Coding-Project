@@ -7,7 +7,12 @@ class LevelManager {
     constructor(scene) {
         this.scene = scene;
         this.blocks = [];
+        this.healItems = [];
         this.generatedChunks = new Set();
+        this.healItemTimer = 0;
+        this.arenaVisuals = [];
+        this.createArenaVisuals();
+        this.resetHealItemTimer();
         this.generateLevel();
     }
 
@@ -15,8 +20,13 @@ class LevelManager {
         if (this.blocks) {
             this.blocks.forEach(b => this.disposeBlock(b));
         }
+        if (this.healItems) {
+            this.healItems.forEach(item => this.disposeHealItem(item));
+        }
         this.blocks = [];
+        this.healItems = [];
         this.generatedChunks.clear();
+        this.resetHealItemTimer();
         this.generateAroundPosition(new THREE.Vector3(0, 0, 0));
     }
 
@@ -33,6 +43,7 @@ class LevelManager {
 
     generateChunk(chunkX, chunkZ) {
         const levelCfg = CONFIG.level;
+        if (!this.isChunkWithinArena(chunkX, chunkZ)) return;
         const key = this.getChunkKey(chunkX, chunkZ);
         if (this.generatedChunks.has(key)) return;
         this.generatedChunks.add(key);
@@ -67,6 +78,7 @@ class LevelManager {
                 const z = chunkCenterZ + (Math.random() - 0.5) * levelCfg.chunkSize;
 
                 if (x * x + z * z < levelCfg.safeRadius * levelCfg.safeRadius) continue;
+                if (!this.isInsideArenaXZ(x, z, Math.max(sx, sz) * 0.5 + levelCfg.arenaSpawnMargin)) continue;
 
                 const tempBox = new THREE.Box3();
                 tempBox.min.set(x - sx / 2 - levelCfg.spacingPadding, 0, z - sz / 2 - levelCfg.spacingPadding);
@@ -165,7 +177,7 @@ class LevelManager {
                     if (b.hitEntities.has(block.id)) continue;
                     b.hitEntities.add(block.id);
 
-                    const didDamage = this.damageBlock(block, b.damage);
+                    const didDamage = this.damageBlock(block, b.damage, b.attackerDragon);
                     if (b.onImpact) b.onImpact(b);
 
                     b.markedForDeletion = true;
@@ -179,7 +191,7 @@ class LevelManager {
         });
     }
 
-    damageBlock(block, amount) {
+    damageBlock(block, amount, sourceDragon = null) {
         if (!block || block.isDead || !block.destructible) {
             if (block && block.mesh && block.mesh.material && block.mesh.material.emissive) {
                 block.flashTimer = 0.06;
@@ -194,6 +206,7 @@ class LevelManager {
             const pos = block.mesh.position.clone();
             this.disposeBlock(block);
             this.spawnDebris(pos);
+            this.rewardDestructibleBreak(sourceDragon, pos);
         }
         return true;
     }
@@ -229,6 +242,176 @@ class LevelManager {
                 b.mesh.rotation.z += dt * 0.2;
             }
         });
+        this.updateHealItems(dt);
+    }
+
+    createArenaVisuals() {
+        const levelCfg = CONFIG.level;
+        const arenaSize = levelCfg.arenaHalfSize * 2;
+        const waterSize = arenaSize + levelCfg.arenaWaterWidth * 2;
+
+        const waterGeo = new THREE.PlaneGeometry(waterSize, waterSize, 1, 1);
+        const waterMat = new THREE.MeshBasicMaterial({
+            color: 0x0b5d83,
+            transparent: true,
+            opacity: 0.78,
+            side: THREE.DoubleSide
+        });
+        const water = new THREE.Mesh(waterGeo, waterMat);
+        water.rotation.x = -Math.PI / 2;
+        water.position.y = -0.08;
+        this.scene.add(water);
+        this.arenaVisuals.push(water);
+
+        const groundGeo = new THREE.PlaneGeometry(arenaSize, arenaSize, 1, 1);
+        const groundMat = new THREE.MeshLambertMaterial({ color: 0x303631 });
+        const ground = new THREE.Mesh(groundGeo, groundMat);
+        ground.rotation.x = -Math.PI / 2;
+        ground.position.y = -0.04;
+        ground.receiveShadow = true;
+        this.scene.add(ground);
+        this.arenaVisuals.push(ground);
+
+        const shoreMat = new THREE.MeshBasicMaterial({
+            color: 0x5ed0ff,
+            transparent: true,
+            opacity: 0.32,
+            side: THREE.DoubleSide
+        });
+        const shoreThickness = 0.5;
+        const makeShore = (sx, sz, x, z) => {
+            const geo = new THREE.PlaneGeometry(sx, sz, 1, 1);
+            const mesh = new THREE.Mesh(geo, shoreMat.clone());
+            mesh.rotation.x = -Math.PI / 2;
+            mesh.position.set(x, 0.018, z);
+            this.scene.add(mesh);
+            this.arenaVisuals.push(mesh);
+        };
+        makeShore(arenaSize, shoreThickness, 0, levelCfg.arenaHalfSize);
+        makeShore(arenaSize, shoreThickness, 0, -levelCfg.arenaHalfSize);
+        makeShore(shoreThickness, arenaSize, levelCfg.arenaHalfSize, 0);
+        makeShore(shoreThickness, arenaSize, -levelCfg.arenaHalfSize, 0);
+    }
+
+    resetHealItemTimer() {
+        const levelCfg = CONFIG.level;
+        this.healItemTimer = levelCfg.healItemSpawnIntervalMin + Math.random() * levelCfg.healItemSpawnIntervalRand;
+    }
+
+    updateHealItems(dt) {
+        const levelCfg = CONFIG.level;
+        this.healItemTimer -= dt;
+        if (this.healItemTimer <= 0) {
+            this.resetHealItemTimer();
+            if (this.healItems.length < levelCfg.healItemMaxCount) {
+                const pos = this.findHealItemSpawnPosition();
+                if (pos) this.spawnHealItem(pos);
+            }
+        }
+
+        for (let i = this.healItems.length - 1; i >= 0; i--) {
+            const item = this.healItems[i];
+            if (!item || item.isDead) continue;
+            item.life += dt;
+            item.group.rotation.y += dt * 1.8;
+            item.group.position.y = 0.62 + Math.sin(item.life * 4.2) * 0.1;
+            const pulse = 1 + Math.sin(item.life * 5.5) * 0.08;
+            item.core.scale.setScalar(pulse);
+            item.ring.scale.setScalar(1.0 + Math.sin(item.life * 4.5) * 0.06);
+
+            const pickupRadiusSq = levelCfg.healItemPickupRadius * levelCfg.healItemPickupRadius;
+            const picker = (state.dragons || []).find(dragon => {
+                if (!dragon || dragon.isDead || !dragon.mesh.visible) return false;
+                const dx = dragon.mesh.position.x - item.group.position.x;
+                const dz = dragon.mesh.position.z - item.group.position.z;
+                return dx * dx + dz * dz <= pickupRadiusSq;
+            });
+            if (!picker) continue;
+
+            picker.heal(picker.maxHP * levelCfg.healItemHealPct);
+            this.spawnHealBurst(item.group.position.clone(), 0x56ff86);
+            item.isDead = true;
+            this.disposeHealItem(item);
+            this.healItems.splice(i, 1);
+        }
+    }
+
+    findHealItemSpawnPosition() {
+        const levelCfg = CONFIG.level;
+        const limit = levelCfg.arenaHalfSize - levelCfg.arenaSpawnMargin;
+        for (let attempt = 0; attempt < 80; attempt++) {
+            const pos = new THREE.Vector3(
+                (Math.random() * 2 - 1) * limit,
+                0,
+                (Math.random() * 2 - 1) * limit
+            );
+            if (pos.x * pos.x + pos.z * pos.z < levelCfg.safeRadius * levelCfg.safeRadius) continue;
+            let blocked = false;
+            this.blocks.forEach(block => {
+                if (blocked || block.isDead || !block.solid) return;
+                if (this.isPointInsideBlockFootprint(pos, block, 1.4)) blocked = true;
+            });
+            if (blocked) continue;
+            this.healItems.forEach(item => {
+                if (blocked || item.isDead) return;
+                if (item.group.position.distanceTo(pos) < 5) blocked = true;
+            });
+            if (blocked) continue;
+            return pos;
+        }
+        return null;
+    }
+
+    spawnHealItem(pos) {
+        const group = new THREE.Group();
+        group.position.set(pos.x, 0.62, pos.z);
+
+        const coreMat = new THREE.MeshBasicMaterial({
+            color: 0x44ff77,
+            transparent: true,
+            opacity: 0.82
+        });
+        const core = new THREE.Mesh(new THREE.SphereGeometry(0.42, 14, 10), coreMat);
+        group.add(core);
+
+        const ring = new THREE.Mesh(
+            new THREE.TorusGeometry(0.62, 0.045, 8, 28),
+            new THREE.MeshBasicMaterial({ color: 0xc8ffd7, transparent: true, opacity: 0.75 })
+        );
+        ring.rotation.x = Math.PI / 2;
+        group.add(ring);
+
+        const plusMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+        const plusA = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.72, 0.12), plusMat);
+        const plusB = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.18, 0.12), plusMat.clone());
+        plusA.position.z = 0.43;
+        plusB.position.z = 0.43;
+        group.add(plusA);
+        group.add(plusB);
+
+        this.scene.add(group);
+        this.healItems.push({
+            group,
+            core,
+            ring,
+            life: Math.random() * Math.PI * 2,
+            isDead: false
+        });
+    }
+
+    disposeHealItem(item) {
+        if (!item || !item.group) return;
+        if (item.group.parent) this.scene.remove(item.group);
+        item.group.traverse(obj => {
+            if (obj.geometry) obj.geometry.dispose();
+            if (obj.material) obj.material.dispose();
+        });
+    }
+
+    rewardDestructibleBreak(sourceDragon, pos) {
+        if (!sourceDragon || sourceDragon.isDead || !sourceDragon.heal) return;
+        sourceDragon.heal(sourceDragon.maxHP * CONFIG.stats.destructibleHealPct);
+        this.spawnHealBurst(pos, 0x7cff9a);
     }
 
     cleanupFarChunks(position) {
@@ -300,6 +483,32 @@ class LevelManager {
         if (block.mesh.material) block.mesh.material.dispose();
     }
 
+    isInsideArenaXZ(x, z, padding = 0) {
+        const limit = Math.max(0, CONFIG.level.arenaHalfSize - padding);
+        return x >= -limit && x <= limit && z >= -limit && z <= limit;
+    }
+
+    clampPositionToArena(pos, padding = 0) {
+        const limit = Math.max(0, CONFIG.level.arenaHalfSize - padding);
+        const beforeX = pos.x;
+        const beforeZ = pos.z;
+        pos.x = THREE.MathUtils.clamp(pos.x, -limit, limit);
+        pos.z = THREE.MathUtils.clamp(pos.z, -limit, limit);
+        return {
+            x: pos.x !== beforeX,
+            z: pos.z !== beforeZ
+        };
+    }
+
+    isChunkWithinArena(chunkX, chunkZ) {
+        const levelCfg = CONFIG.level;
+        const centerX = chunkX * levelCfg.chunkSize;
+        const centerZ = chunkZ * levelCfg.chunkSize;
+        const halfChunk = levelCfg.chunkSize * 0.5;
+        return Math.abs(centerX) - halfChunk <= levelCfg.arenaHalfSize &&
+            Math.abs(centerZ) - halfChunk <= levelCfg.arenaHalfSize;
+    }
+
     getChunkCoord(value) {
         return Math.round(value / CONFIG.level.chunkSize);
     }
@@ -335,6 +544,16 @@ class LevelManager {
         const count = 5;
         for (let i = 0; i < count; i++) {
             state.particles.push(new Particle(pos, 0x555555));
+        }
+    }
+
+    spawnHealBurst(pos, color) {
+        for (let i = 0; i < 8; i++) {
+            const p = new Particle(pos.clone(), color);
+            p.life = 0.35 + Math.random() * 0.2;
+            p.maxLife = p.life;
+            p.mesh.scale.setScalar(0.55 + Math.random() * 0.35);
+            state.particles.push(p);
         }
     }
 

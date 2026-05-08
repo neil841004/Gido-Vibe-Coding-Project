@@ -29,7 +29,9 @@ dirLight.castShadow = true;
 scene.add(dirLight);
 
 // Ground grid
-const gridHelper = new THREE.GridHelper(100, 100, 0x555555, 0x444444);
+const gridSize = CONFIG.level.arenaHalfSize * 2;
+const gridHelper = new THREE.GridHelper(gridSize, Math.max(10, Math.round(gridSize)), 0x555555, 0x444444);
+gridHelper.position.y = 0.01;
 scene.add(gridHelper);
 
 function createDragon(index) {
@@ -354,6 +356,10 @@ function checkDragonDragonCollisions() {
             a.mesh.position.z -= nz * pen * 0.5;
             b.mesh.position.x += nx * pen * 0.5;
             b.mesh.position.z += nz * pen * 0.5;
+            if (state.levelManager && state.levelManager.clampPositionToArena) {
+                state.levelManager.clampPositionToArena(a.mesh.position, CONFIG.level.playerBoundaryPadding);
+                state.levelManager.clampPositionToArena(b.mesh.position, CONFIG.level.playerBoundaryPadding);
+            }
 
             // 計算相對速度在碰撞法線方向的分量；只在兩龍靠近時施加衝量
             const relVx = b.velocity.x - a.velocity.x;

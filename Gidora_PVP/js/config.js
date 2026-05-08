@@ -12,6 +12,7 @@ const CONFIG = {
     stats: {
         playerHP: 1200,          // 玩家融合獸基礎最大血量
         structureHPBase: 0.5,   // 可破壞障礙物 HP 係數，會乘上體積
+        destructibleHealPct: 0.015, // 破壞白色可破壞關卡物件時，回復自身最大血量比例
         hpDecayRate: 0,         // 開啟敵人生成後，每秒自然扣血量
         hpDecayRateBeam: 6      // 光束施放期間，每秒自然扣血量
     },
@@ -121,7 +122,7 @@ const CONFIG = {
         tailChargeTime: 0.4,                // P4 蓄力所需按住秒數（比頭部 chargeTime 0.4s 更長）
         tailSweepDuration: 0.45,            // P4 蓄力重擊旋轉橫掃的動畫持續秒數
         tailSweepRadius: 5,               // P4 尾巴橫掃攻擊半徑
-        tailSweepDamageScale: 2.1,          // P4 蓄力橫掃傷害倍率（疊加在 meleeDamage 與 tailPower 之上）
+        tailSweepDamageScale: 1.7,          // P4 蓄力橫掃傷害倍率（疊加在 meleeDamage 與 tailPower 之上）
         heavyStaggerBonusScale: 0.5         // 蓄力攻擊命中時，額外造成傷害 50% 的失衡值
     },
 
@@ -159,6 +160,10 @@ const CONFIG = {
     // 關卡物件生成
     // -----------------------------------------------------------------
     level: {
+        arenaHalfSize: 52,       // 有限關卡半邊長，玩家可活動範圍為 -halfSize 到 +halfSize
+        arenaWaterWidth: 42,     // 關卡邊界外海面延伸寬度
+        arenaSpawnMargin: 4,     // 障礙物 / 道具生成時離邊界保留距離
+        playerBoundaryPadding: 0.8, // 玩家碰到邊界時保留的碰撞半徑
         chunkSize: 44,             // 動態關卡區塊邊長，約等於原本一次生成範圍
         generateRadiusChunks: 1,   // 以玩家所在區塊為中心，向外預生成幾圈區塊
         cleanupRadiusChunks: 3,    // 超過玩家幾圈區塊的關卡物件會被清除
@@ -175,7 +180,12 @@ const CONFIG = {
         solidHeightRand: 6,        // 實體障礙物高度隨機增加量
         patchSizeMin: 4,           // 地面效果最小寬深
         patchSizeRand: 4,          // 地面效果寬深隨機增加量
-        patchHeight: 0.08          // 地面效果碰撞/生成用高度
+        patchHeight: 0.08,         // 地面效果碰撞/生成用高度
+        healItemSpawnIntervalMin: 9, // 補血道具生成最短間隔秒數
+        healItemSpawnIntervalRand: 9, // 補血道具生成額外隨機秒數
+        healItemMaxCount: 2,       // 場上最多同時存在的補血道具數量
+        healItemHealPct: 0.2,      // 補血道具回復自身最大血量比例
+        healItemPickupRadius: 2.0  // 補血道具拾取半徑
     },
 
     // -----------------------------------------------------------------
@@ -258,10 +268,10 @@ const CONFIG = {
         hpBoostPct: 0.3,                  // 可疊加血量 Buff：每層最大血量增加比例
         speedBoostPct: 0.3,               // 可疊加速度 Buff：每層速度與轉向增加比例
         meleeBoostPct: 0.3,               // 可疊加近戰 Buff：每層近戰傷害增加比例
-        comboCooldownMultiplier: 0.4,     // 組合技 CD 縮短 Buff：冷卻倍率
+        comboCooldownMultiplier: 0.5,     // 組合技 CD 縮短 Buff：冷卻倍率
         comboDamageMultiplier: 2.0,       // 組合技傷害 Buff：傷害倍率
         lifeStealPct: 0.12,               // 有效傷害回血 Buff：造成傷害轉換回血比例
-        tailDamageMultiplier: 3.0,        // 尾巴攻擊力 Buff：尾巴傷害倍率
+        tailDamageMultiplier: 2.6,        // 尾巴攻擊力 Buff：尾巴傷害倍率
         tailPowerSweepRadiusMultiplier: 1.45, // 尾巴攻擊力 Buff：尾巴蓄力橫掃範圍倍率
         leafShieldCount: 1,               // 葉子護盾 Buff：護盾葉片數量
         missileInterval: 2.5,             // 飛彈巢 Buff：發射間隔秒數
@@ -285,6 +295,8 @@ const CONFIG = {
         ramDamage: 45,                    // 高速衝撞 Buff：撞擊傷害
         ramKnockback: 55,                 // 高速衝撞 Buff：撞擊擊退力
         ramStagger: 100,                   // 高速衝撞 Buff：額外失衡值
+        staggerImmuneIncomingMultiplier: 0.5, // 不容易跌倒 Buff：受到失衡值倍率（0.5 = 減少 50%）
+        staggerImmuneRecoveryMultiplier: 1.5, // 不容易跌倒 Buff：失衡值衰退速度倍率（1.5 = +50%）
         stationaryShieldDelay: 2.0,       // 靜止護盾 Buff：站定多久後啟用
         stationaryShieldMultiplier: 0.8,  // 靜止護盾 Buff：受傷倍率
         teamworkRegenPerSecond: 25,        // 同心協力回血 Buff：每秒回血量
@@ -359,24 +371,31 @@ const CONFIG = {
         cpuDecisionIntervalMax: 0.95,     // CPU 每個部位重新判斷行動的最長間隔秒數
         cpuTeamIntentMinSeconds: 1.7,     // CPU 整體戰術意圖維持的最短秒數
         cpuTeamIntentMaxSeconds: 3.2,     // CPU 整體戰術意圖維持的最長秒數
-        cpuPreferredRange: 5.2,           // CPU 偏好的交戰距離，單位為世界座標距離
+        cpuPreferredRange: 4.0,           // CPU 偏好的交戰距離，單位為世界座標距離
         cpuRetreatRange: 2.8,             // CPU 覺得過近而想後退的距離
         cpuChaseRange: 7.5,               // CPU 超過此距離時傾向追擊
         cpuMeleeRange: 5.4,               // CPU 三顆頭嘗試近戰的距離
-        cpuTailMeleeRange: 6.4,           // CPU 尾巴嘗試掃擊的距離
+        cpuTailMeleeRange: 4.6,           // CPU 尾巴嘗試掃擊的距離
+        cpuMeleeAlignDuration: 0.3,       // CPU 觸發近戰後，本部位優先朝真實玩家方向對齊的秒數
         cpuMoveNoiseAngle: 0.22,          // CPU 正常移動方向最大隨機偏角，弧度
-        cpuConfusedMoveNoiseAngle: 1.15,  // CPU 混亂事件中的移動方向最大隨機偏角，弧度
+        cpuConfusedMoveNoiseAngle: 1.15,  // CPU 整體猶豫事件中的移動方向最大隨機偏角，弧度
         cpuIdleMoveChance: 0.05,          // CPU 單一部位本次決策故意不移動的機率
-        cpuConfusionChance: 0.13,         // CPU 單一部位在非集氣時進入混亂操作事件的機率
-        cpuConfusionDurationMin: 2.0,     // CPU 混亂操作事件最短持續秒數
-        cpuConfusionDurationMax: 3.0,     // CPU 混亂操作事件最長持續秒數
+        cpuConfusionChance: 0,            // [Deprecated] 已被 cpuTeamConfusionChance 取代，個別部位不再獨立進入混亂
+        cpuTeamConfusionChance: 0.06,     // CPU 在團隊意圖切換時觸發整體猶豫事件的機率
+        cpuTeamConfusionDurationMin: 0.8, // CPU 整體猶豫事件最短持續秒數
+        cpuTeamConfusionDurationMax: 1.4, // CPU 整體猶豫事件最長持續秒數
+        cpuConfusionDurationMin: 2.0,     // [Deprecated] 舊 per-part 混亂事件持續秒數，保留以利對照
+        cpuConfusionDurationMax: 3.0,     // [Deprecated] 舊 per-part 混亂事件持續秒數，保留以利對照
+        cpuHealItemSeekHpRatio: 0.8,      // CPU 血量比例低於此值時開始搶補血道具
+        cpuHealItemSeekRange: 18.0,       // CPU 搜尋補血道具的最大距離
+        cpuHealItemSeekBlend: 0.9,        // CPU 朝補血道具移動的方向權重，1 = 完全覆蓋戰術方向
         cpuTargetOffsetRadius: 2.4,       // CPU 判斷玩家位置時的最大誤差半徑，世界座標距離
         cpuTargetOffsetMinSeconds: 1.1,   // CPU 目標位置誤差維持的最短秒數
         cpuTargetOffsetMaxSeconds: 2.4,   // CPU 目標位置誤差維持的最長秒數
         cpuRetreatHpRatio: 0.32,          // CPU 血量低於此比例時更常後退
         cpuRetreatChance: 0.42,           // CPU 低血量且距離偏近時選擇後退的機率
         cpuPressureIntentChance: 0.7,     // CPU 距離適中時選擇壓迫而非繞行的機率
-        cpuAttackChance: 0.52,            // CPU 進入攻擊距離時，本次決策嘗試近戰的基礎機率
+        cpuAttackChance: 0.68,            // CPU 進入攻擊距離時，本次決策嘗試近戰的基礎機率
         cpuHeavyAttackChance: 0.34,       // CPU 嘗試近戰時改成蓄力攻擊的機率
         cpuAttackPressSeconds: 0.1,       // CPU 輕攻擊按鍵維持秒數
         cpuInitialAttackDelayMin: 0.25,   // CPU 開局後同一部位最早可嘗試攻擊的延遲秒數
@@ -396,7 +415,7 @@ const CONFIG = {
         cpuHazardAvoidWeight: 0.85,       // CPU 避開火焰 / 黏液地形的方向權重
         cpuObstacleAheadDot: -0.15,       // CPU 只避開大致在行進方向前方的障礙物，內積門檻
         cpuObstacleMoveAwayDot: 0.95,     // CPU 已明顯遠離障礙物時略過避障的內積門檻
-        cpuConfusionMoveBlend: 0.8,       // CPU 混亂事件中，混亂方向覆蓋正常方向的比例
+        cpuConfusionMoveBlend: 0.8,       // CPU 整體猶豫事件中，混亂方向覆蓋正常方向的比例
         cpuComboPlanIntervalMin: 10,      // CPU 兩次合體技企圖之間的最短間隔秒數
         cpuComboPlanIntervalMax: 22,      // CPU 兩次合體技企圖之間的最長間隔秒數
         cpuComboPlanDurationMin: 2.2,     // CPU 一次合體技企圖持續的最短秒數
@@ -492,9 +511,10 @@ const state = {
 
     // PVE 對戰狀態；實際雙龍戰鬥 HUD / 勝負沿用 PVP 對戰基礎，這裡只記錄 CPU 模式差異
     pve: {
-        active: false,        // true = Dragon B 由 CPU 控制
-        configuring: false,   // true = PVE 配對介面開啟
-        cpu: null             // CpuDragonController instance，由 main.js 建立
+        active: false,            // true = Dragon B 由 CPU 控制
+        configuring: false,       // true = PVE 配對介面開啟
+        cpu: null,                // CpuDragonController instance，由 main.js 建立
+        testKeyboardEnabled: true // 鍵鼠測試模式：ON 時 Dragon A 改用 WASD+1~8 操作，並忽略 overlay 指派（Dragon B 仍由 CPU 控制）
     },
 
     lastTime: 0

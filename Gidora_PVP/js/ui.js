@@ -786,6 +786,28 @@ function createPveCpuColumn() {
     });
     buffRow.appendChild(select);
     column.appendChild(buffRow);
+
+    const kbdRow = document.createElement('label');
+    kbdRow.style.display = 'flex';
+    kbdRow.style.alignItems = 'center';
+    kbdRow.style.gap = '8px';
+    kbdRow.style.marginTop = '10px';
+    kbdRow.style.fontSize = '13px';
+    kbdRow.style.cursor = 'pointer';
+    const kbdCheck = document.createElement('input');
+    kbdCheck.type = 'checkbox';
+    kbdCheck.id = 'pve-test-keyboard-toggle';
+    kbdCheck.style.pointerEvents = 'auto';
+    kbdCheck.checked = !!state.pve.testKeyboardEnabled;
+    kbdCheck.addEventListener('change', () => {
+        state.pve.testKeyboardEnabled = kbdCheck.checked;
+    });
+    const kbdLabel = document.createElement('span');
+    kbdLabel.textContent = '啟用鍵鼠測試（WASD + 1~8 直接操作 Dragon A，忽略 slot 指派）';
+    kbdRow.appendChild(kbdCheck);
+    kbdRow.appendChild(kbdLabel);
+    column.appendChild(kbdRow);
+
     return column;
 }
 
