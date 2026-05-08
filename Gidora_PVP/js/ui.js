@@ -81,6 +81,7 @@ function setupUI() {
     pveBtn.addEventListener('click', openPveSetupOverlay);
 
     setupBuffUI();
+    setupMysteryBoxRollUI();
     refreshTopLeftUI();
 }
 
@@ -1221,8 +1222,8 @@ function ensurePvpBattleHud() {
             panel.style.bottom = '72px';
             panel.style[index === 0 ? 'left' : 'right'] = '18px';
             panel.style.width = '230px';
-            panel.style.maxHeight = '32vh';
-            panel.style.overflow = 'hidden';
+            panel.style.maxHeight = 'calc(100vh - 100px)';
+            panel.style.overflow = 'visible';
             panel.style.pointerEvents = 'none';
             panel.style.zIndex = '12';
             panel.style.color = 'white';
@@ -1520,3 +1521,186 @@ window.pvpHandleGamepadSetupInput = pvpHandleGamepadSetupInput;
 window.pvpHandleKeyboardSetupInput = pvpHandleKeyboardSetupInput;
 window.showPvpResultOverlay = showPvpResultOverlay;
 window.refreshAllUI = refreshAllUI;
+
+// ---------------------------------------------------------------------
+// 問號箱抽獎演出
+// ---------------------------------------------------------------------
+let mysteryOverlay = null;
+
+function setupMysteryBoxRollUI() {
+    state.onMysteryBoxPickup = (dragon) => startMysteryBoxRoll(dragon);
+}
+
+function buildMysteryOverlay() {
+    mysteryOverlay = document.createElement('div');
+    mysteryOverlay.id = 'mystery-box-overlay';
+    Object.assign(mysteryOverlay.style, {
+        position: 'absolute', left: '0', right: '0', top: '6%',
+        zIndex: '200',
+        display: 'none', alignItems: 'center', justifyContent: 'center',
+        flexDirection: 'column', background: 'transparent',
+        pointerEvents: 'none', color: 'white', fontFamily: 'sans-serif'
+    });
+
+    const label = document.createElement('div');
+    label.style.fontSize = '20px';
+    label.style.fontWeight = '900';
+    label.style.marginBottom = '14px';
+    label.style.textShadow = '0 2px 6px rgba(0,0,0,0.65)';
+    mysteryOverlay.appendChild(label);
+    mysteryOverlay._label = label;
+
+    const row = document.createElement('div');
+    Object.assign(row.style, {
+        display: 'flex', gap: '14px', padding: '18px 22px',
+        background: 'rgba(20,30,40,0.78)', borderRadius: '14px',
+        border: '1px solid rgba(255,255,255,0.18)'
+    });
+    mysteryOverlay.appendChild(row);
+
+    const slots = [];
+    for (let i = 0; i < 5; i++) {
+        const slot = document.createElement('div');
+        Object.assign(slot.style, {
+            width: '78px', height: '78px', borderRadius: '50%',
+            background: '#222', display: 'flex', alignItems: 'center',
+            justifyContent: 'center', fontWeight: '900', fontSize: '20px',
+            color: 'white', border: '3px solid transparent',
+            boxShadow: 'inset 0 0 12px rgba(0,0,0,0.5)'
+        });
+        if (i === 2) {
+            slot.style.border = '3px solid #ffd24a';
+            slot.style.boxShadow = '0 0 18px rgba(255,210,74,0.65), inset 0 0 12px rgba(0,0,0,0.5)';
+        }
+        row.appendChild(slot);
+        slots.push(slot);
+    }
+    mysteryOverlay._slots = slots;
+
+    const finalName = document.createElement('div');
+    finalName.style.fontSize = '22px';
+    finalName.style.fontWeight = '900';
+    finalName.style.marginTop = '14px';
+    finalName.style.textShadow = '0 2px 6px rgba(0,0,0,0.65)';
+    mysteryOverlay.appendChild(finalName);
+    mysteryOverlay._finalName = finalName;
+
+    document.body.appendChild(mysteryOverlay);
+}
+
+function setMysterySlotIcon(slot, id) {
+    const cfg = BUFFS[id];
+    if (!cfg) {
+        slot.style.background = '#222';
+        slot.style.color = '#fff';
+        slot.textContent = '?';
+        return;
+    }
+    const icon = cfg.icon || {};
+    slot.style.background = icon.bg || '#333';
+    slot.style.color = icon.color || '#fff';
+    slot.textContent = icon.glyph || '?';
+}
+
+function collectMysteryCandidates(dragon) {
+    if (!dragon || !dragon.buffSystem) return [];
+    return Object.keys(BUFFS).filter(id => {
+        const cfg = BUFFS[id];
+        if (!cfg) return false;
+        if (cfg.disabled) return false;
+        if (cfg.implemented === false) return false;
+        if (cfg.pvpExclude) return false;
+        if (!cfg.stackable && dragon.buffSystem.active.has(id)) return false;
+        return true;
+    });
+}
+
+function applyMysteryBoxBuff(dragon, id) {
+    const cfg = BUFFS[id];
+    if (!cfg || !dragon || !dragon.buffSystem) return;
+    if (cfg.stackable) {
+        dragon.buffSystem.addStack(id);
+    } else {
+        // toggle 在新 id 不存在時自動清除同 group 並加入；候選池已過濾掉已啟用的非 stackable
+        dragon.buffSystem.toggle(id);
+    }
+    if (typeof refreshAllUI === 'function') refreshAllUI();
+}
+
+function startMysteryBoxRoll(dragon) {
+    if (!state.mysteryBoxQueue) state.mysteryBoxQueue = [];
+    state.mysteryBoxQueue.push(dragon);
+    if (!state.mysteryBox.active) runNextMysteryRoll();
+}
+
+function runNextMysteryRoll() {
+    if (!state.mysteryBoxQueue || state.mysteryBoxQueue.length === 0) {
+        state.mysteryBox.active = false;
+        state.mysteryBox.dragonIndex = -1;
+        state.mysteryBox.rolledBuffId = null;
+        if (mysteryOverlay) mysteryOverlay.style.display = 'none';
+        return;
+    }
+    const dragon = state.mysteryBoxQueue.shift();
+    if (!dragon || dragon.isDead) {
+        runNextMysteryRoll();
+        return;
+    }
+    const candidates = collectMysteryCandidates(dragon);
+    if (candidates.length === 0) {
+        runNextMysteryRoll();
+        return;
+    }
+    const finalId = candidates[Math.floor(Math.random() * candidates.length)];
+
+    if (!mysteryOverlay) buildMysteryOverlay();
+
+    const dragonIndex = state.dragons.indexOf(dragon);
+    state.mysteryBox.active = true;
+    state.mysteryBox.dragonIndex = dragonIndex;
+    state.mysteryBox.rolledBuffId = finalId;
+
+    const rollMs = CONFIG.level.mysteryBoxRollDuration * 1000;
+    const revealMs = CONFIG.level.mysteryBoxRevealDuration * 1000;
+    const totalMs = rollMs + revealMs;
+    const finalSlotIndex = 2;
+
+    mysteryOverlay._label.textContent =
+        `Dragon ${dragonIndex === 0 ? 'A' : 'B'} 拾取問號箱…`;
+    mysteryOverlay._finalName.textContent = '';
+    mysteryOverlay._slots.forEach((el, i) => {
+        el.style.opacity = '1';
+        setMysterySlotIcon(el, candidates[Math.floor(Math.random() * candidates.length)]);
+    });
+    mysteryOverlay.style.display = 'flex';
+
+    const startTime = performance.now();
+    let lastChange = startTime;
+
+    const step = (now) => {
+        const elapsed = now - startTime;
+        if (elapsed < rollMs) {
+            const t = elapsed / rollMs;
+            const interval = 60 + t * 280;
+            if (now - lastChange >= interval) {
+                lastChange = now;
+                mysteryOverlay._slots.forEach(el => {
+                    setMysterySlotIcon(el, candidates[Math.floor(Math.random() * candidates.length)]);
+                });
+            }
+        } else if (elapsed < totalMs) {
+            setMysterySlotIcon(mysteryOverlay._slots[finalSlotIndex], finalId);
+            const cfg = BUFFS[finalId];
+            mysteryOverlay._finalName.textContent = cfg ? cfg.name : finalId;
+            mysteryOverlay._slots.forEach((el, i) => {
+                el.style.opacity = i === finalSlotIndex ? '1' : '0.4';
+            });
+        } else {
+            applyMysteryBoxBuff(dragon, finalId);
+            runNextMysteryRoll();
+            return;
+        }
+        requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+}

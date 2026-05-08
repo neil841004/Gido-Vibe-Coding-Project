@@ -10,7 +10,7 @@ const CONFIG = {
     // 角色 / 世界基礎數值
     // -----------------------------------------------------------------
     stats: {
-        playerHP: 1200,          // 玩家融合獸基礎最大血量
+        playerHP: 1300,          // 玩家融合獸基礎最大血量
         structureHPBase: 0.5,   // 可破壞障礙物 HP 係數，會乘上體積
         destructibleHealPct: 0.015, // 破壞白色可破壞關卡物件時，回復自身最大血量比例
         hpDecayRate: 0,         // 開啟敵人生成後，每秒自然扣血量
@@ -97,6 +97,12 @@ const CONFIG = {
         cooldown: 0.6,                      // 攻擊基礎冷卻秒數
         recoilForce: 10,                    // 保留用玩家反作用力
         knockbackBase: 0.2,                 // 傷害轉換為擊退的基礎倍率
+        meleeKnockback: 10,                 // 近戰頭部命中目標的擊退力
+        tailMeleeKnockback: 15,             // 近戰尾巴命中目標的擊退力
+        headRecoilForce: 4,                 // 近戰頭部命中目標時，自身往後反推的反作用力
+        blockRecoilForce: 5,                // 近戰命中可破壞建築時的反作用力
+        fireballKnockback: 16,              // 火球輕擊命中擊退力
+        fireballHeavyKnockback: 24,         // 火球蓄力命中擊退力
         chargeTime: 0.4,                    // 按住多久後蓄力完成並顯示落點預判
         heavyDamageScale: 3.0,              // 蓄力攻擊傷害倍率
         heavyRadiusScale: 1.4,             // 蓄力攻擊範圍倍率
@@ -104,13 +110,13 @@ const CONFIG = {
         chargeDefaultDistance: 4.2,         // 蓄力落點與身體的固定距離
         chargeAimHalfAngle: Math.PI / 3,    // 每顆頭可瞄準扇形半角，Math.PI / 4 = 45 度
         strikeTime: 0.16,                   // 頭部從後方向前攻擊的動畫秒數
-        fireballDamageScale: 1.2,           // 火球型態傷害倍率
-        fireballHeavyDamageScale: 1.35,     // 噴火球型態蓄力完成後額外傷害倍率
+        fireballDamageScale: 1.4,           // 火球型態傷害倍率
+        fireballHeavyDamageScale: 1.5,     // 噴火球型態蓄力完成後額外傷害倍率
         fireballAimDistance: 17.0,          // 火球型態固定落點距離，比一般頭槌落點更遠
-        fireballSpeed: 24,                  // 火球型態投射物飛行速度
+        fireballSpeed: 35,                  // 火球型態投射物飛行速度
         fireballRadius: 2.4,                // 火球爆炸半徑
-        fireballProjectileSize: 0.59,       // 火球型態投射物顯示尺寸，比原本大約 30%
-        fireballHeavySizeScale: 1.35,       // 噴火球蓄力完成後投射物與爆炸半徑倍率
+        fireballProjectileSize: 0.7,       // 火球型態投射物顯示尺寸，比原本大約 30%
+        fireballHeavySizeScale: 1.5,       // 噴火球蓄力完成後投射物與爆炸半徑倍率
         flamethrowerDamagePerSecond: 40,    // 噴火型態每秒傷害
         flamethrowerRange: 5.5,             // 噴火型態射程
         flamethrowerAngle: 0.5,            // 噴火型態半角，單位為弧度
@@ -130,11 +136,12 @@ const CONFIG = {
     // 失衡 / 架勢值
     // -----------------------------------------------------------------
     stagger: {
-        playerThreshold: 400,       // 玩家失衡條滿值，達到後跌倒
+        playerThreshold: 450,       // 玩家失衡條滿值，達到後跌倒
         playerWindow: 0,         // 玩家受傷後延遲多久才開始倒退失衡值
         playerRecoveryRate: 25,    // 玩家未受傷後，每秒倒退的失衡值
         playerFallDuration: 3.1,   // 玩家跌倒不可操作秒數
         playerStandUpDuration: 0.5, // 玩家跌倒後重新站起來的動畫秒數
+        staggeredDamageBonusPct: 0.3, // 失衡狀態（累積中或跌倒中）受到傷害的額外比例
         enemyThreshold: 60,        // 敵人失衡條滿值，達到後跌倒
         enemyWindow: 1.0,          // 敵人受傷後延遲多久才開始倒退失衡值
         enemyRecoveryRate: 85,     // 敵人未受傷後，每秒倒退的失衡值
@@ -185,7 +192,14 @@ const CONFIG = {
         healItemSpawnIntervalRand: 9, // 補血道具生成額外隨機秒數
         healItemMaxCount: 2,       // 場上最多同時存在的補血道具數量
         healItemHealPct: 0.2,      // 補血道具回復自身最大血量比例
-        healItemPickupRadius: 2.0  // 補血道具拾取半徑
+        healItemPickupRadius: 2.0, // 補血道具拾取半徑
+        mysteryBoxSpawnIntervalMin: 14, // 問號箱生成最短間隔秒數
+        mysteryBoxSpawnIntervalRand: 12, // 問號箱生成額外隨機秒數
+        mysteryBoxMaxCount: 8,     // 場上最多同時存在的問號箱數量
+        mysteryBoxInitialCount: 8, // PVP/PVE 開場立即生成的問號箱數量
+        mysteryBoxPickupRadius: 2.0, // 問號箱拾取半徑
+        mysteryBoxRollDuration: 1.4, // 問號箱抽獎演出滾動秒數
+        mysteryBoxRevealDuration: 0.9 // 問號箱抽獎揭曉停留秒數
     },
 
     // -----------------------------------------------------------------
@@ -213,6 +227,7 @@ const CONFIG = {
     combo: {
         cooldown: 15.0,       // 合體技冷卻秒數
         preCastDelay: 2.3,    // 合體技前置延遲秒數
+        defaultAreaKnockback: 18, // 組合技 / 範圍傷害命中目標的預設擊退力
         vineSpeed: 2.0,       // 藤蔓掃動速度
         moveSpeedFactor: 0.5, // 合體技期間移動速度倍率
         dotInterval: 0.5,     // 藤蔓 DoT 觸發間隔秒數
@@ -273,7 +288,14 @@ const CONFIG = {
         lifeStealPct: 0.12,               // 有效傷害回血 Buff：造成傷害轉換回血比例
         tailDamageMultiplier: 2.6,        // 尾巴攻擊力 Buff：尾巴傷害倍率
         tailPowerSweepRadiusMultiplier: 1.45, // 尾巴攻擊力 Buff：尾巴蓄力橫掃範圍倍率
-        leafShieldCount: 1,               // 葉子護盾 Buff：護盾葉片數量
+        leafShieldCount: 4,               // 葉子護盾 Buff：護盾葉片數量
+        leafShieldRadius: 2.1,            // 葉子護盾 Buff：葉子環繞身體的半徑
+        leafShieldHitRadius: 0.8,         // 葉子護盾 Buff：投射物碰葉子反彈的判定半徑
+        reflectedBulletKnockback: 12,     // 葉子護盾 Buff：投射物反彈後擊退力
+        reflectedBulletDamageMin: 10,     // 葉子護盾 Buff：投射物反彈後最低傷害下限
+        missileKnockback: 18,             // 飛彈巢 Buff：發射飛彈的擊退力
+        defenseBoostPct: 0.2,             // 防禦率 Buff：每層減少受傷比例（每層乘 (1 - 0.2)）
+        knockbackBoostMultiplier: 3,      // 把敵人推得遠遠的 Buff：所有由本龍造成的擊退力倍率
         missileInterval: 2.5,             // 飛彈巢 Buff：發射間隔秒數
         missileDamage: 12,                // 飛彈巢 Buff：單發飛彈傷害
         missileSpeed: 14,                 // 飛彈巢 Buff：飛彈速度
@@ -295,8 +317,8 @@ const CONFIG = {
         ramDamage: 45,                    // 高速衝撞 Buff：撞擊傷害
         ramKnockback: 55,                 // 高速衝撞 Buff：撞擊擊退力
         ramStagger: 100,                   // 高速衝撞 Buff：額外失衡值
-        staggerImmuneIncomingMultiplier: 0.5, // 不容易跌倒 Buff：受到失衡值倍率（0.5 = 減少 50%）
-        staggerImmuneRecoveryMultiplier: 1.5, // 不容易跌倒 Buff：失衡值衰退速度倍率（1.5 = +50%）
+        staggerImmuneIncomingMultiplier: 0.6, // 不容易跌倒 Buff：受到失衡值倍率（0.5 = 減少 50%）
+        staggerImmuneRecoveryMultiplier: 1.2, // 不容易跌倒 Buff：失衡值衰退速度倍率（1.5 = +50%）
         stationaryShieldDelay: 2.0,       // 靜止護盾 Buff：站定多久後啟用
         stationaryShieldMultiplier: 0.8,  // 靜止護盾 Buff：受傷倍率
         teamworkRegenPerSecond: 25,        // 同心協力回血 Buff：每秒回血量
@@ -325,6 +347,8 @@ const CONFIG = {
         dragonBSpawn: { x: 8, z: 0, facingY: Math.PI }, // 第二隻三頭龍出生點與初始面向 (弧度)
         // PVP 配對介面選項
         maxBuffsPerDragon: 10,            // 配對介面 Buff 數量上限
+        randomBuffCountMin: 3,            // 配對介面選「隨機」時，每隻龍最少抽到的 Buff 數量
+        randomBuffCountMax: 7,            // 配對介面選「隨機」時，每隻龍最多抽到的 Buff 數量
         cameraMargin: 8,                  // PVP 鏡頭跟隨額外邊界，越大鏡頭拉得越遠
         cameraMinDist: 12,                // PVP 鏡頭最小距離，避免過於貼近
         cameraMaxDist: 50,                // PVP 鏡頭最大距離，避免拉得過遠
@@ -491,6 +515,15 @@ const state = {
 
     // Buff 面板目前操作的對象 (0 = Dragon A, 1 = Dragon B)
     buffTarget: 0,
+
+    // 問號箱抽獎演出狀態：active 為 true 時主迴圈暫停世界邏輯
+    mysteryBox: {
+        active: false,
+        dragonIndex: -1,     // 拾取者龍 index
+        rolledBuffId: null,  // 已決定抽到的 Buff id，演出結束後實際套用
+        timer: 0             // 剩餘演出秒數
+    },
+    onMysteryBoxPickup: null, // 由 ui.js 在 setupUI 時填入；接收 picker dragon
 
     // PVP 對戰狀態機
     pvp: {

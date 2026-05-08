@@ -6,9 +6,10 @@
 // =====================================================================
 
 const BUFFS = {
-    hpBoost: { name: '增加血量 30%', description: '每層最大血量 +30%。', stackable: true, implemented: true, icon: { glyph: '+', color: '#62f28f', bg: '#14371f' } },
+    hpBoost: { name: '增加血量 30%', description: '已禁用：此 Buff 不會在 PVP/PVE/問號箱抽取，也無法手動啟用。', stackable: true, implemented: false, disabled: true, pvpExclude: true, icon: { glyph: '+', color: '#62f28f', bg: '#14371f' } },
     speedBoost: { name: '移動、轉向速度提高', description: '每層速度與轉向 +30%。', stackable: true, implemented: true, icon: { glyph: '>>', color: '#59d8ff', bg: '#12303b' } },
     meleeBoost: { name: 'Melee 攻擊力 +30%', description: '每層頭槌/尾巴近戰 +30%。', stackable: true, implemented: true, icon: { glyph: 'X', color: '#ffd166', bg: '#3a2c12' } },
+    defenseBoost: { name: '增加 20% 防禦率', description: '每層受傷減少 20%（疊加為相乘）。', stackable: true, implemented: true, icon: { glyph: 'DF', color: '#9ad8ff', bg: '#152a3d' } },
 
     comboCd: { name: '組合技 CD 縮短 50%', description: '組合技冷卻只剩 40%。', implemented: true, icon: { glyph: 'CD', color: '#c4a7ff', bg: '#231a3d' } },
     comboDamage: { name: '組合技傷害 +100%', description: '組合技傷害加倍。', implemented: true, icon: { glyph: 'B', color: '#ff8cff', bg: '#39183c' } },
@@ -19,7 +20,7 @@ const BUFFS = {
     lifeSteal: { name: '有效傷害回血', description: '造成有效傷害時回復少量 HP。', implemented: true, pvpExclude: true, icon: { glyph: 'L', color: '#ff6b7a', bg: '#3d151b' } },
     tailPower: { name: '尾巴攻擊力 +300%', description: '尾巴傷害變為 4 倍。', implemented: true, icon: { glyph: 'T', color: '#60efff', bg: '#12393d' } },
     poisonTrail: { name: '走路留下毒液', description: '毒液殘留 10 秒，緩速並 DOT 敵人。', implemented: true, icon: { glyph: 'P', color: '#8cff5f', bg: '#173a14' } },
-    leafShield: { name: '一片葉子護盾', description: '一片葉子環繞，會阻擋傷害。', implemented: true, icon: { glyph: '4', color: '#a7ff83', bg: '#203714' } },
+    leafShield: { name: '葉子護盾', description: '4 片葉子環繞，投射物碰到葉子會直接反彈。', implemented: true, icon: { glyph: '4', color: '#a7ff83', bg: '#203714' } },
 
     meleeFireball: { name: 'Melee 型態：噴火球', description: '頭部近戰改成落點火球；尾巴不變。', group: 'meleeForm', implemented: true, icon: { glyph: 'F', color: '#ff9f1c', bg: '#3d2410' } },
     meleeShockwave: { name: 'Melee 型態：蓄力震波', description: '蓄力重擊會打出暈眩震波。', group: 'meleeForm', implemented: true, icon: { glyph: '~', color: '#a6c8ff', bg: '#172845' } },
@@ -30,14 +31,15 @@ const BUFFS = {
     comboRamp: { name: '連擊傷害提高', description: '2 秒內有效攻擊會逐步提高傷害。', implemented: true, icon: { glyph: 'x', color: '#ffe66d', bg: '#383312' } },
     missileNest: { name: '背上飛彈巢', description: '定期發射追蹤飛彈。', implemented: true, icon: { glyph: 'M', color: '#ffb347', bg: '#3d2a10' } },
     directionalGuard: { name: '正面減傷', description: '正面受傷降低。', implemented: true, icon: { glyph: 'G', color: '#9ad1ff', bg: '#162f45' } },
-    reflectProjectile: { name: '50% 反彈投射物', description: '有機率反彈敵方投射物。', implemented: true, icon: { glyph: 'R', color: '#b7ffdd', bg: '#12382a' } },
+    reflectProjectile: { name: '50% 反彈投射物', description: '已禁用：此 Buff 不會在 PVP/PVE/問號箱抽取，也無法手動啟用。', implemented: false, disabled: true, pvpExclude: true, icon: { glyph: 'R', color: '#b7ffdd', bg: '#12382a' } },
     beamSlow: { name: '光束波緩速', description: '組合技命中時使敵方緩速。', implemented: true, icon: { glyph: 'SL', color: '#b7d7ff', bg: '#17283f' } },
     poisonCloud: { name: '定期毒霧', description: '週期性噴出大範圍 DOT 毒霧。', implemented: true, icon: { glyph: 'C', color: '#78ff8f', bg: '#14351c' } },
     ramStagger: { name: '高速衝撞', description: '已禁用：此 Buff 不會在 PVP/PVE 抽取，也無法手動啟用。', implemented: false, disabled: true, pvpExclude: true, icon: { glyph: 'R', color: '#ff5a5a', bg: '#3d1010' } },
     staggerImmune: { name: '不容易跌倒', description: '受到的失衡值減少 50%，衰退速度 +50%。', implemented: true, icon: { glyph: 'I', color: '#ffffff', bg: '#303030' } },
     stationaryShield: { name: '停止不動護盾', description: '站定後免疫 30% 傷害。', implemented: true, icon: { glyph: 'D', color: '#d8fff5', bg: '#173631' } },
     teamworkRegen: { name: '同心協力回血', description: '同向加速時持續回血。', implemented: true, pvpExclude: true, icon: { glyph: 'H', color: '#73ff9a', bg: '#17351e' } },
-    lowHpExplosion: { name: '半血超大爆炸', description: '血量低於一半時觸發一次。', implemented: true, icon: { glyph: '!', color: '#ffef73', bg: '#4a2510' } },
+    lowHpExplosion: { name: '跌倒反擊大爆炸', description: '失衡跌倒站起來時，向四周噴發一次大爆炸。', implemented: true, icon: { glyph: '!', color: '#ffef73', bg: '#4a2510' } },
+    knockbackBoost: { name: '把敵人推得遠遠的', description: '本龍造成的所有擊退力變為 3 倍。', implemented: true, icon: { glyph: 'KB', color: '#ffd166', bg: '#3a1f12' } },
     comboInvincible: { name: '組合技期間無敵', description: '光束波施放期間免疫傷害。', implemented: true, icon: { glyph: 'V', color: '#f7f2ff', bg: '#2b1f42' } }
 };
 
@@ -295,6 +297,16 @@ class BuffSystem {
         return 1 + CONFIG.buffs.meleeBoostPct * this.getStack('meleeBoost');
     }
 
+    getDefenseMultiplier() {
+        const stack = this.getStack('defenseBoost');
+        if (stack <= 0) return 1;
+        return Math.pow(1 - CONFIG.buffs.defenseBoostPct, stack);
+    }
+
+    getKnockbackMultiplier() {
+        return this.isActive('knockbackBoost') ? CONFIG.buffs.knockbackBoostMultiplier : 1;
+    }
+
     getComboCooldownMultiplier() {
         return this.isActive('comboCd') ? CONFIG.buffs.comboCooldownMultiplier : 1;
     }
@@ -342,14 +354,23 @@ class BuffSystem {
         }
     }
 
-    blockIncomingDamage(sourcePos) {
-        if (!this.isActive('leafShield')) return false;
-        const shield = this.objects.leafShields.find(s => !s.cooldown || s.cooldown <= 0);
-        if (!shield) return false;
-        shield.cooldown = 1.6;
-        shield.mesh.visible = false;
-        this._spawnRing(sourcePos || shield.mesh.position, 0x99ff55, 2.0);
-        return true;
+    blockIncomingDamage() {
+        // 葉子護盾改為投射物反彈，不再擋一般傷害
+        return false;
+    }
+
+    findLeafShieldHit(bulletPos) {
+        if (!this.isActive('leafShield')) return null;
+        const hitR = CONFIG.buffs.leafShieldHitRadius;
+        const hitRSq = hitR * hitR;
+        for (const s of this.objects.leafShields) {
+            if (!s.mesh || !s.mesh.visible) continue;
+            const dx = bulletPos.x - s.mesh.position.x;
+            const dy = bulletPos.y - s.mesh.position.y;
+            const dz = bulletPos.z - s.mesh.position.z;
+            if (dx * dx + dy * dy + dz * dz <= hitRSq) return s;
+        }
+        return null;
     }
 
     reflectProjectile(bullet, dragon) {
@@ -361,8 +382,8 @@ class BuffSystem {
         bullet.owner = 'reflected';
         bullet.attackerDragon = dragon; // 反彈後子彈視為由反彈方發出
         bullet.velocity.copy(dir.multiplyScalar(bullet.speed || 16));
-        bullet.damage = Math.max(bullet.damage || 5, 10);
-        bullet.knockback = 12;
+        bullet.damage = Math.max(bullet.damage || 5, CONFIG.buffs.reflectedBulletDamageMin);
+        bullet.knockback = CONFIG.buffs.reflectedBulletKnockback * this.getKnockbackMultiplier();
         bullet.hitEntities = new Set();
         if (bullet.mesh && bullet.mesh.material) bullet.mesh.material.color.setHex(0x99ff55);
         return true;
@@ -413,11 +434,11 @@ class BuffSystem {
         }
 
         const t = Date.now() * 0.002;
+        const radius = CONFIG.buffs.leafShieldRadius;
         this.objects.leafShields.forEach((s, i) => {
-            s.cooldown = Math.max(0, (s.cooldown || 0) - dt);
-            if (s.cooldown <= 0) s.mesh.visible = true;
+            s.mesh.visible = true;
             s.angle = t + (i / CONFIG.buffs.leafShieldCount) * Math.PI * 2;
-            s.mesh.position.copy(dragon.mesh.position).add(new THREE.Vector3(Math.cos(s.angle) * 2.1, 1.8, Math.sin(s.angle) * 2.1));
+            s.mesh.position.copy(dragon.mesh.position).add(new THREE.Vector3(Math.cos(s.angle) * radius, 1.8, Math.sin(s.angle) * radius));
             s.mesh.lookAt(camera.position);
         });
     }
@@ -530,7 +551,7 @@ class BuffSystem {
             isHoming: true,
             target: target.mesh,
             homingStrength: 3.5,
-            knockback: 18
+            knockback: CONFIG.buffs.missileKnockback * this.getKnockbackMultiplier()
         });
         missile.attackerDragon = dragon; // 飛彈視為由本龍發出
         state.bullets.push(missile);
@@ -614,10 +635,19 @@ class BuffSystem {
     }
 
     _updateLowHpExplosion(dragon) {
-        if (!this.isActive('lowHpExplosion') || this.lowHpExplosionUsed) return;
-        if (dragon.hp > dragon.maxHP * 0.5) return;
-        this.lowHpExplosionUsed = true;
-        dragon.createAreaDamage(dragon.mesh.position.clone(), CONFIG.buffs.lowHpExplosionRadius, CONFIG.buffs.lowHpExplosionDamage, 0xffaa00, { stagger: 100 });
+        // 觸發改為跌倒站起完成時 (onStandUpComplete)，這裡保留為 no-op 以維持 update 流程
+    }
+
+    onStandUpComplete() {
+        const dragon = this.dragon;
+        if (!dragon || dragon.isDead || !this.isActive('lowHpExplosion')) return;
+        dragon.createAreaDamage(
+            dragon.mesh.position.clone(),
+            CONFIG.buffs.lowHpExplosionRadius,
+            CONFIG.buffs.lowHpExplosionDamage,
+            0xffaa00,
+            { stagger: 100 }
+        );
     }
 
     _updateComboFormDecor(dt, dragon) {

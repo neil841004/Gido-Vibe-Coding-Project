@@ -217,6 +217,12 @@ class Gidora {
         if (this.buffSystem.isActive('stationaryShield') && this.stationaryTimer >= CONFIG.buffs.stationaryShieldDelay) {
             finalAmount *= CONFIG.buffs.stationaryShieldMultiplier;
         }
+        finalAmount *= this.buffSystem.getDefenseMultiplier();
+
+        const isStaggered = this.staggerValue > 0 || this.fallTimer > 0 || this.standUpTimer > 0;
+        if (isStaggered) {
+            finalAmount *= 1 + CONFIG.stagger.staggeredDamageBonusPct;
+        }
 
         finalAmount = Math.max(0, finalAmount);
         this.damageFlashTimer = 0.2;
@@ -227,7 +233,7 @@ class Gidora {
         if (sourcePos && this.mesh.position) {
             const dir = this.mesh.position.clone().sub(sourcePos).normalize();
             dir.y = 0;
-            const force = (knockbackForce !== undefined) ? knockbackForce : finalAmount * 0.2;
+            const force = (knockbackForce !== undefined) ? knockbackForce : finalAmount * CONFIG.combat.knockbackBase;
             this.knockbackVel.add(dir.multiplyScalar(force));
         }
 
@@ -1465,6 +1471,8 @@ class Gidora {
     }
 
     createHitbox(pos, radius, damage, duration, isTail, color, options = {}) {
+        const hitKnockback = (isTail ? CONFIG.combat.tailMeleeKnockback : CONFIG.combat.meleeKnockback)
+            * this.buffSystem.getKnockbackMultiplier();
         const ringGeo = new THREE.RingGeometry(0.5, radius, 32);
         ringGeo.rotateX(-Math.PI / 2);
         const ringMat = new THREE.MeshBasicMaterial({ color, side: THREE.DoubleSide, transparent: true, opacity: 0.8 });
@@ -1502,7 +1510,7 @@ class Gidora {
                     state.enemyManager.enemies.forEach(e => {
                         if (e.isDead || this.hitList.has(e)) return;
                         if (e.mesh.position.distanceTo(ring.position) < radius + 0.5) {
-                            e.takeDamage(damage, owner.mesh.position, isTail ? 15 : 10);
+                            e.takeDamage(damage, owner.mesh.position, hitKnockback);
                             if (e.addStagger) {
                                 const baseStagger = options.stagger || (options.heavy ? 35 : 0);
                                 const heavyBonus = options.heavy ? damage * CONFIG.combat.heavyStaggerBonusScale : 0;
@@ -1514,7 +1522,7 @@ class Gidora {
                             if (!isTail && !options.noRecoil) {
                                 const recoilDir = owner.mesh.position.clone().sub(e.mesh.position).normalize();
                                 recoilDir.y = 0;
-                                owner.knockbackVel.add(recoilDir.multiplyScalar(4));
+                                owner.knockbackVel.add(recoilDir.multiplyScalar(CONFIG.combat.headRecoilForce));
                             }
                         }
                     });
@@ -1524,7 +1532,7 @@ class Gidora {
                 state.dragons.forEach(d => {
                     if (!d || d === owner || d.isDead || this.hitList.has(d)) return;
                     if (d.intersectsHitCircle && d.intersectsHitCircle(ring.position, radius)) {
-                        d.takeDamage(damage, owner.mesh.position, isTail ? 15 : 10);
+                        d.takeDamage(damage, owner.mesh.position, hitKnockback);
                         if (options.heavy && d.addStagger) {
                             d.addStagger(damage * CONFIG.combat.heavyStaggerBonusScale, ring.position);
                         }
@@ -1534,7 +1542,7 @@ class Gidora {
                         if (!isTail && !options.noRecoil) {
                             const recoilDir = owner.mesh.position.clone().sub(d.mesh.position).normalize();
                             recoilDir.y = 0;
-                            owner.knockbackVel.add(recoilDir.multiplyScalar(4));
+                            owner.knockbackVel.add(recoilDir.multiplyScalar(CONFIG.combat.headRecoilForce));
                         }
                     }
                 });
@@ -1550,7 +1558,7 @@ class Gidora {
                             if (!isTail && !options.noRecoil) {
                                 const recoilDir = owner.mesh.position.clone().sub(block.mesh.position).normalize();
                                 recoilDir.y = 0;
-                                owner.knockbackVel.add(recoilDir.multiplyScalar(5));
+                                owner.knockbackVel.add(recoilDir.multiplyScalar(CONFIG.combat.blockRecoilForce));
                             }
                         }
                     });
@@ -1594,7 +1602,8 @@ class Gidora {
         const bullet = new Bullet(playerIndex, startPos, dir, CONFIG.combat.fireballSpeed, 1.4, 0, CONFIG.combat.fireballProjectileSize * sizeScale, {
             damage,
             color: this.colors[playerIndex],
-            knockback: isHeavy ? 24 : 16,
+            knockback: (isHeavy ? CONFIG.combat.fireballHeavyKnockback : CONFIG.combat.fireballKnockback)
+                * this.buffSystem.getKnockbackMultiplier(),
             penetration: 0
         });
         bullet.attackerDragon = this;
@@ -1931,7 +1940,9 @@ class Gidora {
         this._hideSpecialComboFX();
     }
 
-    applyComboAreaDamage(center, radius, damage, color, knockback = 18, stagger = 70) {
+    applyComboAreaDamage(center, radius, damage, color, knockback, stagger = 70) {
+        const baseKnockback = (knockback === undefined) ? CONFIG.combo.defaultAreaKnockback : knockback;
+        knockback = baseKnockback * this.buffSystem.getKnockbackMultiplier();
         const origin = center.clone();
         origin.y = 0.1;
         if (state.enemyManager) {
@@ -2747,7 +2758,10 @@ class Gidora {
             this.mesh.rotation.x = THREE.MathUtils.lerp(this.standUpStartRotationX, 0, ease);
             this.velocity.multiplyScalar(Math.max(0, 1 - 10 * dt));
             this.knockbackVel.set(0, 0, 0);
-            if (this.standUpTimer <= 0) this.mesh.rotation.x = 0;
+            if (this.standUpTimer <= 0) {
+                this.mesh.rotation.x = 0;
+                if (this.buffSystem && this.buffSystem.onStandUpComplete) this.buffSystem.onStandUpComplete();
+            }
             return;
         } else if (Math.abs(this.mesh.rotation.x) > 0.001) {
             this.mesh.rotation.x = THREE.MathUtils.lerp(this.mesh.rotation.x, 0, dt * 8);

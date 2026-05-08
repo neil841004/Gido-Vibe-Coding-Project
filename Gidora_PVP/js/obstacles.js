@@ -8,11 +8,14 @@ class LevelManager {
         this.scene = scene;
         this.blocks = [];
         this.healItems = [];
+        this.mysteryBoxes = [];
         this.generatedChunks = new Set();
         this.healItemTimer = 0;
+        this.mysteryBoxTimer = 0;
         this.arenaVisuals = [];
         this.createArenaVisuals();
         this.resetHealItemTimer();
+        this.resetMysteryBoxTimer();
         this.generateLevel();
     }
 
@@ -23,10 +26,15 @@ class LevelManager {
         if (this.healItems) {
             this.healItems.forEach(item => this.disposeHealItem(item));
         }
+        if (this.mysteryBoxes) {
+            this.mysteryBoxes.forEach(item => this.disposeMysteryBox(item));
+        }
         this.blocks = [];
         this.healItems = [];
+        this.mysteryBoxes = [];
         this.generatedChunks.clear();
         this.resetHealItemTimer();
+        this.resetMysteryBoxTimer();
         this.generateAroundPosition(new THREE.Vector3(0, 0, 0));
     }
 
@@ -243,6 +251,7 @@ class LevelManager {
             }
         });
         this.updateHealItems(dt);
+        this.updateMysteryBoxes(dt);
     }
 
     createArenaVisuals() {
@@ -400,6 +409,101 @@ class LevelManager {
     }
 
     disposeHealItem(item) {
+        if (!item || !item.group) return;
+        if (item.group.parent) this.scene.remove(item.group);
+        item.group.traverse(obj => {
+            if (obj.geometry) obj.geometry.dispose();
+            if (obj.material) obj.material.dispose();
+        });
+    }
+
+    spawnInitialMysteryBoxes() {
+        const levelCfg = CONFIG.level;
+        const target = Math.min(levelCfg.mysteryBoxInitialCount || 0, levelCfg.mysteryBoxMaxCount);
+        for (let i = this.mysteryBoxes.length; i < target; i++) {
+            const pos = this.findHealItemSpawnPosition();
+            if (!pos) break;
+            this.spawnMysteryBox(pos);
+        }
+    }
+
+    resetMysteryBoxTimer() {
+        const levelCfg = CONFIG.level;
+        this.mysteryBoxTimer = levelCfg.mysteryBoxSpawnIntervalMin + Math.random() * levelCfg.mysteryBoxSpawnIntervalRand;
+    }
+
+    updateMysteryBoxes(dt) {
+        const levelCfg = CONFIG.level;
+        this.mysteryBoxTimer -= dt;
+        if (this.mysteryBoxTimer <= 0) {
+            this.resetMysteryBoxTimer();
+            if (this.mysteryBoxes.length < levelCfg.mysteryBoxMaxCount) {
+                const pos = this.findHealItemSpawnPosition();
+                if (pos) this.spawnMysteryBox(pos);
+            }
+        }
+
+        for (let i = this.mysteryBoxes.length - 1; i >= 0; i--) {
+            const item = this.mysteryBoxes[i];
+            if (!item || item.isDead) continue;
+            item.life += dt;
+            item.group.rotation.y += dt * 1.4;
+            item.group.position.y = 0.85 + Math.sin(item.life * 3.2) * 0.12;
+
+            const pickupRadiusSq = levelCfg.mysteryBoxPickupRadius * levelCfg.mysteryBoxPickupRadius;
+            const picker = (state.dragons || []).find(dragon => {
+                if (!dragon || dragon.isDead || !dragon.mesh.visible) return false;
+                const dx = dragon.mesh.position.x - item.group.position.x;
+                const dz = dragon.mesh.position.z - item.group.position.z;
+                return dx * dx + dz * dz <= pickupRadiusSq;
+            });
+            if (!picker) continue;
+
+            this.spawnHealBurst(item.group.position.clone(), 0xffe066);
+            item.isDead = true;
+            this.disposeMysteryBox(item);
+            this.mysteryBoxes.splice(i, 1);
+            if (typeof state.onMysteryBoxPickup === 'function') {
+                state.onMysteryBoxPickup(picker);
+            }
+        }
+    }
+
+    spawnMysteryBox(pos) {
+        const group = new THREE.Group();
+        group.position.set(pos.x, 0.85, pos.z);
+
+        const cubeMat = new THREE.MeshBasicMaterial({ color: 0xb55cff, transparent: true, opacity: 0.9 });
+        const cube = new THREE.Mesh(new THREE.BoxGeometry(0.85, 0.85, 0.85), cubeMat);
+        group.add(cube);
+
+        const edgeGeo = new THREE.EdgesGeometry(cube.geometry);
+        const edgeMat = new THREE.LineBasicMaterial({ color: 0xfff2a6 });
+        const edges = new THREE.LineSegments(edgeGeo, edgeMat);
+        group.add(edges);
+
+        const qMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+        const top = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.10, 0.04), qMat);
+        const right = new THREE.Mesh(new THREE.BoxGeometry(0.10, 0.18, 0.04), qMat.clone());
+        const mid = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.10, 0.04), qMat.clone());
+        const stem = new THREE.Mesh(new THREE.BoxGeometry(0.10, 0.18, 0.04), qMat.clone());
+        const dot = new THREE.Mesh(new THREE.BoxGeometry(0.10, 0.10, 0.04), qMat.clone());
+        top.position.set(0, 0.30, 0.44);
+        right.position.set(0.13, 0.16, 0.44);
+        mid.position.set(-0.04, 0.02, 0.44);
+        stem.position.set(-0.04, -0.14, 0.44);
+        dot.position.set(-0.04, -0.34, 0.44);
+        group.add(top); group.add(right); group.add(mid); group.add(stem); group.add(dot);
+
+        this.scene.add(group);
+        this.mysteryBoxes.push({
+            group,
+            life: Math.random() * Math.PI * 2,
+            isDead: false
+        });
+    }
+
+    disposeMysteryBox(item) {
         if (!item || !item.group) return;
         if (item.group.parent) this.scene.remove(item.group);
         item.group.traverse(obj => {

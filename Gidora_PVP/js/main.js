@@ -170,13 +170,17 @@ function clearTransientBattleObjects() {
 function resetLevelForBattle() {
     if (!state.levelManager || !state.levelManager.generateLevel) return;
     state.levelManager.generateLevel();
+    if (state.levelManager.spawnInitialMysteryBoxes) {
+        state.levelManager.spawnInitialMysteryBoxes();
+    }
 }
 
 function getRandomBuffCount(setting) {
     if (setting === -1) {
-        const minRandomBuffs = Math.min(3, CONFIG.pvp.maxBuffsPerDragon);
-        const randomRange = CONFIG.pvp.maxBuffsPerDragon - minRandomBuffs + 1;
-        return minRandomBuffs + Math.floor(Math.random() * Math.max(1, randomRange));
+        const minRandomBuffs = Math.min(CONFIG.pvp.randomBuffCountMin, CONFIG.pvp.maxBuffsPerDragon);
+        const maxRandomBuffs = Math.min(CONFIG.pvp.randomBuffCountMax, CONFIG.pvp.maxBuffsPerDragon);
+        const range = Math.max(1, maxRandomBuffs - minRandomBuffs + 1);
+        return minRandomBuffs + Math.floor(Math.random() * range);
     }
     return THREE.MathUtils.clamp(Number(setting) || 0, 0, CONFIG.pvp.maxBuffsPerDragon);
 }
@@ -223,6 +227,14 @@ function enterPvpBattle() {
     ensureEnemyDragon();
     clearTransientBattleObjects();
     resetLevelForBattle();
+    if (state.mysteryBox) {
+        state.mysteryBox.active = false;
+        state.mysteryBox.dragonIndex = -1;
+        state.mysteryBox.rolledBuffId = null;
+    }
+    state.mysteryBoxQueue = [];
+    const overlay = document.getElementById('mystery-box-overlay');
+    if (overlay) overlay.style.display = 'none';
     state.pve.active = false;
     state.pve.configuring = false;
     state.spawnerEnabled = false;
@@ -247,6 +259,14 @@ function enterPveBattle() {
     ensureEnemyDragon();
     clearTransientBattleObjects();
     resetLevelForBattle();
+    if (state.mysteryBox) {
+        state.mysteryBox.active = false;
+        state.mysteryBox.dragonIndex = -1;
+        state.mysteryBox.rolledBuffId = null;
+    }
+    state.mysteryBoxQueue = [];
+    const overlay = document.getElementById('mystery-box-overlay');
+    if (overlay) overlay.style.display = 'none';
     state.spawnerEnabled = false;
     state.hpDecayEnabled = false;
     state.dummyEnabled = false;

@@ -393,10 +393,42 @@ class MeatChunk {
     }
 }
 
+function tryReflectOnLeafShields(bullet) {
+    if (bullet.markedForDeletion || !bullet.mesh) return;
+    const dragons = state.dragons || [];
+    for (const dragon of dragons) {
+        if (!dragon || dragon.isDead) continue;
+        if (bullet.attackerDragon === dragon) continue;
+        if (!dragon.buffSystem || !dragon.buffSystem.findLeafShieldHit) continue;
+        const leaf = dragon.buffSystem.findLeafShieldHit(bullet.mesh.position);
+        if (!leaf) continue;
+
+        const speed = bullet.velocity.length() || bullet.speed || 16;
+        const dir = bullet.velocity.clone();
+        if (dir.lengthSq() < 0.001) {
+            dir.copy(bullet.mesh.position).sub(dragon.mesh.position);
+        }
+        if (dir.lengthSq() < 0.001) dir.set(0, 0, 1);
+        dir.negate().normalize();
+        bullet.velocity.copy(dir.multiplyScalar(speed));
+        bullet.direction.copy(dir);
+        bullet.attackerDragon = dragon;
+        bullet.owner = 'reflected';
+        bullet.isEnemy = false;
+        bullet.hitEntities = new Set();
+        bullet.mesh.position.add(dir.clone().multiplyScalar(0.4));
+        if (bullet.mesh.material && bullet.mesh.material.color) {
+            bullet.mesh.material.color.setHex(0x99ff55);
+        }
+        return;
+    }
+}
+
 function updateBullets(dt) {
     for (let i = state.bullets.length - 1; i >= 0; i--) {
         const b = state.bullets[i];
         b.update(dt);
+        tryReflectOnLeafShields(b);
         if (b.markedForDeletion) {
             b.destroy();
             state.bullets.splice(i, 1);
