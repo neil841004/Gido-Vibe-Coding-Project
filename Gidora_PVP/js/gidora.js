@@ -119,6 +119,11 @@ class Gidora {
         this.comboState = 'idle';
         this.comboTargetPos = new THREE.Vector3();
         this.pteroDropVelocity = 0;
+        this.rushTarget = null;
+        this.rushHitCount = 0;
+        this.rushHitTimer = 0;
+        this.rushWasHidden = false;
+        this.refractBeamSegments = [];
         this.comboVines = [];
 
         this.cooldowns = { p1: 0, p2: 0, p3: 0, p4: 0 };
@@ -793,8 +798,7 @@ class Gidora {
                 }
                 this.tailGroup.rotation.x = THREE.MathUtils.lerp(this.tailGroup.rotation.x, 0, dt * 8);
                 if (this.attackTimers[p] <= 0) {
-                    this.attackStates[p] = 'idle';
-                    this.tailGroup.rotation.x = 0;
+                    this.finishTailRecovery();
                 }
             } else {
                 this.hideChargeIndicator(p);
@@ -994,6 +998,9 @@ class Gidora {
         if (this.activeComboForm === 'flora' && this.beamPhase !== 'idle') {
             return this.isPlayerMeleeBusy(playerIndex);
         }
+        if (this.activeComboForm === 'rush' && this.beamPhase === 'firing' && this.comboState === 'rushDash') {
+            return this.isPlayerMeleeBusy(playerIndex);
+        }
         return this.input[playerIndex].charge || this.isPlayerMeleeBusy(playerIndex);
     }
 
@@ -1028,6 +1035,9 @@ class Gidora {
 
     startAttackPress(playerIndex) {
         if (this.attackStates[playerIndex] !== 'idle') {
+            if (playerIndex === 'p4' && this.attackStates.p4 === 'recovery') {
+                this.recoveryBufferedPress.p4 = true;
+            }
             if (this.canChargeAttack(playerIndex) &&
                 (this.attackStates[playerIndex] === 'strike' || this.attackStates[playerIndex] === 'recovery')) {
                 this.recoveryBufferedPress[playerIndex] = true;
@@ -1117,6 +1127,24 @@ class Gidora {
         this.attackTimers[playerIndex] = 0;
         this.attackReleaseQueued[playerIndex] = false;
         this.attackImpactDone[playerIndex] = false;
+        if (this.recoveryBufferedPress[playerIndex] && this.input[playerIndex].attack) {
+            this.cooldowns[playerIndex] = 0;
+            this.recoveryBufferedPress[playerIndex] = false;
+            this.startAttackPress(playerIndex);
+        } else {
+            this.recoveryBufferedPress[playerIndex] = false;
+        }
+    }
+
+    finishTailRecovery() {
+        const playerIndex = 'p4';
+        this.attackStates[playerIndex] = 'idle';
+        this.attackTimers[playerIndex] = 0;
+        this.attackHoldTimers[playerIndex] = 0;
+        this.attackReleaseQueued[playerIndex] = false;
+        this.attackQueuedKinds[playerIndex] = 'light';
+        this.attackImpactDone[playerIndex] = false;
+        if (this.tailGroup) this.tailGroup.rotation.x = 0;
         if (this.recoveryBufferedPress[playerIndex] && this.input[playerIndex].attack) {
             this.cooldowns[playerIndex] = 0;
             this.recoveryBufferedPress[playerIndex] = false;
@@ -1762,6 +1790,12 @@ class Gidora {
         if (this.beamImpactMesh) this.beamImpactMesh.visible = false;
         if (this.beamOriginLight) this.beamOriginLight.intensity = 0;
         if (this.beamImpactLight) this.beamImpactLight.intensity = 0;
+        if (this.refractBeamSegments) {
+            this.refractBeamSegments.forEach(seg => {
+                seg.core.visible = false;
+                seg.glow.visible = false;
+            });
+        }
     }
 
     _clearComboVines() {
@@ -1784,6 +1818,10 @@ class Gidora {
             this.pteroTimerRing.material.opacity = 0;
         }
         this._clearComboVines();
+        if (this.rushWasHidden) {
+            this.mesh.visible = true;
+            this.rushWasHidden = false;
+        }
         this.comboState = 'idle';
     }
 
@@ -1799,8 +1837,12 @@ class Gidora {
             this.startPteroCombo();
             return;
         }
+        if (this.activeComboForm === 'rush') {
+            this.startRushCombo();
+            return;
+        }
 
-        this.activeComboForm = 'beam';
+        if (this.activeComboForm !== 'refractBeam') this.activeComboForm = 'beam';
         this.beamPhase = 'prefire';
         this.beamPreFireTimer = CONFIG.beam.preFireDelay;
         this.beamChargeRing.position.copy(this.mesh.position);
@@ -1857,11 +1899,28 @@ class Gidora {
         this.pteroTimerRing.scale.setScalar(0.01);
     }
 
+    startRushCombo() {
+        this.beamPhase = 'firing';
+        this.comboState = 'rushDash';
+        this.comboTimer = CONFIG.combo.rushDuration;
+        this.rushTarget = null;
+        this.rushHitCount = 0;
+        this.rushHitTimer = 0;
+        this.rushWasHidden = false;
+        this.beamCharge = CONFIG.beam.maxCharge;
+        this.velocity.copy(this.getForwardVector().normalize().multiplyScalar(CONFIG.movement.maxSpeed * CONFIG.combo.rushSpeedMultiplier));
+    }
+
     beginSpecialComboPostfire() {
+        if (this.rushWasHidden) {
+            this.mesh.visible = true;
+            this.rushWasHidden = false;
+        }
         this.beamCharge = 0;
         this.beamPhase = 'postfire';
         this.beamPostFireTimer = CONFIG.beam.postFireDelay;
         this.comboCooldown = this.comboCooldownMax;
+        this.rushTarget = null;
         this._hideSpecialComboFX();
     }
 
@@ -1941,6 +2000,155 @@ class Gidora {
         }
     }
 
+    spawnRushShockwave() {
+        const forward = this.getForwardVector().normalize();
+        const pos = this.mesh.position.clone().add(forward.clone().multiplyScalar(2.2));
+        pos.y = 0.7;
+        const geo = new THREE.TorusGeometry(1.0, 0.045, 6, 28, Math.PI);
+        const mat = new THREE.MeshBasicMaterial({
+            color: 0x9ef7ff,
+            transparent: true,
+            opacity: 0.62,
+            side: THREE.DoubleSide,
+            depthWrite: false
+        });
+        const mesh = new THREE.Mesh(geo, mat);
+        mesh.position.copy(pos);
+        mesh.rotation.x = Math.PI / 2;
+        mesh.rotation.z = -this.mesh.rotation.y;
+        scene.add(mesh);
+        state.particles.push({
+            life: 0.18,
+            maxLife: 0.18,
+            update(dt) {
+                this.life -= dt;
+                const t = 1 - this.life / this.maxLife;
+                mesh.position.add(forward.clone().multiplyScalar(dt * 8));
+                mesh.scale.setScalar(1 + t * 1.2);
+                mesh.material.opacity = Math.max(0, 0.62 * (1 - t));
+                if (this.life <= 0) {
+                    scene.remove(mesh);
+                    mesh.geometry.dispose();
+                    mesh.material.dispose();
+                    return false;
+                }
+                return true;
+            }
+        });
+    }
+
+    findRushComboTarget() {
+        const forward = this.getForwardVector().normalize();
+        const center = this.mesh.position.clone().add(forward.clone().multiplyScalar(CONFIG.combo.rushHitRadius));
+        let best = null;
+        let bestDist = Infinity;
+        const consider = (target) => {
+            if (!target || target.isDead) return;
+            const hit = target.intersectsHitCircle
+                ? target.intersectsHitCircle(center, CONFIG.combo.rushHitRadius)
+                : target.mesh.position.distanceTo(center) <= CONFIG.combo.rushHitRadius + 1.0;
+            if (!hit) return;
+            const dist = target.mesh.position.distanceTo(this.mesh.position);
+            if (dist < bestDist) {
+                best = target;
+                bestDist = dist;
+            }
+        };
+        if (state.enemyManager) state.enemyManager.enemies.forEach(consider);
+        state.dragons.forEach(d => {
+            if (d && d !== this) consider(d);
+        });
+        return best;
+    }
+
+    startRushBarrage(target) {
+        this.rushTarget = target;
+        this.comboState = 'rushBarrage';
+        this.comboTimer = CONFIG.combo.rushBarrageDuration;
+        this.rushHitCount = 0;
+        this.rushHitTimer = 0;
+        this.rushWasHidden = true;
+        this.mesh.visible = false;
+        this.velocity.set(0, 0, 0);
+    }
+
+    updateRushBarrage(dt) {
+        if (!this.rushTarget || this.rushTarget.isDead) {
+            this.beginSpecialComboPostfire();
+            return;
+        }
+
+        this.comboTimer -= dt;
+        if (this.rushTarget.applySlow) this.rushTarget.applySlow(0.05, 0.2);
+        if (this.rushTarget.velocity) this.rushTarget.velocity.set(0, 0, 0);
+        if (this.rushTarget.knockbackVel) this.rushTarget.knockbackVel.set(0, 0, 0);
+        const hitInterval = CONFIG.combo.rushBarrageDuration / Math.max(1, CONFIG.combo.rushBarrageHits);
+        this.rushHitTimer -= dt;
+        while (this.rushHitTimer <= 0 && this.rushHitCount < CONFIG.combo.rushBarrageHits) {
+            this.rushHitTimer += hitInterval;
+            this.rushHitCount += 1;
+            const targetPos = this.rushTarget.mesh.position.clone();
+            const offsets = [
+                new THREE.Vector3(0, 2.8, 0),
+                new THREE.Vector3(2.8, 1.1, 0),
+                new THREE.Vector3(-2.8, 1.1, 0),
+                new THREE.Vector3(0, 1.1, 2.8),
+                new THREE.Vector3(0, 1.1, -2.8)
+            ];
+            const from = targetPos.clone().add(offsets[this.rushHitCount % offsets.length]);
+            from.y = Math.max(0.6, from.y);
+            this.spawnRushAfterimageSlash(from, targetPos);
+            const damage = CONFIG.combo.rushBarrageDamage * this.buffSystem.getComboDamageMultiplier();
+            this.rushTarget.takeDamage(damage, from, CONFIG.combo.rushKnockback);
+            if (this.rushTarget.addStagger) this.rushTarget.addStagger(35, from);
+            this.buffSystem.onEffectiveDamage(damage);
+        }
+
+        if (this.comboTimer <= 0 || this.rushHitCount >= CONFIG.combo.rushBarrageHits) {
+            const back = this.rushTarget.mesh.position.clone().sub(this.getForwardVector().normalize().multiplyScalar(2.2));
+            back.y = 0;
+            this.mesh.position.copy(back);
+            this.beginSpecialComboPostfire();
+        }
+    }
+
+    spawnRushAfterimageSlash(from, to) {
+        const dir = to.clone().sub(from).normalize();
+        const geo = new THREE.BoxGeometry(0.18, 0.18, 2.8);
+        const mat = new THREE.MeshBasicMaterial({
+            color: 0xdfffff,
+            transparent: true,
+            opacity: 0.85,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false
+        });
+        const mesh = new THREE.Mesh(geo, mat);
+        mesh.position.copy(from);
+        mesh.lookAt(to);
+        scene.add(mesh);
+        state.particles.push({
+            life: 0.12,
+            maxLife: 0.12,
+            update(dt) {
+                this.life -= dt;
+                mesh.position.add(dir.clone().multiplyScalar(dt * 40));
+                mesh.material.opacity = Math.max(0, 0.85 * (this.life / this.maxLife));
+                if (this.life <= 0) {
+                    scene.remove(mesh);
+                    mesh.geometry.dispose();
+                    mesh.material.dispose();
+                    return false;
+                }
+                return true;
+            }
+        });
+        const p = new Particle(to.clone().add(new THREE.Vector3(0, 1.2, 0)), 0x9ef7ff);
+        p.life = 0.25;
+        p.maxLife = 0.25;
+        p.mesh.scale.setScalar(0.75);
+        state.particles.push(p);
+    }
+
     updateActiveCombo(dt) {
         if (this.activeComboForm === 'flora') {
             this.updateFloraCombo(dt);
@@ -1948,6 +2156,14 @@ class Gidora {
         }
         if (this.activeComboForm === 'ptero') {
             this.updatePteroCombo(dt);
+            return;
+        }
+        if (this.activeComboForm === 'rush') {
+            this.updateRushCombo(dt);
+            return;
+        }
+        if (this.activeComboForm === 'refractBeam') {
+            this.updateRefractBeam(dt);
             return;
         }
         this.updateBeam(dt);
@@ -2066,6 +2282,249 @@ class Gidora {
             this.applyComboAreaDamage(this.mesh.position, CONFIG.combo.pteroRadius, damage, 0xffaa00, 45, 120);
             this.pulseScale = 1.35;
             this.beginSpecialComboPostfire();
+        }
+    }
+
+    updateRushCombo(dt) {
+        if (this.beamPhase === 'postfire') {
+            this.updateSpecialPostfire(dt);
+            return;
+        }
+        if (this.beamPhase !== 'firing') return;
+
+        if (this.comboState === 'rushBarrage') {
+            this.updateRushBarrage(dt);
+            return;
+        }
+
+        this.comboTimer -= dt;
+        const forward = this.getForwardVector().normalize();
+        this.velocity.copy(forward.multiplyScalar(CONFIG.movement.maxSpeed * CONFIG.combo.rushSpeedMultiplier));
+
+        this.ramShockwaveFxTimer -= dt;
+        if (this.ramShockwaveFxTimer <= 0) {
+            this.ramShockwaveFxTimer = 0.055;
+            this.spawnRushShockwave();
+        }
+
+        const target = this.findRushComboTarget();
+        if (target) {
+            this.startRushBarrage(target);
+            return;
+        }
+        if (this.comboTimer <= 0) this.beginSpecialComboPostfire();
+    }
+
+    _ensureRefractBeamSegments(count) {
+        if (!this.refractBeamSegments) this.refractBeamSegments = [];
+        while (this.refractBeamSegments.length < count) {
+            const geo = new THREE.CylinderGeometry(1, 1, 1, 10);
+            geo.rotateX(Math.PI / 2);
+            geo.translate(0, 0, 0.5);
+            const core = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({
+                color: 0xffffff,
+                transparent: true,
+                opacity: 0,
+                depthWrite: false
+            }));
+            const glow = new THREE.Mesh(geo.clone(), new THREE.MeshBasicMaterial({
+                color: this.colors.beam,
+                transparent: true,
+                opacity: 0,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false
+            }));
+            core.visible = false;
+            glow.visible = false;
+            scene.add(glow);
+            scene.add(core);
+            this.refractBeamSegments.push({ core, glow });
+        }
+        this.refractBeamSegments.forEach((seg, i) => {
+            const active = i < count;
+            seg.core.visible = active;
+            seg.glow.visible = active;
+        });
+    }
+
+    _setRefractBeamSegment(seg, start, end, width, opacity) {
+        const dir = end.clone().sub(start);
+        const len = Math.max(0.01, dir.length());
+        dir.normalize();
+        const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), dir);
+        seg.core.position.copy(start);
+        seg.core.quaternion.copy(q);
+        seg.core.scale.set(width, width, len);
+        seg.core.material.opacity = opacity;
+        seg.glow.position.copy(start);
+        seg.glow.quaternion.copy(q);
+        seg.glow.scale.set(width * 2.6, width * 2.6, len);
+        seg.glow.material.opacity = 0.26 + Math.sin(Date.now() * 0.014) * 0.08;
+    }
+
+    _distancePointToSegment(point, a, b) {
+        const ab = b.clone().sub(a);
+        const denom = Math.max(0.0001, ab.lengthSq());
+        const t = THREE.MathUtils.clamp(point.clone().sub(a).dot(ab) / denom, 0, 1);
+        const closest = a.clone().add(ab.multiplyScalar(t));
+        return point.distanceTo(closest);
+    }
+
+    _isPointNearRefractPath(point, radius, points) {
+        for (let i = 0; i < points.length - 1; i++) {
+            if (this._distancePointToSegment(point, points[i], points[i + 1]) <= radius) return true;
+        }
+        return false;
+    }
+
+    _findRefractBeamTarget(origin, forward, range) {
+        let best = null;
+        let bestScore = Infinity;
+        const consider = (target) => {
+            if (!target || target.isDead || !target.mesh) return;
+            const toTarget = target.mesh.position.clone().sub(origin);
+            const dist = toTarget.length();
+            if (dist <= 0.01 || dist > range) return;
+            const dot = toTarget.clone().normalize().dot(forward);
+            if (dot < -0.12) return;
+            const score = dist - dot * 10;
+            if (score < bestScore) {
+                best = target;
+                bestScore = score;
+            }
+        };
+        if (state.enemyManager) state.enemyManager.enemies.forEach(consider);
+        state.dragons.forEach(d => {
+            if (d && d !== this) consider(d);
+        });
+        return best;
+    }
+
+    _buildRefractBeamPath(origin, forward, range, target) {
+        const count = Math.max(2, CONFIG.combo.refractBeamSegments);
+        const points = [origin.clone()];
+        const step = range / count;
+        let dir = forward.clone().normalize();
+        let current = origin.clone();
+        const targetPos = target && target.mesh ? target.mesh.position.clone() : null;
+        if (targetPos) targetPos.y = 1.2;
+        for (let i = 1; i <= count; i++) {
+            if (targetPos) {
+                const desired = targetPos.clone().sub(current);
+                if (desired.lengthSq() > 0.01) {
+                    dir.lerp(desired.normalize(), CONFIG.combo.refractBeamTurnStrength).normalize();
+                }
+            }
+            const side = new THREE.Vector3(dir.z, 0, -dir.x).normalize();
+            const wobble = Math.sin(Date.now() * 0.006 + i * 1.7) * 0.08 * i;
+            current = current.clone().add(dir.clone().multiplyScalar(step)).add(side.multiplyScalar(wobble));
+            points.push(current.clone());
+        }
+        return points;
+    }
+
+    updateRefractBeam(dt) {
+        const beamCfg = CONFIG.beam;
+        const maxCharge = beamCfg.maxCharge;
+        const beamWidth = beamCfg.width * 0.92;
+        const range = beamCfg.range * CONFIG.combo.refractBeamRangeMultiplier;
+        const now = Date.now();
+
+        if (this.beamPhase === 'prefire') {
+            this.beamCharge = maxCharge;
+            this.beamPreFireTimer -= dt;
+            const progress = 1.0 - (this.beamPreFireTimer / beamCfg.preFireDelay);
+            this.beamChargeRing.position.copy(this.mesh.position);
+            this.beamChargeRing.position.y = 0.2;
+            this.beamChargeRing.material.opacity = 0.55 + Math.sin(progress * 46) * 0.45;
+            this.beamChargeRing.scale.setScalar(0.9 + progress * 1.7);
+            if (this.beamPreFireTimer <= 0) {
+                this.beamPhase = 'firing';
+                this.beamFiringTimer = beamCfg.firingDuration;
+                this.beamDotTimer = 0;
+                this.beamChargeRing.material.opacity = 0;
+                this.beamImpactMesh.visible = true;
+            }
+            return;
+        }
+
+        if (this.beamPhase === 'postfire') {
+            this.updateSpecialPostfire(dt);
+            return;
+        }
+
+        if (this.beamPhase !== 'firing') return;
+        this.beamFiringTimer -= dt;
+        if (this.beamFiringTimer <= 0) {
+            this.beginSpecialComboPostfire();
+            this._hideBeamFX();
+            return;
+        }
+
+        this.beamMesh.visible = false;
+        if (this.beamGlowMesh) this.beamGlowMesh.visible = false;
+        const forward = this.getForwardVector().normalize();
+        const origin = this.mesh.position.clone();
+        origin.y = 1.0;
+        const target = this._findRefractBeamTarget(origin, forward, range);
+        const points = this._buildRefractBeamPath(origin, forward, range, target);
+        this._ensureRefractBeamSegments(points.length - 1);
+        const pulse = 0.78 + Math.sin(now * 0.024) * 0.18;
+        for (let i = 0; i < points.length - 1; i++) {
+            this._setRefractBeamSegment(this.refractBeamSegments[i], points[i], points[i + 1], beamWidth, pulse);
+        }
+
+        const impactPos = points[points.length - 1];
+        if (this.beamImpactMesh) {
+            this.beamImpactMesh.position.copy(impactPos);
+            this.beamImpactMesh.scale.setScalar(beamWidth * (2.1 + Math.sin(now * 0.025) * 0.7));
+            this.beamImpactMesh.material.opacity = 0.68 + Math.sin(now * 0.035) * 0.32;
+        }
+        if (this.beamOriginLight) {
+            this.beamOriginLight.position.copy(origin);
+            this.beamOriginLight.intensity = 2.8 + Math.sin(now * 0.02) * 0.9;
+        }
+        if (this.beamImpactLight) {
+            this.beamImpactLight.position.copy(impactPos);
+            this.beamImpactLight.intensity = 3.8 + Math.sin(now * 0.028) * 1.6;
+        }
+
+        this.beamDotTimer += dt;
+        if (this.beamDotTimer < beamCfg.tickInterval) return;
+        this.beamDotTimer = 0;
+        const damage = beamCfg.damagePerTick * beamCfg.damageScale * this.buffSystem.getComboDamageMultiplier();
+        const hitRadius = beamWidth + 0.25;
+        if (state.enemyManager) {
+            state.enemyManager.enemies.forEach(e => {
+                if (e.isDead) return;
+                if (!this._isPointNearRefractPath(e.mesh.position, hitRadius + 1.2, points)) return;
+                e.takeDamage(damage, origin, CONFIG.beam.tickKnockback);
+                if (e.addStagger) e.addStagger(damage * CONFIG.combo.refractBeamStaggerBonusPct, origin);
+                if (this.buffSystem.isActive('beamSlow') && e.applySlow) {
+                    e.applySlow(CONFIG.buffs.beamSlowFactor, CONFIG.buffs.beamSlowDuration);
+                }
+                this.buffSystem.onEffectiveDamage(damage);
+            });
+        }
+        state.dragons.forEach(d => {
+            if (!d || d === this || d.isDead) return;
+            const hit = d.getHitSpheres
+                ? d.getHitSpheres(CONFIG.hitbox.beamPadding).some(s => this._isPointNearRefractPath(s.pos, hitRadius + s.radius, points))
+                : this._isPointNearRefractPath(d.mesh.position, hitRadius + 1.2, points);
+            if (!hit) return;
+            d.takeDamage(damage, origin, CONFIG.beam.tickKnockback);
+            if (d.addStagger) d.addStagger(damage * CONFIG.combo.refractBeamStaggerBonusPct, origin);
+            if (this.buffSystem.isActive('beamSlow') && d.applySlow) {
+                d.applySlow(CONFIG.buffs.beamSlowFactor, CONFIG.buffs.beamSlowDuration);
+            }
+            this.buffSystem.onEffectiveDamage(damage);
+        });
+        if (state.levelManager) {
+            state.levelManager.blocks.forEach(b => {
+                if (b.isDead || !b.solid) return;
+                if (!this._isPointNearRefractPath(b.mesh.position, hitRadius + 2.0, points)) return;
+                if (state.levelManager.damageBlock(b, damage)) this.buffSystem.onEffectiveDamage(damage);
+            });
         }
     }
 
@@ -2293,6 +2752,7 @@ class Gidora {
         const maxCharge = beamCfg.maxCharge;
         const isBeamActive = (this.beamPhase !== 'idle');
         const isFloraComboActive = this.activeComboForm === 'flora' && this.beamPhase !== 'idle';
+        const isRushComboActive = this.activeComboForm === 'rush' && this.beamPhase === 'firing';
 
         if (isBeamActive) {
             this.cancelAllMeleeForCombo();
@@ -2449,7 +2909,9 @@ class Gidora {
             while (deltaAngle > Math.PI) deltaAngle -= Math.PI * 2;
             while (deltaAngle < -Math.PI) deltaAngle += Math.PI * 2;
 
-            const rotSpeedMult = (this.beamPhase === 'firing' && !isFloraComboActive) ? 0.35 : 1.0;
+            const rotSpeedMult = isRushComboActive
+                ? CONFIG.combo.rushTurnMultiplier
+                : ((this.beamPhase === 'firing' && !isFloraComboActive) ? 0.35 : 1.0);
             const teamworkTurnMult = speedMult > 1.0 ? speedMult : 1.0;
             const rotStep = CONFIG.movement.rotationSpeed * this.buffSystem.getTurnMultiplier() * rotSpeedMult * teamworkTurnMult * dt;
             if (Math.abs(deltaAngle) < rotStep) this.mesh.rotation.y = targetAngle;
@@ -2474,7 +2936,9 @@ class Gidora {
         const forward = this.getForwardVector();
         const isInputting = totalInput.lengthSq() > 0.01;
 
-        if (isBeamActive && !isFloraComboActive) {
+        if (isRushComboActive) {
+            // 爆衝組合技由 updateRushCombo 固定速度，這裡只讓位置積分繼續走。
+        } else if (isBeamActive && !isFloraComboActive) {
             this.velocity.multiplyScalar(Math.max(0, 1 - 20 * dt));
         } else if (isInputting) {
             if (currentSpeed > 0.1) {
@@ -2557,6 +3021,7 @@ class Gidora {
             this.beamMesh, this.beamGlowMesh, this.beamImpactMesh,
             this.beamOriginLight, this.beamImpactLight, this.beamChargeRing,
             this.comboFxGroup, this.pteroComboRing, this.pteroTimerRing,
+            ...((this.refractBeamSegments || []).flatMap(seg => [seg.core, seg.glow])),
             ...Object.values(this.fireballAimArrows || {}),
             ...Object.values(this.flamethrowerIndicators || {})
         ].forEach(obj => {

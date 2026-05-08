@@ -14,6 +14,8 @@ const BUFFS = {
     comboDamage: { name: '組合技傷害 +100%', description: '組合技傷害加倍。', implemented: true, icon: { glyph: 'B', color: '#ff8cff', bg: '#39183c' } },
     comboFlora: { name: '組合技型態：藤蔓掃場', description: '組合技改為長出藤蔓，一段時間內範圍攻擊。', group: 'comboForm', implemented: true, icon: { glyph: 'VN', color: '#b8ff8a', bg: '#173719' } },
     comboPtero: { name: '組合技型態：飛天墜擊', description: '組合技改為飛上天空，瞄準落點後墜落攻擊。', group: 'comboForm', implemented: true, icon: { glyph: 'SK', color: '#fff2a6', bg: '#2f2b12' } },
+    comboRush: { name: '組合技型態：爆衝連擊', description: '組合技改為高速向前爆衝，撞到目標後進入快閃多段攻擊。', group: 'comboForm', implemented: true, icon: { glyph: 'RS', color: '#9ef7ff', bg: '#12373b' } },
+    comboRefractBeam: { name: '組合技型態：折光追獵炮', description: '強化版光束炮，射得更遠，會微微扭曲追向敵人並提高失衡值。', group: 'comboForm', implemented: true, icon: { glyph: 'RB', color: '#e7fbff', bg: '#182a45' } },
     lifeSteal: { name: '有效傷害回血', description: '造成有效傷害時回復少量 HP。', implemented: true, pvpExclude: true, icon: { glyph: 'L', color: '#ff6b7a', bg: '#3d151b' } },
     tailPower: { name: '尾巴攻擊力 +300%', description: '尾巴傷害變為 4 倍。', implemented: true, icon: { glyph: 'T', color: '#60efff', bg: '#12393d' } },
     poisonTrail: { name: '走路留下毒液', description: '毒液殘留 10 秒，緩速並 DOT 敵人。', implemented: true, icon: { glyph: 'P', color: '#8cff5f', bg: '#173a14' } },
@@ -31,7 +33,7 @@ const BUFFS = {
     reflectProjectile: { name: '50% 反彈投射物', description: '有機率反彈敵方投射物。', implemented: true, icon: { glyph: 'R', color: '#b7ffdd', bg: '#12382a' } },
     beamSlow: { name: '光束波緩速', description: '組合技命中時使敵方緩速。', implemented: true, icon: { glyph: 'SL', color: '#b7d7ff', bg: '#17283f' } },
     poisonCloud: { name: '定期毒霧', description: '週期性噴出大範圍 DOT 毒霧。', implemented: true, icon: { glyph: 'C', color: '#78ff8f', bg: '#14351c' } },
-    ramStagger: { name: '高速衝撞', description: '高速移動撞擊敵人，造成大量失衡值。', implemented: true, icon: { glyph: 'R', color: '#66f7ff', bg: '#12373b' } },
+    ramStagger: { name: '高速衝撞', description: '已禁用：此 Buff 不會在 PVP/PVE 抽取，也無法手動啟用。', implemented: false, disabled: true, pvpExclude: true, icon: { glyph: 'R', color: '#ff5a5a', bg: '#3d1010' } },
     staggerImmune: { name: '免疫失衡', description: '不會因失衡跌倒。', implemented: true, icon: { glyph: 'I', color: '#ffffff', bg: '#303030' } },
     stationaryShield: { name: '停止不動護盾', description: '站定後免疫 30% 傷害。', implemented: true, icon: { glyph: 'D', color: '#d8fff5', bg: '#173631' } },
     teamworkRegen: { name: '同心協力回血', description: '同向加速時持續回血。', implemented: true, pvpExclude: true, icon: { glyph: 'H', color: '#73ff9a', bg: '#17351e' } },
@@ -152,6 +154,7 @@ class BuffSystem {
     toggle(id) {
         const cfg = BUFFS[id];
         if (!cfg) return;
+        if (cfg.disabled) return;
 
         if (cfg.stackable) {
             if (this.active.has(id)) this.active.delete(id);
@@ -171,14 +174,14 @@ class BuffSystem {
 
     addStack(id) {
         const cfg = BUFFS[id];
-        if (!cfg || !cfg.stackable) return;
+        if (!cfg || cfg.disabled || !cfg.stackable) return;
         this.active.set(id, (this.active.get(id) || 0) + 1);
         this.refreshPlayerStats();
     }
 
     removeStack(id) {
         const cfg = BUFFS[id];
-        if (!cfg || !cfg.stackable) return;
+        if (!cfg || cfg.disabled || !cfg.stackable) return;
         const next = (this.active.get(id) || 0) - 1;
         if (next > 0) this.active.set(id, next);
         else this.active.delete(id);
@@ -187,7 +190,7 @@ class BuffSystem {
 
     setStack(id, stack) {
         const cfg = BUFFS[id];
-        if (!cfg || !cfg.stackable) return;
+        if (!cfg || cfg.disabled || !cfg.stackable) return;
         const next = Math.max(0, Math.floor(stack));
         if (next > 0) this.active.set(id, next);
         else this.active.delete(id);
@@ -271,6 +274,8 @@ class BuffSystem {
     getComboForm() {
         if (this.isActive('comboFlora')) return 'flora';
         if (this.isActive('comboPtero')) return 'ptero';
+        if (this.isActive('comboRush')) return 'rush';
+        if (this.isActive('comboRefractBeam')) return 'refractBeam';
         return 'beam';
     }
 
@@ -635,28 +640,31 @@ class BuffSystem {
             const up = new THREE.Vector3(0, 1, 0);
             for (let i = 0; i < vineCount; i++) {
                 const vine = new THREE.Group();
-                const baseAngle = (i / vineCount) * Math.PI * 2;
+                const baseAngle = (i / vineCount) * Math.PI * 2 + (Math.random() - 0.5) * 0.55;
                 vine.userData.baseAngle = baseAngle;
                 vine.userData.phase = Math.random() * Math.PI * 2;
 
-                for (let j = 0; j < 3; j++) {
-                    const geo = new THREE.CylinderGeometry(0.035, 0.055, 0.78, 6);
+                for (let j = 0; j < 4; j++) {
+                    const geo = new THREE.CylinderGeometry(0.045, 0.075, 0.5 + Math.random() * 0.24, 7);
                     const mat = new THREE.MeshLambertMaterial({ color: j % 2 === 0 ? 0x2f8f36 : 0x58b84e });
                     const seg = new THREE.Mesh(geo, mat);
-                    const angle = baseAngle + (j - 1) * 0.32;
-                    const xRadius = 1.68 + j * 0.06;
-                    const zRadius = 2.45 + j * 0.08;
+                    const angle = baseAngle + (j - 1.5) * (0.22 + Math.random() * 0.2) + (Math.random() - 0.5) * 0.32;
+                    const xRadius = 1.36 + Math.random() * 0.36;
+                    const zRadius = 2.0 + Math.random() * 0.35;
                     const tangent = new THREE.Vector3(
                         -Math.sin(angle) * xRadius,
-                        0.26 * Math.sin(j + baseAngle),
+                        0.85 * Math.sin(j * 1.9 + baseAngle) + (Math.random() - 0.5) * 0.6,
                         Math.cos(angle) * zRadius
                     ).normalize();
                     seg.quaternion.copy(new THREE.Quaternion().setFromUnitVectors(up, tangent));
                     seg.position.set(
                         Math.cos(angle) * xRadius,
-                        1.28 + j * 0.18,
+                        0.72 + Math.random() * 0.78,
                         Math.sin(angle) * zRadius
                     );
+                    seg.userData.basePosition = seg.position.clone();
+                    seg.userData.baseQuaternion = seg.quaternion.clone();
+                    seg.userData.phase = Math.random() * Math.PI * 2;
                     vine.add(seg);
                 }
                 group.add(vine);
@@ -668,9 +676,17 @@ class BuffSystem {
         const t = Date.now() * 0.003;
         this.objects.comboFloraVines.children.forEach((vine, i) => {
             const baseAngle = vine.userData.baseAngle || 0;
-            const wave = Math.sin(t + (vine.userData.phase || 0)) * 0.08;
-            vine.rotation.y = baseAngle * 0.05 + wave;
-            vine.rotation.x = Math.sin(t * 0.8 + i) * 0.035;
+            const wave = Math.sin(t + (vine.userData.phase || 0)) * 0.13;
+            vine.rotation.y = baseAngle * 0.03 + wave;
+            vine.rotation.x = Math.sin(t * 0.8 + i) * 0.06;
+            vine.children.forEach((seg, j) => {
+                if (!seg.userData.basePosition || !seg.userData.baseQuaternion) return;
+                const phase = seg.userData.phase || 0;
+                seg.position.copy(seg.userData.basePosition);
+                seg.position.y += Math.sin(t * 1.4 + phase) * 0.055;
+                seg.quaternion.copy(seg.userData.baseQuaternion);
+                seg.rotation.y += Math.sin(t * 1.8 + phase + j) * 0.03;
+            });
         });
     }
 

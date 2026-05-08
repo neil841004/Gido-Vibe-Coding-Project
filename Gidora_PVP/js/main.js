@@ -184,7 +184,7 @@ function applyRandomBuffs(dragon, countSetting) {
     dragon.buffSystem.clearAll();
     const count = getRandomBuffCount(countSetting);
     // PVP 模式不抽 pvpExclude 的 Buff（同心協力回血、有效傷害回血）
-    const ids = Object.keys(BUFFS).filter(id => !BUFFS[id].pvpExclude);
+    const ids = Object.keys(BUFFS).filter(id => !BUFFS[id].pvpExclude && !BUFFS[id].disabled);
     const meleeFormIds = ids.filter(id => BUFFS[id].group === 'meleeForm');
     const comboFormIds = ids.filter(id => BUFFS[id].group === 'comboForm');
     for (let i = ids.length - 1; i > 0; i--) {
@@ -414,7 +414,7 @@ if (typeof CpuDragonController === 'function') {
 state.levelManager = new LevelManager(scene);
 state.enemyManager = new EnemyManager(scene);
 
-// 初始就生成一隻 Dummy
+// 依設定決定初始是否生成 Dummy
 if (state.dummyEnabled) {
     state.enemyManager.spawnDummy(state.dragons[0].mesh.position);
 }

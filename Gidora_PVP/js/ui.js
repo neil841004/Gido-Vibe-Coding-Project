@@ -186,14 +186,20 @@ function setupBuffUI() {
         row.style.marginBottom = '4px';
         row.style.borderRadius = '7px';
         row.style.background = cfg.pvpExclude ? 'rgba(180,40,40,0.18)' : 'rgba(255,255,255,0.05)';
-        row.style.cursor = 'pointer';
+        row.style.cursor = cfg.disabled ? 'not-allowed' : 'pointer';
+        row.style.opacity = cfg.disabled ? '0.72' : '1';
         row.classList.toggle('buff-incomplete', !isBuffImplemented(id));
 
         const input = document.createElement('input');
         input.type = 'checkbox';
         input.dataset.buffId = id;
+        input.disabled = !!cfg.disabled;
         input.style.marginTop = '3px';
         input.addEventListener('change', () => {
+            if (cfg.disabled) {
+                input.checked = false;
+                return;
+            }
             const dragon = getBuffTargetDragon();
             if (!dragon || !dragon.buffSystem) return;
             if (cfg.stackable) {
@@ -317,9 +323,13 @@ function refreshBuffUI() {
         const stack = dragon && dragon.buffSystem ? dragon.buffSystem.getStack(id) : 0;
         input.checked = stack > 0;
         const isPvpExclude = !!(BUFFS[id] && BUFFS[id].pvpExclude);
+        const isDisabled = !!(BUFFS[id] && BUFFS[id].disabled);
         row.style.background = stack > 0
             ? (isPvpExclude ? 'rgba(200,60,60,0.30)' : 'rgba(84, 255, 175, 0.16)')
             : (isPvpExclude ? 'rgba(180,40,40,0.18)' : 'rgba(255,255,255,0.05)');
+        row.style.cursor = isDisabled ? 'not-allowed' : 'pointer';
+        row.style.opacity = isDisabled ? '0.72' : '1';
+        input.disabled = isDisabled;
         title.textContent = BUFFS[id].name + (BUFFS[id].stackable && stack > 0 ? ` x${stack}` : '');
         title.style.color = isBuffImplemented(id) ? '#ffffff' : '#ff5a5a';
     });
@@ -1317,7 +1327,11 @@ function updateChargeBarForDragon(dragon, ids, dragonLabel, palette) {
 
     const formLabel = dragon && dragon.activeComboForm === 'flora'
         ? '藤蔓掃場'
-        : (dragon && dragon.activeComboForm === 'ptero' ? '飛天墜擊' : '光束炮');
+        : (dragon && dragon.activeComboForm === 'ptero'
+            ? '飛天墜擊'
+            : (dragon && dragon.activeComboForm === 'rush'
+                ? '爆衝連擊'
+                : (dragon && dragon.activeComboForm === 'refractBeam' ? '折光追獵炮' : '光束炮')));
 
     if (!dragon) {
         label.textContent = `Dragon ${dragonLabel} 蓄力 0%`;

@@ -101,7 +101,7 @@ const CONFIG = {
         heavyRadiusScale: 1.4,             // 蓄力攻擊範圍倍率
         chargeAimRadius: 6.0,               // 保留用蓄力瞄準最大半徑
         chargeDefaultDistance: 4.2,         // 蓄力落點與身體的固定距離
-        chargeAimHalfAngle: Math.PI / 3.5,    // 每顆頭可瞄準扇形半角，Math.PI / 4 = 45 度
+        chargeAimHalfAngle: Math.PI / 3,    // 每顆頭可瞄準扇形半角，Math.PI / 4 = 45 度
         strikeTime: 0.16,                   // 頭部從後方向前攻擊的動畫秒數
         fireballDamageScale: 1.2,           // 火球型態傷害倍率
         fireballHeavyDamageScale: 1.35,     // 噴火球型態蓄力完成後額外傷害倍率
@@ -118,7 +118,7 @@ const CONFIG = {
         shockwaveRadius: 3.3,               // 蓄力震波 Buff 的震波半徑
         shockwaveDamageScale: 0.8,          // 蓄力震波 Buff 的震波傷害倍率
         // P4 尾巴蓄力攻擊
-        tailChargeTime: 0.8,                // P4 蓄力所需按住秒數（比頭部 chargeTime 0.4s 更長）
+        tailChargeTime: 0.4,                // P4 蓄力所需按住秒數（比頭部 chargeTime 0.4s 更長）
         tailSweepDuration: 0.45,            // P4 蓄力重擊旋轉橫掃的動畫持續秒數
         tailSweepRadius: 5,               // P4 尾巴橫掃攻擊半徑
         tailSweepDamageScale: 2.1,          // P4 蓄力橫掃傷害倍率（疊加在 meleeDamage 與 tailPower 之上）
@@ -217,7 +217,20 @@ const CONFIG = {
         pteroFlySpeed: 70.0,    // 飛天墜擊 Buff：起飛速度，世界座標/秒
         pteroDropSpeed: 90.0,   // 飛天墜擊 Buff：下墜加速度，世界座標/秒平方
         pteroRadius: 10.0,      // 飛天墜擊 Buff：落地傷害半徑
-        pteroDamage: 140        // 飛天墜擊 Buff：落地基礎傷害
+        pteroDamage: 170,       // 飛天墜擊 Buff：落地基礎傷害
+        rushDuration: 7.0,      // 爆衝連擊 Buff：最多向前衝刺秒數
+        rushSpeedMultiplier: 1.5, // 爆衝連擊 Buff：相對基礎最高速度的固定衝刺倍率
+        rushTurnMultiplier: 2.0,  // 爆衝連擊 Buff：衝刺期間轉向速度倍率
+        rushHitRadius: 2.2,       // 爆衝連擊 Buff：前方撞擊偵測半徑
+        rushBarrageDuration: 1.8, // 爆衝連擊 Buff：命中後快閃演出秒數
+        rushBarrageHits: 10,       // 爆衝連擊 Buff：快閃演出多段攻擊次數
+        rushBarrageDamage: 24,    // 爆衝連擊 Buff：每段快閃基礎傷害
+        rushBarrageRadius: 1.8,   // 爆衝連擊 Buff：快閃傷害落點半徑
+        rushKnockback: 60,        // 爆衝連擊 Buff：每段快閃擊退力
+        refractBeamRangeMultiplier: 1.65, // 折光追獵炮 Buff：相對光束炮的射程倍率
+        refractBeamTurnStrength: 0.45,    // 折光追獵炮 Buff：光束朝目標彎曲的強度
+        refractBeamSegments: 7,           // 折光追獵炮 Buff：扭曲光束視覺分段數
+        refractBeamStaggerBonusPct: 0.5   // 折光追獵炮 Buff：額外失衡值比例
     },
 
     // -----------------------------------------------------------------
@@ -277,7 +290,7 @@ const CONFIG = {
         teamworkRegenPerSecond: 25,        // 同心協力回血 Buff：每秒回血量
         lowHpExplosionDamage: 180,        // 半血爆炸 Buff：爆炸傷害
         lowHpExplosionRadius: 15,         // 半血爆炸 Buff：爆炸半徑
-        comboFloraDecorVineCount: 4,      // 藤蔓掃場型態 Buff：身體周圍點綴藤蔓數量
+        comboFloraDecorVineCount: 3,      // 藤蔓掃場型態 Buff：身體周圍點綴藤蔓數量
         comboPteroWingScale: 1.2,         // 飛天墜擊型態 Buff：小翅膀視覺尺寸倍率
         visualOrbitRadius: 2.8,           // Buff 視覺標記繞角色旋轉半徑
         visualPulseInterval: 0.35,        // Buff 持續粒子特效生成間隔秒數
@@ -448,8 +461,8 @@ const state = {
     // 全場 HP 倒扣（仍綁在 Spawner 開關，PVP 模式內不啟用）
     hpDecayEnabled: false,
 
-    // Phase 1: Dummy 開關狀態 (true = 場上有 Dummy)
-    dummyEnabled: true,
+    // Dummy 開關狀態 (true = 場上有 Dummy)，初始預設關閉
+    dummyEnabled: false,
 
     // 一般敵人 Spawner 開關（PVP 模式時禁用，Mode 切換時自動關閉）
     spawnerEnabled: false,
