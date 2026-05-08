@@ -383,9 +383,11 @@ function setupInputs() {
         if (state.pvp && state.pvp.configuring) return;
         if (state.pvp && state.pvp.active && state.pvp.startCountdownTimer > 0) return;
         if (state.pvp && state.pvp.active) {
-            const pveTestKb = state.pve && state.pve.active && state.pve.testKeyboardEnabled;
-            if (pveTestKb) {
+            const testKeyboard = !!state.pvp.disableKeyboard;
+            if (testKeyboard) {
+                // 啟用鍵鼠測試：鍵盤直接控制 Dragon A 全部位，手把仍依 overlay 指派生效
                 applyKeyboardTestControlsForPveDragonA();
+                applyPvpControls(gamepads);
             } else {
                 applyPvpControls(gamepads);
                 if (!state.pve || !state.pve.active) applyKeyboardDebugControlsForPvp();

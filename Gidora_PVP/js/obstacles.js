@@ -66,6 +66,9 @@ class LevelManager {
         const chunkCenterZ = chunkZ * levelCfg.chunkSize;
         const blockBoxes = this.getExistingBoxesNearChunk(chunkX, chunkZ);
 
+        // 河道優先生成，後續障礙物會自動避開
+        this.generateRiversForChunk(chunkX, chunkZ, blockBoxes);
+
         specs.forEach(spec => {
             let attempts = 0;
             let generated = 0;
@@ -73,15 +76,16 @@ class LevelManager {
                 attempts++;
 
                 const isPatch = spec.type === 'slime' || spec.type === 'fire';
-                const sx = isPatch
-                    ? levelCfg.patchSizeMin + Math.random() * levelCfg.patchSizeRand
-                    : levelCfg.solidSizeMin + Math.random() * levelCfg.solidSizeRand;
-                const sy = isPatch
-                    ? levelCfg.patchHeight
-                    : levelCfg.solidHeightMin + Math.random() * levelCfg.solidHeightRand;
-                const sz = isPatch
-                    ? levelCfg.patchSizeMin + Math.random() * levelCfg.patchSizeRand
-                    : levelCfg.solidSizeMin + Math.random() * levelCfg.solidSizeRand;
+                let sx, sy, sz;
+                if (isPatch) {
+                    sx = levelCfg.patchSizeMin + Math.random() * levelCfg.patchSizeRand;
+                    sy = levelCfg.patchHeight;
+                    sz = levelCfg.patchSizeMin + Math.random() * levelCfg.patchSizeRand;
+                } else {
+                    sx = levelCfg.solidSizeMin + Math.random() * levelCfg.solidSizeRand;
+                    sy = levelCfg.solidHeightMin + Math.random() * levelCfg.solidHeightRand;
+                    sz = levelCfg.solidSizeMin + Math.random() * levelCfg.solidSizeRand;
+                }
                 const x = chunkCenterX + (Math.random() - 0.5) * levelCfg.chunkSize;
                 const z = chunkCenterZ + (Math.random() - 0.5) * levelCfg.chunkSize;
 
@@ -104,6 +108,80 @@ class LevelManager {
                 generated++;
             }
         });
+    }
+
+    makeRiverBox(x, z, sx, sz) {
+        const levelCfg = CONFIG.level;
+        const box = new THREE.Box3();
+        box.min.set(x - sx / 2 - levelCfg.spacingPadding, 0, z - sz / 2 - levelCfg.spacingPadding);
+        box.max.set(x + sx / 2 + levelCfg.spacingPadding, levelCfg.riverHeight, z + sz / 2 + levelCfg.spacingPadding);
+        return box;
+    }
+
+    isRiverSegmentValid(x, z, sx, sz, blockBoxes, ignoreBox = null) {
+        const levelCfg = CONFIG.level;
+        if (x * x + z * z < levelCfg.safeRadius * levelCfg.safeRadius) return false;
+        if (!this.isInsideArenaXZ(x, z, Math.max(sx, sz) * 0.5 + levelCfg.arenaSpawnMargin)) return false;
+        const box = this.makeRiverBox(x, z, sx, sz);
+        for (let other of blockBoxes) {
+            if (other === ignoreBox) continue;
+            if (box.intersectsBox(other)) return false;
+        }
+        return true;
+    }
+
+    generateRiversForChunk(chunkX, chunkZ, blockBoxes) {
+        const levelCfg = CONFIG.level;
+        const chunkCenterX = chunkX * levelCfg.chunkSize;
+        const chunkCenterZ = chunkZ * levelCfg.chunkSize;
+        const sy = levelCfg.riverHeight;
+        let placed = 0;
+        let attempts = 0;
+        const maxAttempts = levelCfg.maxAttemptsPerType;
+
+        while (placed < levelCfg.riverCount && attempts < maxAttempts) {
+            attempts++;
+            const long = levelCfg.riverLengthMin + Math.random() * levelCfg.riverLengthRand;
+            const wide = levelCfg.riverWidthMin + Math.random() * levelCfg.riverWidthRand;
+            const horizontal = Math.random() < 0.5;
+            const sx1 = horizontal ? long : wide;
+            const sz1 = horizontal ? wide : long;
+            const x1 = chunkCenterX + (Math.random() - 0.5) * levelCfg.chunkSize;
+            const z1 = chunkCenterZ + (Math.random() - 0.5) * levelCfg.chunkSize;
+            if (!this.isRiverSegmentValid(x1, z1, sx1, sz1, blockBoxes)) continue;
+
+            const wantL = Math.random() < levelCfg.riverLShapeChance;
+            let secondSeg = null;
+            if (wantL) {
+                const long2 = levelCfg.riverLengthMin + Math.random() * levelCfg.riverLengthRand;
+                const sx2 = horizontal ? wide : long2;
+                const sz2 = horizontal ? long2 : wide;
+                const endSign = Math.random() < 0.5 ? -1 : 1;
+                const sideSign = Math.random() < 0.5 ? -1 : 1;
+                let x2, z2;
+                if (horizontal) {
+                    x2 = x1 + endSign * (sx1 / 2 - wide / 2);
+                    z2 = z1 + sideSign * (long2 / 2 - wide / 2);
+                } else {
+                    x2 = x1 + sideSign * (long2 / 2 - wide / 2);
+                    z2 = z1 + endSign * (sz1 / 2 - wide / 2);
+                }
+                const box1 = this.makeRiverBox(x1, z1, sx1, sz1);
+                if (this.isRiverSegmentValid(x2, z2, sx2, sz2, blockBoxes, box1)) {
+                    secondSeg = { x: x2, z: z2, sx: sx2, sz: sz2 };
+                }
+            }
+
+            const block1 = this.createBlock('river', sx1, sy, sz1, x1, z1, chunkX, chunkZ);
+            this.blocks.push(block1);
+            blockBoxes.push(this.makeRiverBox(x1, z1, sx1, sz1));
+            if (secondSeg) {
+                const block2 = this.createBlock('river', secondSeg.sx, sy, secondSeg.sz, secondSeg.x, secondSeg.z, chunkX, chunkZ);
+                this.blocks.push(block2);
+                blockBoxes.push(this.makeRiverBox(secondSeg.x, secondSeg.z, secondSeg.sx, secondSeg.sz));
+            }
+            placed++;
+        }
     }
 
     createBlock(type, sx, sy, sz, x, z, chunkX, chunkZ) {
@@ -142,6 +220,7 @@ class LevelManager {
             hp: maxHP,
             maxHP,
             solid: config.solid,
+            blocksProjectile: config.blocksProjectile !== undefined ? config.blocksProjectile : !!config.solid,
             destructible: config.destructible,
             hazard: config.hazard,
             slowFactor: config.slowFactor || 1,
@@ -168,6 +247,9 @@ class LevelManager {
         if (type === 'fire') {
             return { color: 0xff5a18, solid: false, destructible: false, hazard: 'fire', damagePerSecond: CONFIG.terrain.fireDamagePerSecond };
         }
+        if (type === 'river') {
+            return { color: 0x2a5b87, solid: true, destructible: false, blocksProjectile: false };
+        }
         return { color: 0x888888, solid: true, destructible: true };
     }
 
@@ -178,7 +260,7 @@ class LevelManager {
             if (b.damage <= 0) return;
 
             for (let block of this.blocks) {
-                if (block.isDead || !block.solid) continue;
+                if (block.isDead || !block.blocksProjectile) continue;
 
                 box.setFromObject(block.mesh);
                 if (box.containsPoint(b.mesh.position)) {

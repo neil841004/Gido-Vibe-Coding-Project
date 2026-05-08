@@ -10,7 +10,7 @@ const CONFIG = {
     // 角色 / 世界基礎數值
     // -----------------------------------------------------------------
     stats: {
-        playerHP: 1300,          // 玩家融合獸基礎最大血量
+        playerHP: 1400,          // 玩家融合獸基礎最大血量
         structureHPBase: 0.5,   // 可破壞障礙物 HP 係數，會乘上體積
         destructibleHealPct: 0.015, // 破壞白色可破壞關卡物件時，回復自身最大血量比例
         hpDecayRate: 0,         // 開啟敵人生成後，每秒自然扣血量
@@ -90,7 +90,7 @@ const CONFIG = {
     combat: {
         meleeDamage: 16,                    // 基礎近戰傷害
         attackRange: 2,                   // 近戰命中半徑
-        windupTime: 0.2,                    // 輕攻擊 / 蓄力按下後往後擺的前搖秒數
+        windupTime: 0.12,                    // 輕攻擊 / 蓄力按下後往後擺的前搖秒數
         recoveryTime: 0.4,                  // 輕攻擊後搖秒數
         heavyWindupTime: 0.16,              // 保留用重攻擊前搖秒數
         heavyRecoveryTime: 0.9,             // 重攻擊後搖秒數，期間禁止移動輸入
@@ -129,6 +129,7 @@ const CONFIG = {
         tailSweepDuration: 0.45,            // P4 蓄力重擊旋轉橫掃的動畫持續秒數
         tailSweepRadius: 5,               // P4 尾巴橫掃攻擊半徑
         tailSweepDamageScale: 1.7,          // P4 蓄力橫掃傷害倍率（疊加在 meleeDamage 與 tailPower 之上）
+        tailLightDashForce: 12,             // P4 尾巴輕攻擊瞬發 dash 沿面向方向的力度
         heavyStaggerBonusScale: 0.5         // 蓄力攻擊命中時，額外造成傷害 50% 的失衡值
     },
 
@@ -181,6 +182,13 @@ const CONFIG = {
         solidCount: 12,            // 每區塊不可破壞實體障礙物數量
         slimeCount: 3,             // 每區塊黏液緩速地面數量
         fireCount: 4,              // 每區塊火焰 DOT 地面數量
+        riverCount: 1,             // 每區塊河道數量；河道擋玩家但不擋投射物
+        riverLengthMin: 12,        // 河道單段最短長度（沿主軸）
+        riverLengthRand: 6,        // 河道單段長度額外隨機增加量
+        riverWidthMin: 2,          // 河道最窄寬度
+        riverWidthRand: 2,         // 河道寬度額外隨機增加量
+        riverHeight: 0.06,         // 河道視覺高度（極矮，略高於地面避免 z-fight）
+        riverLShapeChance: 0.6,    // 河道生成為 L 型（兩段垂直連接）的機率
         solidSizeMin: 2,           // 實體障礙物最小寬深
         solidSizeRand: 3,          // 實體障礙物寬深隨機增加量
         solidHeightMin: 2,         // 實體障礙物最小高度
@@ -237,8 +245,8 @@ const CONFIG = {
         radius: 12.0,         // 藤蔓作用半徑
         vineCount: 4,         // 藤蔓生成數量
         pteroPreCastDelay: 3, // 飛天墜擊 Buff：落點瞄準預備秒數
-        pteroAimSpeed: 10.0,    // 飛天墜擊 Buff：玩家輸入推動落點的速度，世界座標/秒
-        pteroFlyHeight: 18.0,   // 飛天墜擊 Buff：起飛後的最高高度
+        pteroAimSpeed: 14.0,    // 飛天墜擊 Buff：玩家輸入推動落點的速度，世界座標/秒
+        pteroFlyHeight: 30.0,   // 飛天墜擊 Buff：起飛後的最高高度
         pteroFlySpeed: 70.0,    // 飛天墜擊 Buff：起飛速度，世界座標/秒
         pteroDropSpeed: 90.0,   // 飛天墜擊 Buff：下墜加速度，世界座標/秒平方
         pteroRadius: 10.0,      // 飛天墜擊 Buff：落地傷害半徑
@@ -546,8 +554,7 @@ const state = {
     pve: {
         active: false,            // true = Dragon B 由 CPU 控制
         configuring: false,       // true = PVE 配對介面開啟
-        cpu: null,                // CpuDragonController instance，由 main.js 建立
-        testKeyboardEnabled: true // 鍵鼠測試模式：ON 時 Dragon A 改用 WASD+1~8 操作，並忽略 overlay 指派（Dragon B 仍由 CPU 控制）
+        cpu: null                 // CpuDragonController instance，由 main.js 建立
     },
 
     lastTime: 0

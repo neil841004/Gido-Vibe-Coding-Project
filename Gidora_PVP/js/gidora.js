@@ -748,6 +748,12 @@ class Gidora {
                         this.cooldowns.p4 = CONFIG.combat.cooldown;
                         const windupT = Math.min(1, this.attackHoldTimers.p4 / CONFIG.combat.windupTime);
                         this.tailStartRecoveryY = (windupT * (2 - windupT)) * 1.8;
+                        // 尾巴輕攻擊：朝面向方向產生一段 dash
+                        const dashDir = this.getForwardVector();
+                        dashDir.y = 0;
+                        if (dashDir.lengthSq() > 0.001) {
+                            this.knockbackVel.add(dashDir.normalize().multiplyScalar(CONFIG.combat.tailLightDashForce));
+                        }
                     }
                 }
             } else if (currentState === 'tailSweep') {
