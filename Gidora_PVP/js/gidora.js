@@ -113,6 +113,13 @@ class Gidora {
         this.beamDotTimer = 0;
         this.comboCooldown = 0;
         this.comboCooldownMax = CONFIG.combo.cooldown;
+        this.activeComboForm = 'beam';
+        this.comboTimer = 0;
+        this.comboDotTimer = 0;
+        this.comboState = 'idle';
+        this.comboTargetPos = new THREE.Vector3();
+        this.pteroDropVelocity = 0;
+        this.comboVines = [];
 
         this.cooldowns = { p1: 0, p2: 0, p3: 0, p4: 0 };
         this.attackStates = { p1: 'idle', p2: 'idle', p3: 'idle', p4: 'idle' };
@@ -251,6 +258,8 @@ class Gidora {
                 this.beamCharge = 0;
                 this.beamPhase = 'idle';
                 this._hideBeamFX();
+                this._hideSpecialComboFX();
+                if (this.mesh.position.y > 0) this.mesh.position.y = 0;
                 if (this.beamChargeRing) this.beamChargeRing.material.opacity = 0;
             }
             this.velocity.multiplyScalar(0.2);
@@ -284,25 +293,79 @@ class Gidora {
         location.reload();
     }
 
+    getHitSpheres(extraRadius = 0) {
+        const cfg = CONFIG.hitbox;
+        const spheres = [];
+        const addLocal = (local, radius) => {
+            const pos = local.clone().applyQuaternion(this.mesh.quaternion).add(this.mesh.position);
+            spheres.push({ pos, radius: radius + extraRadius });
+        };
+
+        addLocal(new THREE.Vector3(0, 1.2, 0), cfg.bodyCenterRadius);
+        addLocal(new THREE.Vector3(0, 1.2, cfg.bodyFrontOffsetZ), cfg.bodyFrontRadius);
+        addLocal(new THREE.Vector3(0, 1.2, cfg.bodyBackOffsetZ), cfg.bodyBackRadius);
+
+        if (this.necks) {
+            this.necks.forEach(neck => {
+                if (!neck || !neck.pivot || !neck.head) return;
+                const lower = new THREE.Vector3(0, cfg.neckLowerY, 0);
+                const upper = new THREE.Vector3(0, cfg.neckUpperY, 0);
+                neck.pivot.localToWorld(lower);
+                neck.pivot.localToWorld(upper);
+                spheres.push({ pos: lower, radius: cfg.neckRadius + extraRadius });
+                spheres.push({ pos: upper, radius: cfg.neckRadius + extraRadius });
+                const headPos = new THREE.Vector3();
+                neck.head.getWorldPosition(headPos);
+                spheres.push({ pos: headPos, radius: cfg.headRadius + extraRadius });
+            });
+        }
+
+        if (this.tailGroup) {
+            const base = new THREE.Vector3(0, 0, cfg.tailBaseOffsetZ);
+            const tip = new THREE.Vector3(0, 0, cfg.tailTipOffsetZ);
+            this.tailGroup.localToWorld(base);
+            this.tailGroup.localToWorld(tip);
+            spheres.push({ pos: base, radius: cfg.tailBaseRadius + extraRadius });
+            spheres.push({ pos: tip, radius: cfg.tailTipRadius + extraRadius });
+        }
+
+        return spheres;
+    }
+
+    intersectsHitSpheres(pos, radius = 0) {
+        return this.getHitSpheres(radius).some(s => s.pos.distanceTo(pos) <= s.radius);
+    }
+
+    intersectsHitCircle(center, radius = 0) {
+        return this.getHitSpheres(CONFIG.hitbox.meleePadding).some(s => {
+            const dx = s.pos.x - center.x;
+            const dz = s.pos.z - center.z;
+            return dx * dx + dz * dz <= Math.pow(radius + s.radius, 2);
+        });
+    }
+
+    intersectsHitRay(origin, forward, length, radius = 0) {
+        let bestAlong = Infinity;
+        this.getHitSpheres(CONFIG.hitbox.beamPadding).forEach(s => {
+            const toSphere = s.pos.clone().sub(origin);
+            const along = toSphere.dot(forward);
+            if (along < 0 || along > length + s.radius) return;
+            const perp = toSphere.sub(forward.clone().multiplyScalar(along));
+            if (perp.length() <= radius + s.radius) bestAlong = Math.min(bestAlong, Math.max(0, along));
+        });
+        return bestAlong;
+    }
+
     checkCollisions(bullets) {
         if (this.isDead) return;
-
-        const pPos = this.mesh.position.clone();
-        pPos.y += 1.2;
-        let hitRadius = 1.5;
-
-        if (this.body) {
-            const bodyWorldPos = new THREE.Vector3();
-            this.body.getWorldPosition(bodyWorldPos);
-            pPos.copy(bodyWorldPos);
-        }
 
         bullets.forEach(b => {
             if (b.markedForDeletion) return;
             // PVP：受擊條件擴充為「敵人子彈」或「來自其他龍的子彈」(非自己發射)。
             const isFromOtherDragon = (b.attackerDragon && b.attackerDragon !== this);
             if (!b.isEnemy && !isFromOtherDragon) return;
-            if (b.mesh.position.distanceTo(pPos) < hitRadius) {
+            const projectileRadius = (b.size || 0) + CONFIG.hitbox.projectilePadding;
+            if (this.intersectsHitSpheres(b.mesh.position, projectileRadius)) {
                 if (this.buffSystem.reflectProjectile(b, this)) return;
                 b.markedForDeletion = true;
                 this.takeDamage(b.damage || 10, b.mesh.position, b.knockback);
@@ -456,6 +519,49 @@ class Gidora {
         this.beamChargeRing = new THREE.Mesh(chargeRingGeo, chargeRingMat);
         this.beamChargeRing.position.y = 0.2;
         scene.add(this.beamChargeRing);
+
+        this.buildComboFormFx();
+    }
+
+    buildComboFormFx() {
+        const colors = this.colors;
+        this.comboFxGroup = new THREE.Group();
+        scene.add(this.comboFxGroup);
+
+        const floraRingGeo = new THREE.RingGeometry(CONFIG.combo.radius - 0.5, CONFIG.combo.radius, 64);
+        floraRingGeo.rotateX(-Math.PI / 2);
+        this.floraComboRing = new THREE.Mesh(floraRingGeo, new THREE.MeshBasicMaterial({
+            color: 0x88ff66,
+            side: THREE.DoubleSide,
+            transparent: true,
+            opacity: 0,
+            depthWrite: false
+        }));
+        this.floraComboRing.visible = false;
+        this.comboFxGroup.add(this.floraComboRing);
+
+        const pteroRingGeo = new THREE.RingGeometry(CONFIG.combo.pteroRadius - 0.5, CONFIG.combo.pteroRadius, 48);
+        pteroRingGeo.rotateX(-Math.PI / 2);
+        this.pteroComboRing = new THREE.Mesh(pteroRingGeo, new THREE.MeshBasicMaterial({
+            color: 0xffaa00,
+            side: THREE.DoubleSide,
+            transparent: true,
+            opacity: 0,
+            depthWrite: false
+        }));
+        this.pteroComboRing.visible = false;
+        scene.add(this.pteroComboRing);
+
+        this.pteroTimerRing = new THREE.Mesh(pteroRingGeo.clone(), new THREE.MeshBasicMaterial({
+            color: colors.beam,
+            side: THREE.DoubleSide,
+            transparent: true,
+            opacity: 0,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false
+        }));
+        this.pteroTimerRing.visible = false;
+        scene.add(this.pteroTimerRing);
     }
 
     updateDragon(dt) {
@@ -885,7 +991,39 @@ class Gidora {
     }
 
     isPlayerMovementLocked(playerIndex) {
+        if (this.activeComboForm === 'flora' && this.beamPhase !== 'idle') {
+            return this.isPlayerMeleeBusy(playerIndex);
+        }
         return this.input[playerIndex].charge || this.isPlayerMeleeBusy(playerIndex);
+    }
+
+    cancelMeleeForCombo(playerIndex, forceAll = false) {
+        const stateName = this.attackStates[playerIndex] || 'idle';
+        const cancellable = forceAll ||
+            stateName === 'charging' ||
+            stateName === 'tailCharging' ||
+            stateName === 'flamethrower';
+        if (!cancellable || stateName === 'idle') return;
+
+        this.attackStates[playerIndex] = 'idle';
+        this.attackTimers[playerIndex] = 0;
+        this.attackHoldTimers[playerIndex] = 0;
+        this.attackReleaseQueued[playerIndex] = false;
+        this.attackQueuedKinds[playerIndex] = 'light';
+        this.attackImpactDone[playerIndex] = false;
+        this.recoveryBufferedPress[playerIndex] = false;
+        this.lastAttackInput[playerIndex] = false;
+        this.hideChargeIndicator(playerIndex);
+        if (playerIndex !== 'p4') this.hideFlamethrowerIndicator(playerIndex);
+        if (playerIndex === 'p4') {
+            this.tailSweepImpactDone = false;
+            this.tailGroup.rotation.x = 0;
+            this.tailGroup.rotation.y = 0;
+        }
+    }
+
+    cancelAllMeleeForCombo() {
+        ['p1', 'p2', 'p3', 'p4'].forEach(p => this.cancelMeleeForCombo(p, true));
     }
 
     startAttackPress(playerIndex) {
@@ -1350,7 +1488,7 @@ class Gidora {
                 // PVP：對其他三頭龍造成傷害
                 state.dragons.forEach(d => {
                     if (!d || d === owner || d.isDead || this.hitList.has(d)) return;
-                    if (d.mesh.position.distanceTo(ring.position) < radius + 1.0) {
+                    if (d.intersectsHitCircle && d.intersectsHitCircle(ring.position, radius)) {
                         d.takeDamage(damage, owner.mesh.position, isTail ? 15 : 10);
                         if (options.heavy && d.addStagger) {
                             d.addStagger(damage * CONFIG.combat.heavyStaggerBonusScale, ring.position);
@@ -1534,7 +1672,11 @@ class Gidora {
         }
 
         state.dragons.forEach(d => {
-            if (!d || d === this || d.isDead || !isInCone(d.mesh.position, 1.2)) return;
+            if (!d || d === this || d.isDead) return;
+            const hit = d.getHitSpheres
+                ? d.getHitSpheres(CONFIG.hitbox.meleePadding).some(s => isInCone(s.pos, s.radius))
+                : isInCone(d.mesh.position, 1.2);
+            if (!hit) return;
             d.takeDamage(damage, origin, CONFIG.combat.flamethrowerKnockback);
             this.buffSystem.onEffectiveDamage(damage);
         });
@@ -1563,7 +1705,10 @@ class Gidora {
                 this.lastRamHit.set(target, lastHit - dt);
                 return;
             }
-            if (target.mesh.position.distanceTo(this.mesh.position) > 2.0) return;
+            const hit = target.intersectsHitCircle
+                ? target.intersectsHitCircle(this.mesh.position, CONFIG.hitbox.ramRadius)
+                : target.mesh.position.distanceTo(this.mesh.position) <= 2.0;
+            if (!hit) return;
             target.takeDamage(CONFIG.buffs.ramDamage, this.mesh.position, CONFIG.buffs.ramKnockback);
             if (target.addStagger) target.addStagger(CONFIG.buffs.ramStagger, this.mesh.position);
             this.buffSystem.onEffectiveDamage(CONFIG.buffs.ramDamage);
@@ -1617,6 +1762,311 @@ class Gidora {
         if (this.beamImpactMesh) this.beamImpactMesh.visible = false;
         if (this.beamOriginLight) this.beamOriginLight.intensity = 0;
         if (this.beamImpactLight) this.beamImpactLight.intensity = 0;
+    }
+
+    _clearComboVines() {
+        if (!this.comboVines) return;
+        this.comboVines.forEach(v => v.destroy());
+        this.comboVines = [];
+    }
+
+    _hideSpecialComboFX() {
+        if (this.floraComboRing) {
+            this.floraComboRing.visible = false;
+            this.floraComboRing.material.opacity = 0;
+        }
+        if (this.pteroComboRing) {
+            this.pteroComboRing.visible = false;
+            this.pteroComboRing.material.opacity = 0;
+        }
+        if (this.pteroTimerRing) {
+            this.pteroTimerRing.visible = false;
+            this.pteroTimerRing.material.opacity = 0;
+        }
+        this._clearComboVines();
+        this.comboState = 'idle';
+    }
+
+    startChargedCombo() {
+        this.activeComboForm = this.buffSystem && this.buffSystem.getComboForm
+            ? this.buffSystem.getComboForm()
+            : 'beam';
+        if (this.activeComboForm === 'flora') {
+            this.startFloraCombo();
+            return;
+        }
+        if (this.activeComboForm === 'ptero') {
+            this.startPteroCombo();
+            return;
+        }
+
+        this.activeComboForm = 'beam';
+        this.beamPhase = 'prefire';
+        this.beamPreFireTimer = CONFIG.beam.preFireDelay;
+        this.beamChargeRing.position.copy(this.mesh.position);
+    }
+
+    startFloraCombo() {
+        this.beamPhase = 'prefire';
+        this.comboState = 'floraPrecast';
+        this.comboTimer = CONFIG.combo.preCastDelay;
+        this.comboDotTimer = 0;
+        this.comboFxGroup.position.copy(this.mesh.position);
+        this.comboFxGroup.position.y = 0.08;
+
+        const r = CONFIG.combo.radius;
+        this.floraComboRing.geometry.dispose();
+        this.floraComboRing.geometry = new THREE.RingGeometry(r - 0.5, r, 64);
+        this.floraComboRing.geometry.rotateX(-Math.PI / 2);
+        this.floraComboRing.visible = true;
+        this.floraComboRing.material.opacity = 0.5;
+        this.floraComboRing.scale.setScalar(0.01);
+
+        this._clearComboVines();
+        for (let i = 0; i < CONFIG.combo.vineCount; i++) {
+            const vine = new Vine(this.comboFxGroup, i, CONFIG.combo.vineCount, CONFIG.combo.radius);
+            vine.setVisible(false);
+            this.comboVines.push(vine);
+        }
+    }
+
+    startPteroCombo() {
+        this.beamPhase = 'prefire';
+        this.comboState = 'pteroAim';
+        this.comboTimer = CONFIG.combo.pteroPreCastDelay;
+        this.comboTargetPos.copy(this.mesh.position);
+        this.comboTargetPos.y = 0.1;
+        this.pteroDropVelocity = 0;
+
+        const r = CONFIG.combo.pteroRadius;
+        this.pteroComboRing.geometry.dispose();
+        this.pteroComboRing.geometry = new THREE.RingGeometry(r - 0.5, r, 48);
+        this.pteroComboRing.geometry.rotateX(-Math.PI / 2);
+        this.pteroComboRing.visible = true;
+        this.pteroComboRing.position.copy(this.comboTargetPos);
+        this.pteroComboRing.material.opacity = 0.95;
+        this.pteroComboRing.scale.setScalar(1);
+
+        this.pteroTimerRing.geometry.dispose();
+        this.pteroTimerRing.geometry = new THREE.RingGeometry(r - 0.5, r, 48);
+        this.pteroTimerRing.geometry.rotateX(-Math.PI / 2);
+        this.pteroTimerRing.visible = true;
+        this.pteroTimerRing.position.copy(this.comboTargetPos);
+        this.pteroTimerRing.position.y = 0.16;
+        this.pteroTimerRing.material.opacity = 0.75;
+        this.pteroTimerRing.scale.setScalar(0.01);
+    }
+
+    beginSpecialComboPostfire() {
+        this.beamCharge = 0;
+        this.beamPhase = 'postfire';
+        this.beamPostFireTimer = CONFIG.beam.postFireDelay;
+        this.comboCooldown = this.comboCooldownMax;
+        this._hideSpecialComboFX();
+    }
+
+    applyComboAreaDamage(center, radius, damage, color, knockback = 18, stagger = 70) {
+        const origin = center.clone();
+        origin.y = 0.1;
+        if (state.enemyManager) {
+            state.enemyManager.enemies.forEach(e => {
+                if (e.isDead) return;
+                const dx = e.mesh.position.x - origin.x;
+                const dz = e.mesh.position.z - origin.z;
+                const dist = Math.sqrt(dx * dx + dz * dz);
+                if (dist > radius + 1.0) return;
+                e.takeDamage(damage, origin, knockback);
+                if (e.addStagger) e.addStagger(stagger, origin);
+                this.buffSystem.onEffectiveDamage(damage);
+            });
+        }
+        state.dragons.forEach(d => {
+            if (!d || d === this || d.isDead) return;
+            const hit = d.intersectsHitCircle
+                ? d.intersectsHitCircle(origin, radius)
+                : d.mesh.position.distanceTo(origin) <= radius + 1.2;
+            if (!hit) return;
+            d.takeDamage(damage, origin, knockback);
+            if (d.addStagger) d.addStagger(stagger, origin);
+            this.buffSystem.onEffectiveDamage(damage);
+        });
+        if (state.levelManager && state.levelManager.blocks) {
+            state.levelManager.blocks.forEach(block => {
+                if (block.isDead || !block.solid) return;
+                const dx = block.mesh.position.x - origin.x;
+                const dz = block.mesh.position.z - origin.z;
+                const dist = Math.sqrt(dx * dx + dz * dz);
+                if (dist > radius + 2.5) return;
+                const didDamage = state.levelManager.damageBlock(block, damage);
+                if (didDamage) this.buffSystem.onEffectiveDamage(damage);
+            });
+        }
+    }
+
+    spawnPteroImpactFX(center, radius) {
+        const waveGeo = new THREE.RingGeometry(0.5, radius, 48);
+        waveGeo.rotateX(-Math.PI / 2);
+        const wave = new THREE.Mesh(waveGeo, new THREE.MeshBasicMaterial({
+            color: 0xffaa00,
+            transparent: true,
+            opacity: 0.85,
+            side: THREE.DoubleSide,
+            depthWrite: false
+        }));
+        wave.position.copy(center);
+        wave.position.y = 0.1;
+        scene.add(wave);
+        state.particles.push({
+            mesh: wave,
+            life: 0.55,
+            maxLife: 0.55,
+            update(dt) {
+                this.life -= dt;
+                const t = 1 - this.life / this.maxLife;
+                this.mesh.material.opacity = Math.max(0, 0.85 * (1 - t));
+                this.mesh.scale.setScalar(1 + t * 1.7);
+                if (this.life <= 0) {
+                    scene.remove(this.mesh);
+                    this.mesh.geometry.dispose();
+                    this.mesh.material.dispose();
+                    return false;
+                }
+                return true;
+            }
+        });
+
+        for (let i = 0; i < 28; i++) {
+            const pPos = center.clone().add(new THREE.Vector3((Math.random() - 0.5) * radius, 0.4 + Math.random() * 0.8, (Math.random() - 0.5) * radius));
+            state.particles.push(new Particle(pPos, 0xffaa00));
+        }
+    }
+
+    updateActiveCombo(dt) {
+        if (this.activeComboForm === 'flora') {
+            this.updateFloraCombo(dt);
+            return;
+        }
+        if (this.activeComboForm === 'ptero') {
+            this.updatePteroCombo(dt);
+            return;
+        }
+        this.updateBeam(dt);
+    }
+
+    updateSpecialPostfire(dt) {
+        this.beamCharge = Math.max(0, this.beamCharge - CONFIG.beam.decayRate * dt);
+        this.beamPostFireTimer -= dt;
+        if (this.beamPostFireTimer <= 0) {
+            this.beamPhase = 'idle';
+            this.activeComboForm = 'beam';
+        }
+    }
+
+    updateFloraCombo(dt) {
+        if (this.beamPhase === 'postfire') {
+            this.updateSpecialPostfire(dt);
+            return;
+        }
+
+        this.comboFxGroup.position.copy(this.mesh.position);
+        this.comboFxGroup.position.y = 0.08;
+
+        if (this.beamPhase === 'prefire') {
+            this.comboTimer -= dt;
+            const progress = THREE.MathUtils.clamp(1 - this.comboTimer / CONFIG.combo.preCastDelay, 0, 1);
+            this.floraComboRing.scale.setScalar(Math.max(0.01, progress));
+            this.floraComboRing.material.opacity = 0.45 + Math.sin(progress * 20) * 0.2;
+            if (this.comboTimer <= 0) {
+                this.beamPhase = 'firing';
+                this.comboState = 'floraActive';
+                this.comboTimer = CONFIG.combo.activeDuration;
+                this.comboDotTimer = 0;
+                this.floraComboRing.scale.setScalar(1);
+                this.floraComboRing.material.opacity = 0.8;
+                this.comboVines.forEach(v => v.setVisible(true));
+            }
+            return;
+        }
+
+        if (this.beamPhase !== 'firing') return;
+        this.comboTimer -= dt;
+        this.comboVines.forEach(v => v.update(dt, true));
+        const pulse = 0.9 + Math.sin(Date.now() * 0.006) * 0.08;
+        this.floraComboRing.scale.setScalar(pulse);
+        this.floraComboRing.material.opacity = 0.68 + Math.sin(Date.now() * 0.01) * 0.12;
+
+        this.comboDotTimer += dt;
+        if (this.comboDotTimer >= CONFIG.combo.dotInterval) {
+            this.comboDotTimer = 0;
+            const damage = CONFIG.combo.dotDamage * this.buffSystem.getComboDamageMultiplier();
+            this.applyComboAreaDamage(this.mesh.position, CONFIG.combo.radius, damage, 0x88ff66, 8, 20);
+        }
+
+        if (this.comboTimer <= 0) this.beginSpecialComboPostfire();
+    }
+
+    updatePteroCombo(dt) {
+        if (this.beamPhase === 'postfire') {
+            this.updateSpecialPostfire(dt);
+            return;
+        }
+
+        if (this.beamPhase === 'prefire') {
+            this.comboTimer -= dt;
+            let moveVec = new THREE.Vector3();
+            ['p1', 'p2', 'p3', 'p4'].forEach(p => {
+                const inp = this.input[p].move;
+                if (!inp) return;
+                moveVec.x += inp.x;
+                moveVec.z += inp.y;
+            });
+            if (moveVec.lengthSq() > 0.01) {
+                moveVec.normalize().multiplyScalar(CONFIG.combo.pteroAimSpeed * dt);
+                this.comboTargetPos.add(moveVec);
+            }
+            this.comboTargetPos.y = 0.1;
+            this.pteroComboRing.position.copy(this.comboTargetPos);
+            this.pteroTimerRing.position.copy(this.comboTargetPos);
+            this.pteroTimerRing.position.y = 0.16;
+            const progress = THREE.MathUtils.clamp(1 - this.comboTimer / CONFIG.combo.pteroPreCastDelay, 0, 1);
+            this.pteroTimerRing.scale.setScalar(Math.max(0.01, progress));
+            this.pteroComboRing.scale.setScalar(1 + Math.sin(Date.now() * 0.009) * 0.08);
+            if (this.comboTimer <= 0) {
+                this.beamPhase = 'firing';
+                this.comboState = 'pteroFly';
+                this.comboTimer = Math.max(0.2, CONFIG.combo.pteroFlyHeight / CONFIG.combo.pteroFlySpeed);
+                this.pteroDropVelocity = 0;
+            }
+            return;
+        }
+
+        if (this.beamPhase !== 'firing') return;
+
+        if (this.comboState === 'pteroFly') {
+            this.comboTimer -= dt;
+            this.mesh.position.y = Math.min(CONFIG.combo.pteroFlyHeight, this.mesh.position.y + CONFIG.combo.pteroFlySpeed * dt);
+            this.pteroComboRing.material.opacity = 0.55 + Math.sin(Date.now() * 0.015) * 0.2;
+            if (this.comboTimer <= 0) {
+                this.comboState = 'pteroDrop';
+                this.mesh.position.x = this.comboTargetPos.x;
+                this.mesh.position.z = this.comboTargetPos.z;
+                this.mesh.position.y = CONFIG.combo.pteroFlyHeight;
+                this.pteroDropVelocity = 0;
+            }
+            return;
+        }
+
+        if (this.comboState === 'pteroDrop') {
+            this.pteroDropVelocity += CONFIG.combo.pteroDropSpeed * dt;
+            this.mesh.position.y -= this.pteroDropVelocity * dt;
+            if (this.mesh.position.y > 0) return;
+            this.mesh.position.y = 0;
+            const damage = CONFIG.combo.pteroDamage * this.buffSystem.getComboDamageMultiplier();
+            this.spawnPteroImpactFX(this.mesh.position.clone(), CONFIG.combo.pteroRadius);
+            this.applyComboAreaDamage(this.mesh.position, CONFIG.combo.pteroRadius, damage, 0xffaa00, 45, 120);
+            this.pulseScale = 1.35;
+            this.beginSpecialComboPostfire();
+        }
     }
 
     updateBeam(dt) {
@@ -1677,11 +2127,10 @@ class Gidora {
             // PVP：其他三頭龍會擋光束 (但不擋自己)
             state.dragons.forEach(d => {
                 if (!d || d === this || d.isDead) return;
-                const toD = d.mesh.position.clone().sub(origin);
-                const along = toD.dot(forward);
-                if (along < 0 || along > beamLength) return;
-                const perp = toD.clone().sub(forward.clone().multiplyScalar(along));
-                if (perp.length() < 1.2 + hitRadius) beamLength = Math.min(beamLength, along);
+                const along = d.intersectsHitRay
+                    ? d.intersectsHitRay(origin, forward, beamLength, hitRadius)
+                    : Infinity;
+                if (along < Infinity) beamLength = Math.min(beamLength, along);
             });
             if (state.levelManager) {
                 state.levelManager.blocks.forEach(b => {
@@ -1753,11 +2202,10 @@ class Gidora {
                 // PVP：光束 tick 也對其他龍生效
                 state.dragons.forEach(d => {
                     if (!d || d === this || d.isDead) return;
-                    const toD = d.mesh.position.clone().sub(origin);
-                    const along = toD.dot(forward);
-                    if (along < 0 || along > beamLength + 1.2) return;
-                    const perp = toD.clone().sub(forward.clone().multiplyScalar(along));
-                    if (perp.length() < 1.2 + hitRadius) {
+                    const along = d.intersectsHitRay
+                        ? d.intersectsHitRay(origin, forward, beamLength + 1.2, hitRadius)
+                        : Infinity;
+                    if (along < Infinity) {
                         d.takeDamage(damage, origin, CONFIG.beam.tickKnockback);
                         if (this.buffSystem.isActive('beamSlow') && d.applySlow) {
                             d.applySlow(CONFIG.buffs.beamSlowFactor, CONFIG.buffs.beamSlowDuration);
@@ -1844,10 +2292,12 @@ class Gidora {
         const beamCfg = CONFIG.beam;
         const maxCharge = beamCfg.maxCharge;
         const isBeamActive = (this.beamPhase !== 'idle');
+        const isFloraComboActive = this.activeComboForm === 'flora' && this.beamPhase !== 'idle';
 
         if (isBeamActive) {
-            this.updateBeam(dt);
-            if (this.beamPhase === 'prefire' || this.beamPhase === 'postfire') return;
+            this.cancelAllMeleeForCombo();
+            this.updateActiveCombo(dt);
+            if (!isFloraComboActive && (this.beamPhase === 'prefire' || this.beamPhase === 'postfire')) return;
         }
 
         // Phase 1: Combo CD 倒數 (idle 階段)
@@ -1858,6 +2308,9 @@ class Gidora {
         // 蓄力邏輯 (idle 階段)；CD 期間禁止蓄力，按住也只會緩慢衰減
         // 互斥：Melee 進行中的玩家不計入集氣；正在 tailCharging 的 P4 也不計入
         if (this.beamPhase === 'idle') {
+            players.forEach(p => {
+                if (this.input[p].charge) this.cancelMeleeForCombo(p);
+            });
             const chargeCount = players.filter(p =>
                 this.input[p].charge && !this.isPlayerMeleeBusy(p)
             ).length;
@@ -1871,9 +2324,8 @@ class Gidora {
 
         if (this.beamPhase === 'idle' && this.beamCharge >= maxCharge && this.comboCooldown <= 0) {
             this.beamCharge = maxCharge;
-            this.beamPhase = 'prefire';
-            this.beamPreFireTimer = beamCfg.preFireDelay;
-            this.beamChargeRing.position.copy(this.mesh.position);
+            this.cancelAllMeleeForCombo();
+            this.startChargedCombo();
             return;
         }
 
@@ -1888,6 +2340,7 @@ class Gidora {
             const isPress = isDown && !this.lastAttackInput[p];
             const isRelease = !isDown && this.lastAttackInput[p];
             this.lastAttackInput[p] = isDown;
+            if (isBeamActive) return;
             if (isRelease) this.releaseAttackPress(p);
             if (this.input[p].charge) return; // 集氣時忽略新的 Melee 按下
             if (isPress) this.startAttackPress(p);
@@ -1952,7 +2405,7 @@ class Gidora {
                 const inputVec = new THREE.Vector3(moveInput.x, 0, moveInput.y);
                 const dir = inputVec.clone().normalize();
                 if (!tailSweepRotating) totalRotationInput.add(inputVec);
-                if (!isBeamActive) {
+                if (!isBeamActive || isFloraComboActive) {
                     totalInput.add(inputVec);
                     activeDirs.push(dir);
                 }
@@ -1996,7 +2449,7 @@ class Gidora {
             while (deltaAngle > Math.PI) deltaAngle -= Math.PI * 2;
             while (deltaAngle < -Math.PI) deltaAngle += Math.PI * 2;
 
-            const rotSpeedMult = (this.beamPhase === 'firing') ? 0.35 : 1.0;
+            const rotSpeedMult = (this.beamPhase === 'firing' && !isFloraComboActive) ? 0.35 : 1.0;
             const teamworkTurnMult = speedMult > 1.0 ? speedMult : 1.0;
             const rotStep = CONFIG.movement.rotationSpeed * this.buffSystem.getTurnMultiplier() * rotSpeedMult * teamworkTurnMult * dt;
             if (Math.abs(deltaAngle) < rotStep) this.mesh.rotation.y = targetAngle;
@@ -2021,7 +2474,7 @@ class Gidora {
         const forward = this.getForwardVector();
         const isInputting = totalInput.lengthSq() > 0.01;
 
-        if (isBeamActive) {
+        if (isBeamActive && !isFloraComboActive) {
             this.velocity.multiplyScalar(Math.max(0, 1 - 20 * dt));
         } else if (isInputting) {
             if (currentSpeed > 0.1) {
@@ -2097,11 +2550,13 @@ class Gidora {
     destroy() {
         if (this.buffSystem && this.buffSystem.clearAll) this.buffSystem.clearAll();
         if (this.hpBar && this.hpBar.destroy) this.hpBar.destroy();
+        this._hideSpecialComboFX();
 
         [
             this.p1Arrow, this.p2Arrow, this.p3Arrow, this.p4Arrow,
             this.beamMesh, this.beamGlowMesh, this.beamImpactMesh,
             this.beamOriginLight, this.beamImpactLight, this.beamChargeRing,
+            this.comboFxGroup, this.pteroComboRing, this.pteroTimerRing,
             ...Object.values(this.fireballAimArrows || {}),
             ...Object.values(this.flamethrowerIndicators || {})
         ].forEach(obj => {

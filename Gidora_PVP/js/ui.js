@@ -1315,12 +1315,19 @@ function updateChargeBarForDragon(dragon, ids, dragonLabel, palette) {
         label.style.textShadow = `0 0 8px ${palette.glow}, 0 0 16px ${palette.glow}88`;
     }
 
+    const formLabel = dragon && dragon.activeComboForm === 'flora'
+        ? '藤蔓掃場'
+        : (dragon && dragon.activeComboForm === 'ptero' ? '飛天墜擊' : '光束炮');
+
     if (!dragon) {
         label.textContent = `Dragon ${dragonLabel} 蓄力 0%`;
     } else if (dragon.beamPhase === 'firing') {
-        label.textContent = `Dragon ${dragonLabel} 光束炮發射中 ${Math.ceil(dragon.beamFiringTimer)}s`;
+        const timer = dragon.activeComboForm === 'beam'
+            ? dragon.beamFiringTimer
+            : dragon.comboTimer;
+        label.textContent = `Dragon ${dragonLabel} ${formLabel}施放中 ${Math.ceil(Math.max(0, timer || 0))}s`;
     } else if (dragon.beamPhase === 'prefire') {
-        label.textContent = `Dragon ${dragonLabel} 即將發射`;
+        label.textContent = `Dragon ${dragonLabel} ${formLabel}準備中`;
     } else if (isCooldownLocked) {
         label.textContent = `Dragon ${dragonLabel} 合體技封鎖 ${dragon.comboCooldown.toFixed(1)}s`;
     } else if (dragon.beamPhase === 'postfire') {

@@ -186,29 +186,31 @@ function applyRandomBuffs(dragon, countSetting) {
     // PVP 模式不抽 pvpExclude 的 Buff（同心協力回血、有效傷害回血）
     const ids = Object.keys(BUFFS).filter(id => !BUFFS[id].pvpExclude);
     const meleeFormIds = ids.filter(id => BUFFS[id].group === 'meleeForm');
-    const nonMeleeFormIds = ids.filter(id => BUFFS[id].group !== 'meleeForm');
+    const comboFormIds = ids.filter(id => BUFFS[id].group === 'comboForm');
     for (let i = ids.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
         [ids[i], ids[j]] = [ids[j], ids[i]];
     }
     const selectedIds = [];
-    if (count > 5 && meleeFormIds.length > 0) {
-        const meleeIds = shuffleArray(meleeFormIds.slice());
-        selectedIds.push(meleeIds[0]);
-        shuffleArray(nonMeleeFormIds.slice()).some(id => {
-            selectedIds.push(id);
-            return selectedIds.length >= count;
-        });
-    } else {
-        let hasMeleeForm = false;
-        ids.some(id => {
-            const isMeleeForm = BUFFS[id].group === 'meleeForm';
-            if (isMeleeForm && hasMeleeForm) return false;
-            if (isMeleeForm) hasMeleeForm = true;
-            selectedIds.push(id);
-            return selectedIds.length >= count;
-        });
+    const selectedGroups = new Set();
+    const trySelectBuff = (id) => {
+        const group = BUFFS[id] && BUFFS[id].group;
+        if (group && selectedGroups.has(group)) return false;
+        selectedIds.push(id);
+        if (group) selectedGroups.add(group);
+        return true;
+    };
+    if (count >= 4 && meleeFormIds.length > 0) {
+        trySelectBuff(shuffleArray(meleeFormIds.slice())[0]);
     }
+    if (count >= 6 && comboFormIds.length > 0) {
+        trySelectBuff(shuffleArray(comboFormIds.slice())[0]);
+    }
+    ids.some(id => {
+        if (selectedIds.length >= count) return true;
+        trySelectBuff(id);
+        return selectedIds.length >= count;
+    });
     selectedIds.forEach(id => {
         if (BUFFS[id].stackable) dragon.buffSystem.setStack(id, 1);
         else dragon.buffSystem.toggle(id);

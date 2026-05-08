@@ -321,7 +321,10 @@ class MeleeEnemy extends Enemy {
             flash.material.dispose();
         }, 100);
 
-        if (targetDragon && this.mesh.position.distanceTo(targetPos) < this.attackRange * 1.5) {
+        const hit = targetDragon && targetDragon.intersectsHitCircle
+            ? targetDragon.intersectsHitCircle(this.mesh.position, this.attackRange * CONFIG.hitbox.enemyMeleeRangeScale)
+            : targetDragon && this.mesh.position.distanceTo(targetPos) < this.attackRange * 1.5;
+        if (hit) {
             targetDragon.takeDamage(this.damage, this.mesh.position, this.damage * 0.6);
         }
     }
@@ -475,7 +478,10 @@ class NinjaEnemy extends Enemy {
         animateSlash();
 
         const slashRange = 4.0;
-        if (targetDragon && this.mesh.position.distanceTo(playerPos) < slashRange) {
+        const hit = targetDragon && targetDragon.intersectsHitCircle
+            ? targetDragon.intersectsHitCircle(this.mesh.position, slashRange * CONFIG.hitbox.enemySlashRangeScale)
+            : targetDragon && this.mesh.position.distanceTo(playerPos) < slashRange;
+        if (hit) {
             targetDragon.takeDamage(this.damage, this.mesh.position, this.damage);
         }
 

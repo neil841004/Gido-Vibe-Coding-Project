@@ -210,7 +210,14 @@ const CONFIG = {
         maxVineCount: 6,      // 最大藤蔓數量
         activeDuration: 7.0,  // 合體技作用秒數，原 quad 值
         radius: 12.0,         // 藤蔓作用半徑
-        vineCount: 4          // 藤蔓生成數量
+        vineCount: 4,         // 藤蔓生成數量
+        pteroPreCastDelay: 3, // 飛天墜擊 Buff：落點瞄準預備秒數
+        pteroAimSpeed: 10.0,    // 飛天墜擊 Buff：玩家輸入推動落點的速度，世界座標/秒
+        pteroFlyHeight: 18.0,   // 飛天墜擊 Buff：起飛後的最高高度
+        pteroFlySpeed: 70.0,    // 飛天墜擊 Buff：起飛速度，世界座標/秒
+        pteroDropSpeed: 90.0,   // 飛天墜擊 Buff：下墜加速度，世界座標/秒平方
+        pteroRadius: 10.0,      // 飛天墜擊 Buff：落地傷害半徑
+        pteroDamage: 140        // 飛天墜擊 Buff：落地基礎傷害
     },
 
     // -----------------------------------------------------------------
@@ -270,6 +277,8 @@ const CONFIG = {
         teamworkRegenPerSecond: 25,        // 同心協力回血 Buff：每秒回血量
         lowHpExplosionDamage: 180,        // 半血爆炸 Buff：爆炸傷害
         lowHpExplosionRadius: 15,         // 半血爆炸 Buff：爆炸半徑
+        comboFloraDecorVineCount: 4,      // 藤蔓掃場型態 Buff：身體周圍點綴藤蔓數量
+        comboPteroWingScale: 1.2,         // 飛天墜擊型態 Buff：小翅膀視覺尺寸倍率
         visualOrbitRadius: 2.8,           // Buff 視覺標記繞角色旋轉半徑
         visualPulseInterval: 0.35,        // Buff 持續粒子特效生成間隔秒數
         hpVisualScalePerStack: 0.1        // 血量 Buff 每層角色視覺放大比例
@@ -302,6 +311,31 @@ const CONFIG = {
         dragonCollisionRadius: 2.1,       // 每隻龍的碰撞半徑，兩龍距離 < 半徑x2 時觸發推擠
         dragonBounceRestitution: 0,     // 碰撞速度反彈係數，0=完全不反彈，1=完全彈性碰撞
         dragonPushForce: 2                // 碰撞時額外施加於 knockbackVel 的推力大小，單位/秒
+    },
+
+    // -----------------------------------------------------------------
+    // 三頭龍受擊判定
+    // -----------------------------------------------------------------
+    hitbox: {
+        bodyCenterRadius: 1.25,       // 身體中央受擊球半徑，對應橢圓身體中心
+        bodyFrontRadius: 1.05,        // 身體前段受擊球半徑，補足視覺模型前胸
+        bodyBackRadius: 1.05,         // 身體後段受擊球半徑，補足視覺模型後背
+        bodyFrontOffsetZ: 1.15,       // 身體前段受擊球相對龍中心的本地 Z 偏移
+        bodyBackOffsetZ: -1.15,       // 身體後段受擊球相對龍中心的本地 Z 偏移
+        neckRadius: 0.42,             // 脖子受擊球半徑
+        neckLowerY: 0.85,             // 脖子下段受擊球在 neck pivot 內的本地 Y 位置
+        neckUpperY: 1.55,             // 脖子上段受擊球在 neck pivot 內的本地 Y 位置
+        headRadius: 0.58,             // 頭部受擊球半徑
+        tailBaseRadius: 0.55,         // 尾巴根部受擊球半徑
+        tailTipRadius: 0.46,          // 尾巴尖端受擊球半徑
+        tailBaseOffsetZ: -0.65,       // 尾巴根部受擊球相對 tailGroup 的本地 Z 偏移
+        tailTipOffsetZ: -1.75,        // 尾巴尖端受擊球相對 tailGroup 的本地 Z 偏移
+        projectilePadding: 0.05,      // 投射物命中三頭龍時額外加上的半徑
+        meleePadding: 0.15,           // 地面近戰 / 範圍傷害命中三頭龍時額外加上的半徑
+        beamPadding: 0.05,            // 光束命中三頭龍時額外加上的半徑
+        ramRadius: 1.2,               // 高速衝撞判定的地面圓半徑
+        enemyMeleeRangeScale: 0.65,   // 近戰敵人攻擊距離轉成三頭龍受擊圓時的倍率
+        enemySlashRangeScale: 0.55    // 忍者斬擊距離轉成三頭龍受擊圓時的倍率
     },
 
     // -----------------------------------------------------------------

@@ -10,8 +10,10 @@ const BUFFS = {
     speedBoost: { name: '移動、轉向速度提高', description: '每層速度與轉向 +30%。', stackable: true, implemented: true, icon: { glyph: '>>', color: '#59d8ff', bg: '#12303b' } },
     meleeBoost: { name: 'Melee 攻擊力 +30%', description: '每層頭槌/尾巴近戰 +30%。', stackable: true, implemented: true, icon: { glyph: 'X', color: '#ffd166', bg: '#3a2c12' } },
 
-    comboCd: { name: '組合技 CD 縮短 60%', description: '光束波冷卻只剩 40%。', implemented: true, icon: { glyph: 'CD', color: '#c4a7ff', bg: '#231a3d' } },
-    comboDamage: { name: '組合技傷害 +100%', description: '光束波傷害加倍。', implemented: true, icon: { glyph: 'B', color: '#ff8cff', bg: '#39183c' } },
+    comboCd: { name: '組合技 CD 縮短 60%', description: '組合技冷卻只剩 40%。', implemented: true, icon: { glyph: 'CD', color: '#c4a7ff', bg: '#231a3d' } },
+    comboDamage: { name: '組合技傷害 +100%', description: '組合技傷害加倍。', implemented: true, icon: { glyph: 'B', color: '#ff8cff', bg: '#39183c' } },
+    comboFlora: { name: '組合技型態：藤蔓掃場', description: '組合技改為長出藤蔓，一段時間內範圍攻擊。', group: 'comboForm', implemented: true, icon: { glyph: 'VN', color: '#b8ff8a', bg: '#173719' } },
+    comboPtero: { name: '組合技型態：飛天墜擊', description: '組合技改為飛上天空，瞄準落點後墜落攻擊。', group: 'comboForm', implemented: true, icon: { glyph: 'SK', color: '#fff2a6', bg: '#2f2b12' } },
     lifeSteal: { name: '有效傷害回血', description: '造成有效傷害時回復少量 HP。', implemented: true, pvpExclude: true, icon: { glyph: 'L', color: '#ff6b7a', bg: '#3d151b' } },
     tailPower: { name: '尾巴攻擊力 +300%', description: '尾巴傷害變為 4 倍。', implemented: true, icon: { glyph: 'T', color: '#60efff', bg: '#12393d' } },
     poisonTrail: { name: '走路留下毒液', description: '毒液殘留 10 秒，緩速並 DOT 敵人。', implemented: true, icon: { glyph: 'P', color: '#8cff5f', bg: '#173a14' } },
@@ -132,6 +134,8 @@ class BuffSystem {
             leafShields: [],
             poisonClouds: [],
             missileNest: null,
+            comboFloraVines: null,
+            comboPteroWings: null,
             guardShield: null,
             stationaryShield: null,
             invincibleShield: null
@@ -212,7 +216,7 @@ class BuffSystem {
             this._disposeMesh(this.objects.missileNest);
             this.objects.missileNest = null;
         }
-        ['guardShield', 'stationaryShield', 'invincibleShield'].forEach(key => {
+        ['comboFloraVines', 'comboPteroWings', 'guardShield', 'stationaryShield', 'invincibleShield'].forEach(key => {
             if (this.objects[key]) {
                 this._disposeMesh(this.objects[key]);
                 this.objects[key] = null;
@@ -262,6 +266,12 @@ class BuffSystem {
         if (this.isActive('meleeFlame')) return 'flame';
         if (this.isActive('meleeExplosion')) return 'explosion';
         return 'default';
+    }
+
+    getComboForm() {
+        if (this.isActive('comboFlora')) return 'flora';
+        if (this.isActive('comboPtero')) return 'ptero';
+        return 'beam';
     }
 
     getHpMultiplier() {
@@ -367,6 +377,7 @@ class BuffSystem {
         this._updatePoisonCloud(dt, dragon);
         this._updatePoisonClouds(dt);
         this._updateLowHpExplosion(dragon);
+        this._updateComboFormDecor(dt, dragon);
         this._updateBuffVisuals(dt, dragon);
     }
 
@@ -602,6 +613,121 @@ class BuffSystem {
         if (dragon.hp > dragon.maxHP * 0.5) return;
         this.lowHpExplosionUsed = true;
         dragon.createAreaDamage(dragon.mesh.position.clone(), CONFIG.buffs.lowHpExplosionRadius, CONFIG.buffs.lowHpExplosionDamage, 0xffaa00, { stagger: 100 });
+    }
+
+    _updateComboFormDecor(dt, dragon) {
+        this._updateFloraDecor(dt, dragon);
+        this._updatePteroWingDecor(dt, dragon);
+    }
+
+    _updateFloraDecor(dt, dragon) {
+        if (!this.isActive('comboFlora')) {
+            if (this.objects.comboFloraVines) {
+                this._disposeMesh(this.objects.comboFloraVines);
+                this.objects.comboFloraVines = null;
+            }
+            return;
+        }
+
+        if (!this.objects.comboFloraVines) {
+            const group = new THREE.Group();
+            const vineCount = Math.max(1, CONFIG.buffs.comboFloraDecorVineCount);
+            const up = new THREE.Vector3(0, 1, 0);
+            for (let i = 0; i < vineCount; i++) {
+                const vine = new THREE.Group();
+                const baseAngle = (i / vineCount) * Math.PI * 2;
+                vine.userData.baseAngle = baseAngle;
+                vine.userData.phase = Math.random() * Math.PI * 2;
+
+                for (let j = 0; j < 3; j++) {
+                    const geo = new THREE.CylinderGeometry(0.035, 0.055, 0.78, 6);
+                    const mat = new THREE.MeshLambertMaterial({ color: j % 2 === 0 ? 0x2f8f36 : 0x58b84e });
+                    const seg = new THREE.Mesh(geo, mat);
+                    const angle = baseAngle + (j - 1) * 0.32;
+                    const xRadius = 1.68 + j * 0.06;
+                    const zRadius = 2.45 + j * 0.08;
+                    const tangent = new THREE.Vector3(
+                        -Math.sin(angle) * xRadius,
+                        0.26 * Math.sin(j + baseAngle),
+                        Math.cos(angle) * zRadius
+                    ).normalize();
+                    seg.quaternion.copy(new THREE.Quaternion().setFromUnitVectors(up, tangent));
+                    seg.position.set(
+                        Math.cos(angle) * xRadius,
+                        1.28 + j * 0.18,
+                        Math.sin(angle) * zRadius
+                    );
+                    vine.add(seg);
+                }
+                group.add(vine);
+            }
+            dragon.mesh.add(group);
+            this.objects.comboFloraVines = group;
+        }
+
+        const t = Date.now() * 0.003;
+        this.objects.comboFloraVines.children.forEach((vine, i) => {
+            const baseAngle = vine.userData.baseAngle || 0;
+            const wave = Math.sin(t + (vine.userData.phase || 0)) * 0.08;
+            vine.rotation.y = baseAngle * 0.05 + wave;
+            vine.rotation.x = Math.sin(t * 0.8 + i) * 0.035;
+        });
+    }
+
+    _updatePteroWingDecor(dt, dragon) {
+        if (!this.isActive('comboPtero')) {
+            if (this.objects.comboPteroWings) {
+                this._disposeMesh(this.objects.comboPteroWings);
+                this.objects.comboPteroWings = null;
+            }
+            return;
+        }
+
+        if (!this.objects.comboPteroWings) {
+            const group = new THREE.Group();
+            const makeWing = (side) => {
+                const wing = new THREE.Group();
+                const shape = new THREE.Shape();
+                shape.moveTo(0, 0);
+                shape.lineTo(side * 1.45, 0.3);
+                shape.lineTo(side * 0.35, -1.05);
+                shape.lineTo(0, 0);
+                const geo = new THREE.ShapeGeometry(shape);
+                const mat = new THREE.MeshLambertMaterial({
+                    color: 0xd8c77a,
+                    side: THREE.DoubleSide,
+                    transparent: true,
+                    opacity: 0.92
+                });
+                const membrane = new THREE.Mesh(geo, mat);
+                wing.add(membrane);
+
+                const boneMat = new THREE.MeshLambertMaterial({ color: 0xf2e4aa });
+                const bone = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 1.45, 6), boneMat);
+                bone.position.set(side * 0.55, 0.08, 0.01);
+                bone.rotation.z = side * Math.PI / 2.55;
+                wing.add(bone);
+
+                wing.position.set(side * 0.88, 1.52, -0.62);
+                wing.rotation.x = -0.18;
+                wing.rotation.y = side * 0.42;
+                wing.rotation.z = side * 0.24;
+                return wing;
+            };
+
+            group.add(makeWing(-1));
+            group.add(makeWing(1));
+            group.scale.setScalar(CONFIG.buffs.comboPteroWingScale);
+            dragon.mesh.add(group);
+            this.objects.comboPteroWings = group;
+        }
+
+        const t = Date.now() * 0.006;
+        const flap = Math.sin(t) * 0.08;
+        this.objects.comboPteroWings.children.forEach((wing, i) => {
+            const side = i === 0 ? -1 : 1;
+            wing.rotation.z = side * (0.24 + flap);
+        });
     }
 
     _updateBuffVisuals(dt, dragon) {
