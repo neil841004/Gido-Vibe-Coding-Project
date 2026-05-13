@@ -6,41 +6,43 @@
 // =====================================================================
 
 const BUFFS = {
-    hpBoost: { name: '增加血量 30%', description: '已禁用：此 Buff 不會在 PVP/PVE/問號箱抽取，也無法手動啟用。', stackable: true, implemented: false, disabled: true, pvpExclude: true, icon: { glyph: '+', color: '#62f28f', bg: '#14371f' } },
+    meleeFireball: { name: 'Melee 型態：噴火球', description: '頭部近戰改成落點火球；尾巴不變。', group: 'meleeForm', implemented: true, icon: { glyph: 'F', color: '#ff9f1c', bg: '#3d2410' } },
+    meleeShockwave: { name: 'Melee 型態：蓄力震波', description: '蓄力重擊會打出暈眩震波。', group: 'meleeForm', implemented: true, icon: { glyph: '~', color: '#a6c8ff', bg: '#172845' } },
+    meleeFlame: { name: 'Melee 型態：噴火', description: '按住頭部攻擊會持續朝前方扇形吐火。', group: 'meleeForm', implemented: true, icon: { glyph: 'W', color: '#ff5e2e', bg: '#40180e' } },
+    meleeExplosion: { name: 'Melee 型態：爆炸', description: '近戰命中有機率引發爆炸。', group: 'meleeForm', implemented: true, icon: { glyph: '*', color: '#ffcf66', bg: '#3f2610' } },
+
+    comboFlora: { name: '組合技型態：藤蔓掃場', description: '組合技改為長出藤蔓，一段時間內範圍攻擊。', group: 'comboForm', implemented: true, icon: { glyph: 'VN', color: '#b8ff8a', bg: '#173719' } },
+    comboPtero: { name: '組合技型態：飛天墜擊', description: '組合技改為飛上天空，瞄準落點後墜落攻擊。', group: 'comboForm', implemented: true, icon: { glyph: 'SK', color: '#fff2a6', bg: '#2f2b12' } },
+    comboRush: { name: '組合技型態：爆衝連擊', description: '組合技改為高速向前爆衝，撞到目標後進入快閃多段攻擊。', group: 'comboForm', implemented: true, icon: { glyph: 'RS', color: '#9ef7ff', bg: '#12373b' } },
+    comboRefractBeam: { name: '組合技型態：折光追獵炮', description: '強化版光束炮，射得更遠，會微微扭曲追向敵人並提高失衡值。', group: 'comboForm', implemented: true, icon: { glyph: 'RB', color: '#e7fbff', bg: '#182a45' } },
+
     speedBoost: { name: '移動、轉向速度提高', description: '每層速度與轉向 +30%。', stackable: true, implemented: true, icon: { glyph: '👟', color: '#59d8ff', bg: '#12303b' } },
     meleeBoost: { name: 'Melee 攻擊力 +30%', description: '每層頭槌/尾巴近戰 +30%。', stackable: true, implemented: true, icon: { glyph: '🗡️', color: '#ffd166', bg: '#3a2c12' } },
     defenseBoost: { name: '增加 20% 防禦率', description: '每層受傷減少 20%（疊加為相乘）。', stackable: true, implemented: true, icon: { glyph: '🛡️', color: '#9ad8ff', bg: '#152a3d' } },
 
     comboCd: { name: '組合技 CD 縮短 50%', description: '組合技冷卻只剩 40%。', implemented: true, icon: { glyph: 'CD', color: '#c4a7ff', bg: '#231a3d' } },
     comboDamage: { name: '組合技傷害 +100%', description: '組合技傷害加倍。', implemented: true, icon: { glyph: 'B', color: '#ff8cff', bg: '#39183c' } },
-    comboFlora: { name: '組合技型態：藤蔓掃場', description: '組合技改為長出藤蔓，一段時間內範圍攻擊。', group: 'comboForm', implemented: true, icon: { glyph: 'VN', color: '#b8ff8a', bg: '#173719' } },
-    comboPtero: { name: '組合技型態：飛天墜擊', description: '組合技改為飛上天空，瞄準落點後墜落攻擊。', group: 'comboForm', implemented: true, icon: { glyph: 'SK', color: '#fff2a6', bg: '#2f2b12' } },
-    comboRush: { name: '組合技型態：爆衝連擊', description: '組合技改為高速向前爆衝，撞到目標後進入快閃多段攻擊。', group: 'comboForm', implemented: true, icon: { glyph: 'RS', color: '#9ef7ff', bg: '#12373b' } },
-    comboRefractBeam: { name: '組合技型態：折光追獵炮', description: '強化版光束炮，射得更遠，會微微扭曲追向敵人並提高失衡值。', group: 'comboForm', implemented: true, icon: { glyph: 'RB', color: '#e7fbff', bg: '#182a45' } },
-    lifeSteal: { name: '有效傷害回血', description: '造成有效傷害時回復少量 HP。', implemented: true, pvpExclude: true, icon: { glyph: 'L', color: '#ff6b7a', bg: '#3d151b' } },
     tailPower: { name: '尾巴攻擊力 +300%', description: '尾巴傷害變為 4 倍。', implemented: true, icon: { glyph: 'T', color: '#60efff', bg: '#12393d' } },
     poisonTrail: { name: '走路留下毒液', description: '毒液殘留 10 秒，緩速並 DOT 敵人。', implemented: true, icon: { glyph: 'P', color: '#8cff5f', bg: '#173a14' } },
     leafShield: { name: '葉子護盾', description: '4 片葉子環繞，投射物碰到葉子會直接反彈。', implemented: true, icon: { glyph: '4', color: '#a7ff83', bg: '#203714' } },
-
-    meleeFireball: { name: 'Melee 型態：噴火球', description: '頭部近戰改成落點火球；尾巴不變。', group: 'meleeForm', implemented: true, icon: { glyph: 'F', color: '#ff9f1c', bg: '#3d2410' } },
-    meleeShockwave: { name: 'Melee 型態：蓄力震波', description: '蓄力重擊會打出暈眩震波。', group: 'meleeForm', implemented: true, icon: { glyph: '~', color: '#a6c8ff', bg: '#172845' } },
-    meleeFlame: { name: 'Melee 型態：噴火', description: '按住頭部攻擊會持續朝前方扇形吐火。', group: 'meleeForm', implemented: true, icon: { glyph: 'W', color: '#ff5e2e', bg: '#40180e' } },
-    meleeExplosion: { name: 'Melee 型態：爆炸', description: '近戰命中有機率引發爆炸。', group: 'meleeForm', implemented: true, icon: { glyph: '*', color: '#ffcf66', bg: '#3f2610' } },
 
     stepShockwave: { name: '落腳震波', description: '每隔幾步，下一次落腳產生震波。', implemented: true, icon: { glyph: 'S', color: '#d9e7ff', bg: '#202d45' } },
     comboRamp: { name: '連擊傷害提高', description: '2 秒內有效攻擊會逐步提高傷害。', implemented: true, icon: { glyph: 'x', color: '#ffe66d', bg: '#383312' } },
     missileNest: { name: '背上飛彈巢', description: '定期發射追蹤飛彈。', implemented: true, icon: { glyph: 'M', color: '#ffb347', bg: '#3d2a10' } },
     directionalGuard: { name: '正面減傷', description: '正面受傷降低。', implemented: true, icon: { glyph: 'G', color: '#9ad1ff', bg: '#162f45' } },
-    reflectProjectile: { name: '50% 反彈投射物', description: '已禁用：此 Buff 不會在 PVP/PVE/問號箱抽取，也無法手動啟用。', implemented: false, disabled: true, pvpExclude: true, icon: { glyph: 'R', color: '#b7ffdd', bg: '#12382a' } },
     beamSlow: { name: '光束波緩速', description: '組合技命中時使敵方緩速。', implemented: true, icon: { glyph: 'SL', color: '#b7d7ff', bg: '#17283f' } },
     poisonCloud: { name: '定期毒霧', description: '週期性噴出大範圍 DOT 毒霧。', implemented: true, icon: { glyph: 'C', color: '#78ff8f', bg: '#14351c' } },
-    ramStagger: { name: '高速衝撞', description: '已禁用：此 Buff 不會在 PVP/PVE 抽取，也無法手動啟用。', implemented: false, disabled: true, pvpExclude: true, icon: { glyph: 'R', color: '#ff5a5a', bg: '#3d1010' } },
     staggerImmune: { name: '不容易跌倒', description: '受到的失衡值減少 50%，衰退速度 +50%。', implemented: true, icon: { glyph: 'I', color: '#ffffff', bg: '#303030' } },
     stationaryShield: { name: '停止不動護盾', description: '站定後免疫 30% 傷害。', implemented: true, icon: { glyph: 'D', color: '#d8fff5', bg: '#173631' } },
-    teamworkRegen: { name: '同心協力回血', description: '同向加速時持續回血。', implemented: true, pvpExclude: true, icon: { glyph: 'H', color: '#73ff9a', bg: '#17351e' } },
     lowHpExplosion: { name: '跌倒反擊大爆炸', description: '失衡跌倒站起來時，向四周噴發一次大爆炸。', implemented: true, icon: { glyph: '!', color: '#ffef73', bg: '#4a2510' } },
     knockbackBoost: { name: '把敵人推得遠遠的', description: '本龍造成的所有擊退力變為 3 倍。', implemented: true, icon: { glyph: 'KB', color: '#ffd166', bg: '#3a1f12' } },
-    comboInvincible: { name: '組合技期間無敵', description: '光束波施放期間免疫傷害。', implemented: true, icon: { glyph: 'V', color: '#f7f2ff', bg: '#2b1f42' } }
+    comboInvincible: { name: '組合技期間無敵', description: '光束波施放期間免疫傷害。', implemented: true, icon: { glyph: 'V', color: '#f7f2ff', bg: '#2b1f42' } },
+
+    lifeSteal: { name: '有效傷害回血', description: '造成有效傷害時回復少量 HP。', implemented: true, pvpExclude: true, icon: { glyph: 'L', color: '#ff6b7a', bg: '#3d151b' } },
+    teamworkRegen: { name: '同心協力回血', description: '同向加速時持續回血。', implemented: true, pvpExclude: true, icon: { glyph: 'H', color: '#73ff9a', bg: '#17351e' } },
+    hpBoost: { name: '增加血量 30%', description: '已禁用：此 Buff 不會在 PVP/PVE/問號箱抽取，也無法手動啟用。', stackable: true, implemented: false, disabled: true, pvpExclude: true, icon: { glyph: '+', color: '#62f28f', bg: '#14371f' } },
+    reflectProjectile: { name: '50% 反彈投射物', description: '已禁用：此 Buff 不會在 PVP/PVE/問號箱抽取，也無法手動啟用。', implemented: false, disabled: true, pvpExclude: true, icon: { glyph: 'R', color: '#b7ffdd', bg: '#12382a' } },
+    ramStagger: { name: '高速衝撞', description: '已禁用：此 Buff 不會在 PVP/PVE 抽取，也無法手動啟用。', implemented: false, disabled: true, pvpExclude: true, icon: { glyph: 'R', color: '#ff5a5a', bg: '#3d1010' } }
 };
 
 function isBuffImplemented(id) {

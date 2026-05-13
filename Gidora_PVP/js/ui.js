@@ -226,7 +226,7 @@ function setupBuffUI() {
         title.className = 'buff-title';
         title.style.fontSize = '13px';
         title.style.fontWeight = 'bold';
-        title.style.color = isBuffImplemented(id) ? '#ffffff' : '#ff5a5a';
+        title.style.color = (isBuffImplemented(id) && !cfg.pvpExclude) ? '#ffffff' : '#ff5a5a';
         title.textContent = cfg.name;
         titleLine.appendChild(title);
         text.appendChild(titleLine);
@@ -332,7 +332,7 @@ function refreshBuffUI() {
         row.style.opacity = isDisabled ? '0.72' : '1';
         input.disabled = isDisabled;
         title.textContent = BUFFS[id].name + (BUFFS[id].stackable && stack > 0 ? ` x${stack}` : '');
-        title.style.color = isBuffImplemented(id) ? '#ffffff' : '#ff5a5a';
+        title.style.color = (isBuffImplemented(id) && !isPvpExclude) ? '#ffffff' : '#ff5a5a';
     });
 }
 
