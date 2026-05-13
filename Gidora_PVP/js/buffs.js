@@ -7,9 +7,9 @@
 
 const BUFFS = {
     hpBoost: { name: '增加血量 30%', description: '已禁用：此 Buff 不會在 PVP/PVE/問號箱抽取，也無法手動啟用。', stackable: true, implemented: false, disabled: true, pvpExclude: true, icon: { glyph: '+', color: '#62f28f', bg: '#14371f' } },
-    speedBoost: { name: '移動、轉向速度提高', description: '每層速度與轉向 +30%。', stackable: true, implemented: true, icon: { glyph: '>>', color: '#59d8ff', bg: '#12303b' } },
-    meleeBoost: { name: 'Melee 攻擊力 +30%', description: '每層頭槌/尾巴近戰 +30%。', stackable: true, implemented: true, icon: { glyph: 'X', color: '#ffd166', bg: '#3a2c12' } },
-    defenseBoost: { name: '增加 20% 防禦率', description: '每層受傷減少 20%（疊加為相乘）。', stackable: true, implemented: true, icon: { glyph: 'DF', color: '#9ad8ff', bg: '#152a3d' } },
+    speedBoost: { name: '移動、轉向速度提高', description: '每層速度與轉向 +30%。', stackable: true, implemented: true, icon: { glyph: '👟', color: '#59d8ff', bg: '#12303b' } },
+    meleeBoost: { name: 'Melee 攻擊力 +30%', description: '每層頭槌/尾巴近戰 +30%。', stackable: true, implemented: true, icon: { glyph: '🗡️', color: '#ffd166', bg: '#3a2c12' } },
+    defenseBoost: { name: '增加 20% 防禦率', description: '每層受傷減少 20%（疊加為相乘）。', stackable: true, implemented: true, icon: { glyph: '🛡️', color: '#9ad8ff', bg: '#152a3d' } },
 
     comboCd: { name: '組合技 CD 縮短 50%', description: '組合技冷卻只剩 40%。', implemented: true, icon: { glyph: 'CD', color: '#c4a7ff', bg: '#231a3d' } },
     comboDamage: { name: '組合技傷害 +100%', description: '組合技傷害加倍。', implemented: true, icon: { glyph: 'B', color: '#ff8cff', bg: '#39183c' } },

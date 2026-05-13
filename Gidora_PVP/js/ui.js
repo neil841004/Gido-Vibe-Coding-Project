@@ -1391,7 +1391,59 @@ function updatePvpBuffSummaryPanel(panelId, dragon) {
         return;
     }
 
+    const stackableEntries = [];
+    const formEntries = [];
+    const otherEntries = [];
+
     entries.forEach(entry => {
+        const cfg = BUFFS[entry.id];
+        if (cfg.stackable) stackableEntries.push(entry);
+        else if (cfg.group === 'comboForm' || cfg.group === 'meleeForm') formEntries.push(entry);
+        else otherEntries.push(entry);
+    });
+
+    if (stackableEntries.length > 0) {
+        const stackRow = document.createElement('div');
+        stackRow.style.display = 'flex';
+        stackRow.style.flexDirection = 'row';
+        stackRow.style.flexWrap = 'wrap';
+        stackRow.style.gap = '6px';
+        stackRow.style.marginBottom = '4px';
+        stackRow.style.justifyContent = isA ? 'flex-start' : 'flex-end';
+
+        stackableEntries.forEach(entry => {
+            const row = document.createElement('div');
+            row.style.display = 'inline-flex';
+            row.style.alignItems = 'center';
+            row.style.gap = '4px';
+            row.style.background = 'rgba(0,0,0,0.42)';
+            row.style.border = '1px solid rgba(255,255,255,0.12)';
+            row.style.borderRadius = '6px';
+            row.style.padding = intro ? '6px' : '4px';
+            row.style.backdropFilter = 'blur(2px)';
+            
+            const icon = createBuffIconElement(entry.id);
+            icon.style.width = intro ? '30px' : '24px';
+            icon.style.height = intro ? '30px' : '24px';
+            icon.style.fontSize = intro ? (getBuffIconSpec(entry.id).glyph.length > 1 ? '13px' : '17px') : (getBuffIconSpec(entry.id).glyph.length > 1 ? '11px' : '14px');
+            row.appendChild(icon);
+
+            if (entry.stack > 1) {
+                const count = document.createElement('span');
+                count.textContent = `x${entry.stack}`;
+                count.style.fontSize = intro ? '14px' : '11px';
+                count.style.fontWeight = '700';
+                count.style.textShadow = '0 0 8px #000';
+                row.appendChild(count);
+            }
+            stackRow.appendChild(row);
+        });
+        list.appendChild(stackRow);
+    }
+
+    const nonStackableEntries = [...formEntries, ...otherEntries];
+
+    nonStackableEntries.forEach(entry => {
         const row = document.createElement('div');
         row.style.display = 'inline-flex';
         row.style.alignItems = 'center';
@@ -1401,6 +1453,7 @@ function updatePvpBuffSummaryPanel(panelId, dragon) {
         row.style.borderRadius = '6px';
         row.style.padding = intro ? '8px 11px' : '4px 7px';
         row.style.backdropFilter = 'blur(2px)';
+        
         const icon = createBuffIconElement(entry.id);
         icon.style.width = intro ? '30px' : '20px';
         icon.style.height = intro ? '30px' : '20px';
