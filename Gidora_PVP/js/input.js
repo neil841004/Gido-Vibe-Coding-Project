@@ -98,12 +98,12 @@ function setupInputs() {
             dragonA.input.p1.pointer.copy(mousePos);
             dragonA.input.p1.pointerActive = true;
             dragonA.input.p1.attack = mouseAttack || !!keys['Digit1'];
-            dragonA.input.p2.attack = !!keys['Digit2'];
-            dragonA.input.p3.attack = !!keys['Digit3'];
+            dragonA.input.p3.attack = !!keys['Digit2'];
+            dragonA.input.p2.attack = !!keys['Digit3'];
             dragonA.input.p4.attack = !!keys['Digit4'];
             dragonA.input.p1.charge = canCharge && (mouseCharge || !!keys['Digit5']);
-            dragonA.input.p2.charge = canCharge && !!keys['Digit6'];
-            dragonA.input.p3.charge = canCharge && !!keys['Digit7'];
+            dragonA.input.p3.charge = canCharge && !!keys['Digit6'];
+            dragonA.input.p2.charge = canCharge && !!keys['Digit7'];
             dragonA.input.p4.charge = canCharge && !!keys['Digit8'];
         }
 
@@ -115,12 +115,12 @@ function setupInputs() {
             if (keys['ArrowRight']) vx += 1;
             assignMove(dragonB, 'p1', vx, vy);
             dragonB.input.p1.attack = !!keys['Numpad1'];
-            dragonB.input.p2.attack = !!keys['Numpad2'];
-            dragonB.input.p3.attack = !!keys['Numpad3'];
+            dragonB.input.p3.attack = !!keys['Numpad2'];
+            dragonB.input.p2.attack = !!keys['Numpad3'];
             dragonB.input.p4.attack = !!keys['Numpad4'];
             dragonB.input.p1.charge = canCharge && !!keys['Numpad5'];
-            dragonB.input.p2.charge = canCharge && !!keys['Numpad6'];
-            dragonB.input.p3.charge = canCharge && !!keys['Numpad7'];
+            dragonB.input.p3.charge = canCharge && !!keys['Numpad6'];
+            dragonB.input.p2.charge = canCharge && !!keys['Numpad7'];
             dragonB.input.p4.charge = canCharge && !!keys['Numpad8'];
         }
     };
@@ -141,12 +141,12 @@ function setupInputs() {
         dragonA.input.p1.pointer.copy(mousePos);
         dragonA.input.p1.pointerActive = true;
         dragonA.input.p1.attack = mouseAttack || !!keys['Digit1'];
-        dragonA.input.p2.attack = !!keys['Digit2'];
-        dragonA.input.p3.attack = !!keys['Digit3'];
+        dragonA.input.p3.attack = !!keys['Digit2'];
+        dragonA.input.p2.attack = !!keys['Digit3'];
         dragonA.input.p4.attack = !!keys['Digit4'];
         dragonA.input.p1.charge = mouseCharge || !!keys['Digit5'];
-        dragonA.input.p2.charge = !!keys['Digit6'];
-        dragonA.input.p3.charge = !!keys['Digit7'];
+        dragonA.input.p3.charge = !!keys['Digit6'];
+        dragonA.input.p2.charge = !!keys['Digit7'];
         dragonA.input.p4.charge = !!keys['Digit8'];
     };
 
@@ -190,7 +190,7 @@ function setupInputs() {
                 if (keys['KeyD']) vx += 1;
                 assignMove(dragonA, 'p1', vx, vy);
             }
-            ['p1', 'p2', 'p3', 'p4'].forEach((p, i) => {
+            ['p1', 'p3', 'p2', 'p4'].forEach((p, i) => {
                 if (keys[`Digit${i + 1}`]) dragonA.input[p].attack = true;
                 if (keys[`Digit${i + 5}`]) dragonA.input[p].charge = true;
             });
@@ -205,7 +205,7 @@ function setupInputs() {
                 if (keys['ArrowRight']) vx += 1;
                 assignMove(dragonB, 'p1', vx, vy);
             }
-            ['p1', 'p2', 'p3', 'p4'].forEach((p, i) => {
+            ['p1', 'p3', 'p2', 'p4'].forEach((p, i) => {
                 if (keys[`Numpad${i + 1}`]) dragonB.input[p].attack = true;
                 if (keys[`Numpad${i + 5}`]) dragonB.input[p].charge = true;
             });

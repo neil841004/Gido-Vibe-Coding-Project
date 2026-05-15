@@ -175,6 +175,7 @@ class Gidora {
         this.standUpStartRotationX = 0;
         this.slowTimer = 0;
         this.slowFactor = 1.0;
+        this.tailLightDashSpeedBonus = 0;
         this.comboRampStacks = 0;
         this.comboRampTimer = 0;
         this.stationaryTimer = 0;
@@ -243,6 +244,36 @@ class Gidora {
     applySlow(factor, duration) {
         this.slowFactor = Math.min(this.slowFactor, factor);
         this.slowTimer = Math.max(this.slowTimer, duration);
+    }
+
+    applyTailLightDash() {
+        const dashDir = this.getForwardVector();
+        dashDir.y = 0;
+        if (dashDir.lengthSq() <= 0.001) return;
+        dashDir.normalize();
+
+        const terrainSpeedFactor = state.levelManager
+            ? state.levelManager.getSpeedFactor(this.mesh.position)
+            : 1.0;
+        const maxSpeed = CONFIG.movement.maxSpeed
+            * this.buffSystem.getSpeedMultiplier()
+            * terrainSpeedFactor
+            * this.slowFactor;
+        const currentForwardSpeed = this.velocity.dot(dashDir);
+        this.tailLightDashSpeedBonus = Math.max(
+            this.tailLightDashSpeedBonus,
+            CONFIG.combat.tailLightDashOverspeed
+        );
+        const dashSpeedCap = Math.max(maxSpeed, currentForwardSpeed) + this.tailLightDashSpeedBonus;
+        const targetForwardSpeed = Math.min(
+            dashSpeedCap,
+            Math.max(0, currentForwardSpeed) + CONFIG.combat.tailLightDashForce
+        );
+        const boost = targetForwardSpeed - currentForwardSpeed;
+        if (boost <= 0) return;
+
+        this.velocity.add(dashDir.multiplyScalar(boost));
+        if (this.velocity.length() > dashSpeedCap) this.velocity.setLength(dashSpeedCap);
     }
 
     heal(amount) {
@@ -748,12 +779,8 @@ class Gidora {
                         this.cooldowns.p4 = CONFIG.combat.cooldown;
                         const windupT = Math.min(1, this.attackHoldTimers.p4 / CONFIG.combat.windupTime);
                         this.tailStartRecoveryY = (windupT * (2 - windupT)) * 1.8;
-                        // 尾巴輕攻擊：朝面向方向產生一段 dash
-                        const dashDir = this.getForwardVector();
-                        dashDir.y = 0;
-                        if (dashDir.lengthSq() > 0.001) {
-                            this.knockbackVel.add(dashDir.normalize().multiplyScalar(CONFIG.combat.tailLightDashForce));
-                        }
+                        // 尾巴輕攻擊：朝面向方向注入主速度，讓起步加速更快，滿速時可短暫微幅超速
+                        this.applyTailLightDash();
                     }
                 }
             } else if (currentState === 'tailSweep') {
@@ -2747,6 +2774,7 @@ class Gidora {
             this.mesh.rotation.x = THREE.MathUtils.lerp(this.mesh.rotation.x, -0.9, dt * 8);
             this.velocity.multiplyScalar(Math.max(0, 1 - 12 * dt));
             this.knockbackVel.set(0, 0, 0);
+            this.tailLightDashSpeedBonus = 0;
             // 鏡頭跟隨改由 main.js 集中管理 (PVP 多龍模式需要中點跟隨)
             if (this.fallTimer <= 0) {
                 this.fallTimer = 0;
@@ -2764,6 +2792,7 @@ class Gidora {
             this.mesh.rotation.x = THREE.MathUtils.lerp(this.standUpStartRotationX, 0, ease);
             this.velocity.multiplyScalar(Math.max(0, 1 - 10 * dt));
             this.knockbackVel.set(0, 0, 0);
+            this.tailLightDashSpeedBonus = 0;
             if (this.standUpTimer <= 0) {
                 this.mesh.rotation.x = 0;
                 if (this.buffSystem && this.buffSystem.onStandUpComplete) this.buffSystem.onStandUpComplete();
@@ -2963,6 +2992,7 @@ class Gidora {
         const currentSpeed = this.velocity.length();
         const terrainSpeedFactor = state.levelManager ? state.levelManager.getSpeedFactor(this.mesh.position) : 1.0;
         const maxSpeed = CONFIG.movement.maxSpeed * this.buffSystem.getSpeedMultiplier() * terrainSpeedFactor * this.slowFactor * speedMult * turnPenalty;
+        const allowedMaxSpeed = maxSpeed + this.tailLightDashSpeedBonus;
         const forward = this.getForwardVector();
         const isInputting = totalInput.lengthSq() > 0.01;
 
@@ -2979,13 +3009,22 @@ class Gidora {
             }
             const accel = CONFIG.movement.acceleration * this.buffSystem.getSpeedMultiplier() * terrainSpeedFactor * this.slowFactor * dt;
             this.velocity.add(forward.multiplyScalar(accel));
-            if (this.velocity.length() > maxSpeed) this.velocity.setLength(maxSpeed);
+            if (this.velocity.length() > allowedMaxSpeed) this.velocity.setLength(allowedMaxSpeed);
         } else {
             const friction = CONFIG.movement.friction * dt;
             const spd = this.velocity.length();
             if (spd > 0) {
                 if (spd < friction) this.velocity.set(0, 0, 0);
                 else this.velocity.multiplyScalar(1 - (friction / spd));
+            }
+        }
+        if (!isRushComboActive && this.tailLightDashSpeedBonus > 0) {
+            this.tailLightDashSpeedBonus = Math.max(
+                0,
+                this.tailLightDashSpeedBonus - CONFIG.combat.tailLightDashReturnRate * dt
+            );
+            if (this.velocity.length() > maxSpeed + this.tailLightDashSpeedBonus) {
+                this.velocity.setLength(maxSpeed + this.tailLightDashSpeedBonus);
             }
         }
 

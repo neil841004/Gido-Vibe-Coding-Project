@@ -129,7 +129,9 @@ const CONFIG = {
         tailSweepDuration: 0.45,            // P4 蓄力重擊旋轉橫掃的動畫持續秒數
         tailSweepRadius: 5,               // P4 尾巴橫掃攻擊半徑
         tailSweepDamageScale: 1.7,          // P4 蓄力橫掃傷害倍率（疊加在 meleeDamage 與 tailPower 之上）
-        tailLightDashForce: 12,             // P4 尾巴輕攻擊瞬發 dash 沿面向方向的力度
+        tailLightDashForce: 9,             // P4 尾巴輕攻擊瞬發 dash 加到主速度的前向速度量
+        tailLightDashOverspeed: 6,        // P4 尾巴輕攻擊可短暫超過目前最高速的額外速度量
+        tailLightDashReturnRate: 10,         // P4 尾巴輕攻擊超速上限每秒回正速度量
         heavyStaggerBonusScale: 0.5         // 蓄力攻擊命中時，額外造成傷害 50% 的失衡值
     },
 
