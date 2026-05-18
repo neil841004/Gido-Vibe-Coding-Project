@@ -176,6 +176,7 @@ class Gidora {
         this.slowTimer = 0;
         this.slowFactor = 1.0;
         this.tailLightDashSpeedBonus = 0;
+        this.tailSweepForwardLockTimer = 0;
         this.comboRampStacks = 0;
         this.comboRampTimer = 0;
         this.stationaryTimer = 0;
@@ -803,10 +804,12 @@ class Gidora {
                     this._triggerTailSweepImpact();
                 }
                 if (this.attackTimers.p4 <= 0) {
+                    this.mesh.rotation.y = this.tailSweepStartY + Math.PI;
                     this.attackStates.p4 = 'recovery';
                     this.attackTimers.p4 = CONFIG.combat.heavyRecoveryTime;
                     this.tailGroup.rotation.x = 0;
                     this.tailStartRecoveryY = -2.6;
+                    this.tailSweepForwardLockTimer = CONFIG.combat.tailSweepForwardLockDuration;
                 }
             } else if (currentState === 'windup') {
                 this.hideChargeIndicator(p);
@@ -2766,6 +2769,9 @@ class Gidora {
             this.comboRampTimer -= dt;
             if (this.comboRampTimer <= 0) this.comboRampStacks = 0;
         }
+        if (this.tailSweepForwardLockTimer > 0) {
+            this.tailSweepForwardLockTimer = Math.max(0, this.tailSweepForwardLockTimer - dt);
+        }
         if (this.velocity.lengthSq() < 0.05 && this.knockbackVel.lengthSq() < 0.05) this.stationaryTimer += dt;
         else this.stationaryTimer = 0;
 
@@ -2775,6 +2781,7 @@ class Gidora {
             this.velocity.multiplyScalar(Math.max(0, 1 - 12 * dt));
             this.knockbackVel.set(0, 0, 0);
             this.tailLightDashSpeedBonus = 0;
+            this.tailSweepForwardLockTimer = 0;
             // 鏡頭跟隨改由 main.js 集中管理 (PVP 多龍模式需要中點跟隨)
             if (this.fallTimer <= 0) {
                 this.fallTimer = 0;
@@ -2793,6 +2800,7 @@ class Gidora {
             this.velocity.multiplyScalar(Math.max(0, 1 - 10 * dt));
             this.knockbackVel.set(0, 0, 0);
             this.tailLightDashSpeedBonus = 0;
+            this.tailSweepForwardLockTimer = 0;
             if (this.standUpTimer <= 0) {
                 this.mesh.rotation.x = 0;
                 if (this.buffSystem && this.buffSystem.onStandUpComplete) this.buffSystem.onStandUpComplete();
@@ -2911,17 +2919,25 @@ class Gidora {
         let totalRotationInput = new THREE.Vector3();
         const activeDirs = [];
         const tailSweepRotating = this.attackStates.p4 === 'tailSweep';
+        const tailSweepForwardLocked = this.tailSweepForwardLockTimer > 0;
+        const forcedForwardInput = this.getForwardVector();
+        forcedForwardInput.y = 0;
+        if (forcedForwardInput.lengthSq() > 0.001) forcedForwardInput.normalize();
+        else forcedForwardInput.set(0, 0, 1);
 
         players.forEach(p => {
             const moveInput = this.input[p].move;
             const hasInput = moveInput.lengthSq() > 0.01;
             const playerLocked = this.isPlayerMovementLocked(p);
+            const tailForwardOverride = tailSweepForwardLocked && !this.input[p].charge;
 
             const arrowMap = { p1: this.p1Arrow, p2: this.p2Arrow, p3: this.p3Arrow, p4: this.p4Arrow };
             const arrow = arrowMap[p];
 
-            if (hasInput && !playerLocked) {
-                const inputVec = new THREE.Vector3(moveInput.x, 0, moveInput.y);
+            if (hasInput && (!playerLocked || tailForwardOverride)) {
+                const inputVec = tailForwardOverride
+                    ? forcedForwardInput.clone()
+                    : new THREE.Vector3(moveInput.x, 0, moveInput.y);
                 const dir = inputVec.clone().normalize();
                 if (!tailSweepRotating) totalRotationInput.add(inputVec);
                 if (!isBeamActive || isFloraComboActive) {

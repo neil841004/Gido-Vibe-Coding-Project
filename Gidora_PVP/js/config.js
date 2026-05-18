@@ -132,6 +132,7 @@ const CONFIG = {
         tailLightDashForce: 9,             // P4 尾巴輕攻擊瞬發 dash 加到主速度的前向速度量
         tailLightDashOverspeed: 6,        // P4 尾巴輕攻擊可短暫超過目前最高速的額外速度量
         tailLightDashReturnRate: 10,         // P4 尾巴輕攻擊超速上限每秒回正速度量
+        tailSweepForwardLockDuration: 0.25,   // P4 尾巴蓄力重擊 180 度轉向完成後，所有移動輸入強制轉成新面向前進的秒數
         heavyStaggerBonusScale: 0.5         // 蓄力攻擊命中時，額外造成傷害 50% 的失衡值
     },
 
