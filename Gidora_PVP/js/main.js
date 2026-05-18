@@ -185,14 +185,22 @@ function getRandomBuffCount(setting) {
     return THREE.MathUtils.clamp(Number(setting) || 0, 0, CONFIG.pvp.maxBuffsPerDragon);
 }
 
+function resolveDragonTypeSelection(setting) {
+    if (setting === -1 || setting === '-1') return getRandomDragonTypeId();
+    return CONFIG.dragonTypes.options[setting] ? setting : CONFIG.dragonTypes.defaultId;
+}
+
+function applyDragonTypeSelection(dragon, setting) {
+    if (!dragon || !dragon.setDragonType) return;
+    dragon.setDragonType(resolveDragonTypeSelection(setting));
+}
+
 function applyRandomBuffs(dragon, countSetting) {
     if (!dragon || !dragon.buffSystem) return;
     dragon.buffSystem.clearAll();
     const count = getRandomBuffCount(countSetting);
     // PVP 模式不抽 pvpExclude 的 Buff（同心協力回血、有效傷害回血）
     const ids = Object.keys(BUFFS).filter(id => !BUFFS[id].pvpExclude && !BUFFS[id].disabled);
-    const meleeFormIds = ids.filter(id => BUFFS[id].group === 'meleeForm');
-    const comboFormIds = ids.filter(id => BUFFS[id].group === 'comboForm');
     for (let i = ids.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
         [ids[i], ids[j]] = [ids[j], ids[i]];
@@ -206,12 +214,6 @@ function applyRandomBuffs(dragon, countSetting) {
         if (group) selectedGroups.add(group);
         return true;
     };
-    if (count >= 4 && meleeFormIds.length > 0) {
-        trySelectBuff(shuffleArray(meleeFormIds.slice())[0]);
-    }
-    if (count >= 6 && comboFormIds.length > 0) {
-        trySelectBuff(shuffleArray(comboFormIds.slice())[0]);
-    }
     ids.some(id => {
         if (selectedIds.length >= count) return true;
         trySelectBuff(id);
@@ -250,6 +252,8 @@ function enterPvpBattle() {
     state.pvp.startTextTimer = 0;
     resetDragonForBattle(state.dragons[0], 0, true);
     resetDragonForBattle(state.dragons[1], 1, true);
+    applyDragonTypeSelection(state.dragons[0], state.pvp.dragonTypes[0]);
+    applyDragonTypeSelection(state.dragons[1], state.pvp.dragonTypes[1]);
     applyRandomBuffs(state.dragons[0], state.pvp.buffCounts[0]);
     applyRandomBuffs(state.dragons[1], state.pvp.buffCounts[1]);
     if (typeof refreshAllUI === 'function') refreshAllUI();
@@ -282,6 +286,8 @@ function enterPveBattle() {
     state.pve.configuring = false;
     resetDragonForBattle(state.dragons[0], 0, true);
     resetDragonForBattle(state.dragons[1], 1, true);
+    applyDragonTypeSelection(state.dragons[0], state.pvp.dragonTypes[0]);
+    applyDragonTypeSelection(state.dragons[1], state.pvp.dragonTypes[1]);
     applyRandomBuffs(state.dragons[0], state.pvp.buffCounts[0]);
     applyRandomBuffs(state.dragons[1], state.pvp.buffCounts[1]);
     if (!state.pve.cpu && typeof CpuDragonController === 'function') {

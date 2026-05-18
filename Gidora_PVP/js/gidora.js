@@ -82,6 +82,7 @@ class Gidora {
     constructor(index = 0, opts = {}) {
         this.index = index;
         this.colors = (index === 1) ? CONFIG.visuals.colorsB : CONFIG.visuals.colors;
+        this.dragonType = CONFIG.dragonTypes.defaultId;
 
         this.mesh = new THREE.Group();
         this.velocity = new THREE.Vector3();
@@ -202,6 +203,22 @@ class Gidora {
             : CONFIG.pvp.dragonASpawn);
         this.mesh.position.set(spawn.x, 0, spawn.z);
         this.mesh.rotation.y = spawn.facingY || 0;
+    }
+
+    setDragonType(typeId) {
+        const options = CONFIG.dragonTypes.options;
+        this.dragonType = options[typeId] ? typeId : CONFIG.dragonTypes.defaultId;
+        if (this.buffSystem && this.buffSystem.active) {
+            Object.keys(BUFFS).forEach(id => {
+                if (isDragonFormBuff(id)) this.buffSystem.active.delete(id);
+            });
+            this.buffSystem.refreshPlayerStats();
+        }
+        if (this.beamPhase === 'idle') {
+            this.activeComboForm = this.buffSystem && this.buffSystem.getComboForm
+                ? this.buffSystem.getComboForm()
+                : getDragonTypeConfig(this.dragonType).comboForm;
+        }
     }
 
     takeDamage(amount, sourcePos, knockbackForce) {

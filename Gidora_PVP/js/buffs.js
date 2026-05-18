@@ -6,15 +6,15 @@
 // =====================================================================
 
 const BUFFS = {
-    meleeFireball: { name: 'Melee 型態：噴火球', description: '頭部近戰改成落點火球；尾巴不變。', group: 'meleeForm', implemented: true, icon: { glyph: 'F', color: '#ff9f1c', bg: '#3d2410' } },
-    meleeShockwave: { name: 'Melee 型態：蓄力震波', description: '蓄力重擊會打出暈眩震波。', group: 'meleeForm', implemented: true, icon: { glyph: '~', color: '#a6c8ff', bg: '#172845' } },
-    meleeFlame: { name: 'Melee 型態：噴火', description: '按住頭部攻擊會持續朝前方扇形吐火。', group: 'meleeForm', implemented: true, icon: { glyph: 'W', color: '#ff5e2e', bg: '#40180e' } },
-    meleeExplosion: { name: 'Melee 型態：爆炸', description: '近戰命中有機率引發爆炸。', group: 'meleeForm', implemented: true, icon: { glyph: '*', color: '#ffcf66', bg: '#3f2610' } },
+    meleeFireball: { name: 'Melee 型態：噴火球', description: '已禁用：Melee 型態改由「龍型態」決定，不會在 PVP/PVE/問號箱抽取，也無法手動啟用。', group: 'meleeForm', implemented: false, disabled: true, pvpExclude: true, icon: { glyph: 'F', color: '#ff9f1c', bg: '#3d2410' } },
+    meleeShockwave: { name: 'Melee 型態：蓄力震波', description: '已禁用：Melee 型態改由「龍型態」決定，不會在 PVP/PVE/問號箱抽取，也無法手動啟用。', group: 'meleeForm', implemented: false, disabled: true, pvpExclude: true, icon: { glyph: '~', color: '#a6c8ff', bg: '#172845' } },
+    meleeFlame: { name: 'Melee 型態：噴火', description: '已禁用：Melee 型態改由「龍型態」決定，不會在 PVP/PVE/問號箱抽取，也無法手動啟用。', group: 'meleeForm', implemented: false, disabled: true, pvpExclude: true, icon: { glyph: 'W', color: '#ff5e2e', bg: '#40180e' } },
+    meleeExplosion: { name: 'Melee 型態：爆炸', description: '已禁用：Melee 型態改由「龍型態」決定，不會在 PVP/PVE/問號箱抽取，也無法手動啟用。', group: 'meleeForm', implemented: false, disabled: true, pvpExclude: true, icon: { glyph: '*', color: '#ffcf66', bg: '#3f2610' } },
 
-    comboFlora: { name: '組合技型態：藤蔓掃場', description: '組合技改為長出藤蔓，一段時間內範圍攻擊。', group: 'comboForm', implemented: true, icon: { glyph: 'VN', color: '#b8ff8a', bg: '#173719' } },
-    comboPtero: { name: '組合技型態：飛天墜擊', description: '組合技改為飛上天空，瞄準落點後墜落攻擊。', group: 'comboForm', implemented: true, icon: { glyph: 'SK', color: '#fff2a6', bg: '#2f2b12' } },
-    comboRush: { name: '組合技型態：爆衝連擊', description: '組合技改為高速向前爆衝，撞到目標後進入快閃多段攻擊。', group: 'comboForm', implemented: true, icon: { glyph: 'RS', color: '#9ef7ff', bg: '#12373b' } },
-    comboRefractBeam: { name: '組合技型態：折光追獵炮', description: '強化版光束炮，射得更遠，會微微扭曲追向敵人並提高失衡值。', group: 'comboForm', implemented: true, icon: { glyph: 'RB', color: '#e7fbff', bg: '#182a45' } },
+    comboFlora: { name: '組合技型態：藤蔓掃場', description: '已禁用：組合技型態改由「龍型態」決定，不會在 PVP/PVE/問號箱抽取，也無法手動啟用。', group: 'comboForm', implemented: false, disabled: true, pvpExclude: true, icon: { glyph: 'VN', color: '#b8ff8a', bg: '#173719' } },
+    comboPtero: { name: '組合技型態：飛天墜擊', description: '已禁用：組合技型態改由「龍型態」決定，不會在 PVP/PVE/問號箱抽取，也無法手動啟用。', group: 'comboForm', implemented: false, disabled: true, pvpExclude: true, icon: { glyph: 'SK', color: '#fff2a6', bg: '#2f2b12' } },
+    comboRush: { name: '組合技型態：爆衝連擊', description: '已禁用：組合技型態改由「龍型態」決定，不會在 PVP/PVE/問號箱抽取，也無法手動啟用。', group: 'comboForm', implemented: false, disabled: true, pvpExclude: true, icon: { glyph: 'RS', color: '#9ef7ff', bg: '#12373b' } },
+    comboRefractBeam: { name: '組合技型態：折光追獵炮', description: '已禁用：組合技型態改由「龍型態」決定，不會在 PVP/PVE/問號箱抽取，也無法手動啟用。', group: 'comboForm', implemented: false, disabled: true, pvpExclude: true, icon: { glyph: 'RB', color: '#e7fbff', bg: '#182a45' } },
 
     speedBoost: { name: '移動、轉向速度提高', description: '每層速度與轉向 +30%。', stackable: true, implemented: true, icon: { glyph: '👟', color: '#59d8ff', bg: '#12303b' } },
     meleeBoost: { name: 'Melee 攻擊力 +30%', description: '每層頭槌/尾巴近戰 +30%。', stackable: true, implemented: true, icon: { glyph: '🗡️', color: '#ffd166', bg: '#3a2c12' } },
@@ -47,6 +47,11 @@ const BUFFS = {
 
 function isBuffImplemented(id) {
     return BUFFS[id] && BUFFS[id].implemented !== false;
+}
+
+function isDragonFormBuff(id) {
+    const group = BUFFS[id] && BUFFS[id].group;
+    return group === 'meleeForm' || group === 'comboForm';
 }
 
 function getBuffIconSpec(id) {
@@ -268,19 +273,13 @@ class BuffSystem {
     }
 
     getMeleeForm() {
-        if (this.isActive('meleeFireball')) return 'fireball';
-        if (this.isActive('meleeShockwave')) return 'shockwave';
-        if (this.isActive('meleeFlame')) return 'flame';
-        if (this.isActive('meleeExplosion')) return 'explosion';
-        return 'default';
+        const type = getDragonTypeConfig(this.dragon && this.dragon.dragonType);
+        return type.meleeForm || 'default';
     }
 
     getComboForm() {
-        if (this.isActive('comboFlora')) return 'flora';
-        if (this.isActive('comboPtero')) return 'ptero';
-        if (this.isActive('comboRush')) return 'rush';
-        if (this.isActive('comboRefractBeam')) return 'refractBeam';
-        return 'beam';
+        const type = getDragonTypeConfig(this.dragon && this.dragon.dragonType);
+        return type.comboForm || 'beam';
     }
 
     getHpMultiplier() {
@@ -658,7 +657,7 @@ class BuffSystem {
     }
 
     _updateFloraDecor(dt, dragon) {
-        if (!this.isActive('comboFlora')) {
+        if (this.getComboForm() !== 'flora') {
             if (this.objects.comboFloraVines) {
                 this._disposeMesh(this.objects.comboFloraVines);
                 this.objects.comboFloraVines = null;
@@ -723,7 +722,7 @@ class BuffSystem {
     }
 
     _updatePteroWingDecor(dt, dragon) {
-        if (!this.isActive('comboPtero')) {
+        if (this.getComboForm() !== 'ptero') {
             if (this.objects.comboPteroWings) {
                 this._disposeMesh(this.objects.comboPteroWings);
                 this.objects.comboPteroWings = null;

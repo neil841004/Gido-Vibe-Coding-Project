@@ -21,6 +21,39 @@ function getHudDragon() {
     return getBuffTargetDragon();
 }
 
+function createDragonTypeIconElement(typeId) {
+    const cfg = getDragonTypeConfig(typeId);
+    const spec = cfg.icon || { glyph: '?', color: '#ffffff', bg: '#333333' };
+    const icon = document.createElement('span');
+    icon.textContent = spec.glyph;
+    icon.style.display = 'inline-flex';
+    icon.style.alignItems = 'center';
+    icon.style.justifyContent = 'center';
+    icon.style.width = '20px';
+    icon.style.height = '20px';
+    icon.style.borderRadius = '5px';
+    icon.style.background = spec.bg;
+    icon.style.color = spec.color;
+    icon.style.border = '1px solid rgba(255,255,255,0.25)';
+    icon.style.fontSize = spec.glyph.length > 1 ? '9px' : '12px';
+    icon.style.fontWeight = '900';
+    icon.style.lineHeight = '1';
+    icon.style.flex = '0 0 auto';
+    return icon;
+}
+
+function getDragonComboDisplayLabel(dragon, form) {
+    if (dragon) {
+        const type = getDragonTypeConfig(dragon.dragonType);
+        if (type.comboForm === form) return type.comboLabel || type.shortName || type.name;
+    }
+    if (form === 'flora') return '藤蔓掃場';
+    if (form === 'ptero') return '飛天墜擊';
+    if (form === 'rush') return '爆衝連擊';
+    if (form === 'refractBeam') return '折光追獵炮';
+    return '光束炮';
+}
+
 function styleTopButton(btn, color) {
     btn.style.backgroundColor = color;
     btn.style.pointerEvents = 'auto';
@@ -175,7 +208,58 @@ function setupBuffUI() {
     });
     list.appendChild(targetRow);
 
-    Object.keys(BUFFS).forEach(id => {
+    const typeSection = document.createElement('div');
+    typeSection.id = 'dragon-type-section';
+    typeSection.style.marginBottom = '10px';
+    typeSection.style.padding = '9px 8px';
+    typeSection.style.border = '1px solid rgba(120,255,190,0.22)';
+    typeSection.style.borderRadius = '7px';
+    typeSection.style.background = 'rgba(84,255,175,0.08)';
+
+    const typeTitle = document.createElement('div');
+    typeTitle.textContent = '龍型態';
+    typeTitle.style.fontSize = '12px';
+    typeTitle.style.fontWeight = '900';
+    typeTitle.style.marginBottom = '7px';
+    typeSection.appendChild(typeTitle);
+
+    getDragonTypeIds().forEach(typeId => {
+        const typeCfg = getDragonTypeConfig(typeId);
+        const row = document.createElement('label');
+        row.className = 'dragon-type-row';
+        row.dataset.dragonType = typeId;
+        row.style.display = 'flex';
+        row.style.alignItems = 'center';
+        row.style.gap = '7px';
+        row.style.padding = '6px';
+        row.style.borderRadius = '6px';
+        row.style.cursor = 'pointer';
+        row.style.marginBottom = '3px';
+
+        const input = document.createElement('input');
+        input.type = 'radio';
+        input.name = 'buff-dragon-type';
+        input.dataset.dragonTypeInput = typeId;
+        input.addEventListener('change', () => {
+            const dragon = getBuffTargetDragon();
+            if (dragon && dragon.setDragonType) dragon.setDragonType(typeId);
+            refreshAllUI();
+        });
+        row.appendChild(input);
+        row.appendChild(createDragonTypeIconElement(typeId));
+
+        const text = document.createElement('span');
+        text.textContent = typeCfg.name;
+        text.style.fontSize = '13px';
+        text.style.fontWeight = '800';
+        row.appendChild(text);
+        typeSection.appendChild(row);
+    });
+    list.appendChild(typeSection);
+
+    const normalBuffIds = Object.keys(BUFFS).filter(id => !isDragonFormBuff(id));
+    const formBuffIds = Object.keys(BUFFS).filter(id => isDragonFormBuff(id));
+    [...normalBuffIds, ...formBuffIds].forEach(id => {
         const cfg = BUFFS[id];
         const row = document.createElement('div');
         row.className = 'buff-row';
@@ -317,6 +401,15 @@ function refreshBuffUI() {
         btn.style.opacity = exists ? '1' : '0.58';
     });
 
+    document.querySelectorAll('.dragon-type-row').forEach(row => {
+        const typeId = row.dataset.dragonType;
+        const active = dragon && dragon.dragonType === typeId;
+        const input = row.querySelector('input');
+        if (input) input.checked = !!active;
+        row.style.background = active ? 'rgba(84,255,175,0.18)' : 'rgba(255,255,255,0.04)';
+        row.style.border = active ? '1px solid rgba(84,255,175,0.42)' : '1px solid transparent';
+    });
+
     document.querySelectorAll('.buff-row').forEach(row => {
         const id = row.dataset.buffId;
         const input = row.querySelector('input');
@@ -325,14 +418,15 @@ function refreshBuffUI() {
         input.checked = stack > 0;
         const isPvpExclude = !!(BUFFS[id] && BUFFS[id].pvpExclude);
         const isDisabled = !!(BUFFS[id] && BUFFS[id].disabled);
+        const isFormBuff = isDragonFormBuff(id);
         row.style.background = stack > 0
-            ? (isPvpExclude ? 'rgba(200,60,60,0.30)' : 'rgba(84, 255, 175, 0.16)')
-            : (isPvpExclude ? 'rgba(180,40,40,0.18)' : 'rgba(255,255,255,0.05)');
+            ? (isPvpExclude || isFormBuff ? 'rgba(200,60,60,0.30)' : 'rgba(84, 255, 175, 0.16)')
+            : (isPvpExclude || isFormBuff ? 'rgba(180,40,40,0.18)' : 'rgba(255,255,255,0.05)');
         row.style.cursor = isDisabled ? 'not-allowed' : 'pointer';
         row.style.opacity = isDisabled ? '0.72' : '1';
         input.disabled = isDisabled;
         title.textContent = BUFFS[id].name + (BUFFS[id].stackable && stack > 0 ? ` x${stack}` : '');
-        title.style.color = (isBuffImplemented(id) && !isPvpExclude) ? '#ffffff' : '#ff5a5a';
+        title.style.color = (isBuffImplemented(id) && !isPvpExclude && !isFormBuff) ? '#ffffff' : '#ff5a5a';
     });
 }
 
@@ -570,6 +664,44 @@ function startPveFromSetup() {
     window.enterPveBattle();
 }
 
+function createDragonTypeSelectRow(dragonIndex, labelText) {
+    const typeRow = document.createElement('label');
+    typeRow.style.display = 'flex';
+    typeRow.style.alignItems = 'center';
+    typeRow.style.gap = '8px';
+    typeRow.style.marginTop = '12px';
+    typeRow.style.fontSize = '13px';
+    typeRow.textContent = labelText;
+
+    const select = document.createElement('select');
+    select.dataset.pvpDragonType = String(dragonIndex);
+    select.style.pointerEvents = 'auto';
+    select.style.flex = '1';
+    select.style.background = '#172333';
+    select.style.color = 'white';
+    select.style.border = '1px solid rgba(255,255,255,0.22)';
+    select.style.borderRadius = '6px';
+    select.style.padding = '7px';
+
+    const randomOpt = document.createElement('option');
+    randomOpt.value = '-1';
+    randomOpt.textContent = '隨機';
+    select.appendChild(randomOpt);
+
+    getDragonTypeIds().forEach(typeId => {
+        const opt = document.createElement('option');
+        opt.value = typeId;
+        opt.textContent = getDragonTypeConfig(typeId).name;
+        select.appendChild(opt);
+    });
+
+    select.addEventListener('change', () => {
+        state.pvp.dragonTypes[dragonIndex] = select.value === '-1' ? -1 : select.value;
+    });
+    typeRow.appendChild(select);
+    return typeRow;
+}
+
 function createPvpTeamColumn(dragonName, dragonIndex) {
     const column = document.createElement('div');
     column.style.border = '1px solid rgba(255,255,255,0.16)';
@@ -627,6 +759,8 @@ function createPvpTeamColumn(dragonName, dragonIndex) {
         device.style.color = '#adc1d8';
         slot.appendChild(device);
     });
+
+    column.appendChild(createDragonTypeSelectRow(dragonIndex, '龍型態'));
 
     const buffRow = document.createElement('label');
     buffRow.style.display = 'flex';
@@ -756,6 +890,8 @@ function createPveCpuColumn() {
     status.style.fontWeight = '800';
     status.style.lineHeight = '1.45';
     column.appendChild(status);
+
+    column.appendChild(createDragonTypeSelectRow(1, 'CPU 龍型態'));
 
     const buffRow = document.createElement('label');
     buffRow.style.display = 'flex';
@@ -990,6 +1126,10 @@ function refreshPvpOverlay() {
     document.querySelectorAll('[data-pvp-buff-count]').forEach(select => {
         const idx = Number(select.dataset.pvpBuffCount);
         select.value = String(state.pvp.buffCounts[idx]);
+    });
+    document.querySelectorAll('[data-pvp-dragon-type]').forEach(select => {
+        const idx = Number(select.dataset.pvpDragonType);
+        select.value = String(state.pvp.dragonTypes[idx]);
     });
 }
 
@@ -1328,13 +1468,7 @@ function updateChargeBarForDragon(dragon, ids, dragonLabel, palette) {
         label.style.textShadow = `0 0 8px ${palette.glow}, 0 0 16px ${palette.glow}88`;
     }
 
-    const formLabel = dragon && dragon.activeComboForm === 'flora'
-        ? '藤蔓掃場'
-        : (dragon && dragon.activeComboForm === 'ptero'
-            ? '飛天墜擊'
-            : (dragon && dragon.activeComboForm === 'rush'
-                ? '爆衝連擊'
-                : (dragon && dragon.activeComboForm === 'refractBeam' ? '折光追獵炮' : '光束炮')));
+    const formLabel = getDragonComboDisplayLabel(dragon, dragon ? dragon.activeComboForm : 'beam');
 
     if (!dragon) {
         label.textContent = `Dragon ${dragonLabel} 蓄力 0%`;
@@ -1381,6 +1515,32 @@ function updatePvpBuffSummaryPanel(panelId, dragon) {
 
     list.innerHTML = '';
     const entries = dragon && dragon.buffSystem ? dragon.buffSystem.getActiveIconEntries() : [];
+    if (dragon) {
+        const typeCfg = getDragonTypeConfig(dragon.dragonType);
+        const typeRow = document.createElement('div');
+        typeRow.style.display = 'inline-flex';
+        typeRow.style.alignItems = 'center';
+        typeRow.style.gap = '6px';
+        typeRow.style.background = 'rgba(84,255,175,0.14)';
+        typeRow.style.border = '1px solid rgba(84,255,175,0.28)';
+        typeRow.style.borderRadius = '6px';
+        typeRow.style.padding = intro ? '8px 11px' : '4px 7px';
+        typeRow.style.backdropFilter = 'blur(2px)';
+
+        const icon = createDragonTypeIconElement(dragon.dragonType);
+        icon.style.width = intro ? '30px' : '20px';
+        icon.style.height = intro ? '30px' : '20px';
+        icon.style.fontSize = intro ? '17px' : '12px';
+        typeRow.appendChild(icon);
+
+        const text = document.createElement('span');
+        text.textContent = typeCfg.name;
+        text.style.fontSize = intro ? '18px' : '12px';
+        text.style.fontWeight = '800';
+        text.style.textShadow = '0 0 8px #000';
+        typeRow.appendChild(text);
+        list.appendChild(typeRow);
+    }
     if (entries.length === 0) {
         const empty = document.createElement('div');
         empty.textContent = 'No Buff';

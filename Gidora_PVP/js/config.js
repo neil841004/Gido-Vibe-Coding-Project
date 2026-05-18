@@ -350,6 +350,39 @@ const CONFIG = {
     },
 
     // -----------------------------------------------------------------
+    // 龍型態設定
+    // -----------------------------------------------------------------
+    dragonTypes: {
+        defaultId: 'original',             // 測試環境與無效選項時使用的預設龍型態
+        options: {
+            original: {
+                name: '原始龍（光束炮）',   // UI 顯示名稱
+                shortName: '原始龍',        // 精簡顯示名稱
+                meleeForm: 'default',       // Melee 行為：頭槌 + 尾巴
+                comboForm: 'beam',          // 合體技行為：光束炮
+                comboLabel: '光束炮',       // 蓄力條 / 戰鬥 HUD 顯示名稱
+                icon: { glyph: 'O', color: '#ffffff', bg: '#274139' } // 型態 UI 圖示配色
+            },
+            bullet: {
+                name: '子彈龍（旋風斬）',   // UI 顯示名稱
+                shortName: '子彈龍',        // 精簡顯示名稱
+                meleeForm: 'fireball',      // Melee 行為：三顆頭改為噴火球
+                comboForm: 'flora',         // 合體技行為：沿用藤蔓橫掃玩法
+                comboLabel: '旋風斬',       // 蓄力條 / 戰鬥 HUD 顯示名稱
+                icon: { glyph: 'B', color: '#ffcf66', bg: '#3d2410' } // 型態 UI 圖示配色
+            },
+            flame: {
+                name: '噴火龍（飛落殺）',   // UI 顯示名稱
+                shortName: '噴火龍',        // 精簡顯示名稱
+                meleeForm: 'flame',         // Melee 行為：三顆頭按住攻擊持續噴火
+                comboForm: 'ptero',         // 合體技行為：飛天墜擊
+                comboLabel: '飛落殺',       // 蓄力條 / 戰鬥 HUD 顯示名稱
+                icon: { glyph: 'F', color: '#ff7b3d', bg: '#40180e' } // 型態 UI 圖示配色
+            }
+        }
+    },
+
+    // -----------------------------------------------------------------
     // PVP 對戰模式
     // -----------------------------------------------------------------
     pvp: {
@@ -550,6 +583,7 @@ const state = {
         // 索引: 0~3 = Dragon A 的 P1/P2/P3/P4，4~7 = Dragon B 的 P1/P2/P3/P4
         slots: [null, null, null, null, null, null, null, null],
         buffCounts: [-1, -1], // Dragon A / B 各自的 Buff 數量設定 (-1 表示「隨機」)
+        dragonTypes: [-1, -1], // Dragon A / B 各自的龍型態設定 (-1 表示「隨機」)
         disableKeyboard: false // 是否禁用鍵鼠裝置
     },
 
@@ -562,3 +596,17 @@ const state = {
 
     lastTime: 0
 };
+
+function getDragonTypeIds() {
+    return Object.keys(CONFIG.dragonTypes.options);
+}
+
+function getDragonTypeConfig(typeId) {
+    const options = CONFIG.dragonTypes.options;
+    return options[typeId] || options[CONFIG.dragonTypes.defaultId];
+}
+
+function getRandomDragonTypeId() {
+    const ids = getDragonTypeIds();
+    return ids[Math.floor(Math.random() * ids.length)] || CONFIG.dragonTypes.defaultId;
+}
