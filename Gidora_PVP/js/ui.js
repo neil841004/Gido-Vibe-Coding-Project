@@ -257,9 +257,9 @@ function setupBuffUI() {
     });
     list.appendChild(typeSection);
 
-    const normalBuffIds = Object.keys(BUFFS).filter(id => !isDragonFormBuff(id));
-    const formBuffIds = Object.keys(BUFFS).filter(id => isDragonFormBuff(id));
-    [...normalBuffIds, ...formBuffIds].forEach(id => {
+    const activeBuffIds = Object.keys(BUFFS).filter(id => !BUFFS[id].disabled);
+    const disabledBuffIds = Object.keys(BUFFS).filter(id => BUFFS[id].disabled);
+    [...activeBuffIds, ...disabledBuffIds].forEach(id => {
         const cfg = BUFFS[id];
         const row = document.createElement('div');
         row.className = 'buff-row';
@@ -287,12 +287,7 @@ function setupBuffUI() {
             }
             const dragon = getBuffTargetDragon();
             if (!dragon || !dragon.buffSystem) return;
-            if (cfg.stackable) {
-                if (input.checked && dragon.buffSystem.getStack(id) === 0) dragon.buffSystem.setStack(id, 1);
-                if (!input.checked) dragon.buffSystem.clear(id);
-            } else {
-                dragon.buffSystem.toggle(id);
-            }
+            dragon.buffSystem.toggle(id);
             refreshBuffUI();
         });
         row.appendChild(input);
@@ -324,60 +319,11 @@ function setupBuffUI() {
         const meta = document.createElement('div');
         meta.className = 'buff-meta';
         meta.style.fontSize = '10px';
-        meta.style.color = cfg.stackable ? '#ffe08a' : (cfg.group ? '#ffb7dd' : '#89f2c1');
-        meta.textContent = cfg.stackable ? '可疊加' : (cfg.group ? '型態互斥' : '不可疊加');
+        meta.style.color = cfg.disabled ? '#ff9b9b' : (cfg.group ? '#ffb7dd' : '#89f2c1');
+        meta.textContent = cfg.disabled ? '已禁用' : (cfg.group ? '型態互斥' : '最多一次');
         text.appendChild(meta);
 
         row.appendChild(text);
-
-        if (cfg.stackable) {
-            const controls = document.createElement('div');
-            controls.style.display = 'flex';
-            controls.style.flexDirection = 'column';
-            controls.style.gap = '4px';
-
-            const plus = document.createElement('button');
-            plus.type = 'button';
-            plus.textContent = '+';
-            plus.title = '增加一層';
-            plus.style.pointerEvents = 'auto';
-            plus.style.width = '24px';
-            plus.style.height = '22px';
-            plus.style.border = '1px solid rgba(255,255,255,0.25)';
-            plus.style.background = 'rgba(80,255,170,0.22)';
-            plus.style.color = 'white';
-            plus.style.cursor = 'pointer';
-            plus.addEventListener('click', (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                const dragon = getBuffTargetDragon();
-                if (dragon && dragon.buffSystem) dragon.buffSystem.addStack(id);
-                refreshBuffUI();
-            });
-            controls.appendChild(plus);
-
-            const minus = document.createElement('button');
-            minus.type = 'button';
-            minus.textContent = '-';
-            minus.title = '減少一層';
-            minus.style.pointerEvents = 'auto';
-            minus.style.width = '24px';
-            minus.style.height = '22px';
-            minus.style.border = '1px solid rgba(255,255,255,0.25)';
-            minus.style.background = 'rgba(255,255,255,0.08)';
-            minus.style.color = 'white';
-            minus.style.cursor = 'pointer';
-            minus.addEventListener('click', (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                const dragon = getBuffTargetDragon();
-                if (dragon && dragon.buffSystem) dragon.buffSystem.removeStack(id);
-                refreshBuffUI();
-            });
-            controls.appendChild(minus);
-
-            row.appendChild(controls);
-        }
         list.appendChild(row);
     });
 
@@ -425,7 +371,7 @@ function refreshBuffUI() {
         row.style.cursor = isDisabled ? 'not-allowed' : 'pointer';
         row.style.opacity = isDisabled ? '0.72' : '1';
         input.disabled = isDisabled;
-        title.textContent = BUFFS[id].name + (BUFFS[id].stackable && stack > 0 ? ` x${stack}` : '');
+        title.textContent = BUFFS[id].name;
         title.style.color = (isBuffImplemented(id) && !isPvpExclude && !isFormBuff) ? '#ffffff' : '#ff5a5a';
     });
 }
@@ -1551,55 +1497,14 @@ function updatePvpBuffSummaryPanel(panelId, dragon) {
         return;
     }
 
-    const stackableEntries = [];
     const formEntries = [];
     const otherEntries = [];
 
     entries.forEach(entry => {
         const cfg = BUFFS[entry.id];
-        if (cfg.stackable) stackableEntries.push(entry);
-        else if (cfg.group === 'comboForm' || cfg.group === 'meleeForm') formEntries.push(entry);
+        if (cfg.group === 'comboForm' || cfg.group === 'meleeForm') formEntries.push(entry);
         else otherEntries.push(entry);
     });
-
-    if (stackableEntries.length > 0) {
-        const stackRow = document.createElement('div');
-        stackRow.style.display = 'flex';
-        stackRow.style.flexDirection = 'row';
-        stackRow.style.flexWrap = 'wrap';
-        stackRow.style.gap = '6px';
-        stackRow.style.marginBottom = '4px';
-        stackRow.style.justifyContent = isA ? 'flex-start' : 'flex-end';
-
-        stackableEntries.forEach(entry => {
-            const row = document.createElement('div');
-            row.style.display = 'inline-flex';
-            row.style.alignItems = 'center';
-            row.style.gap = '4px';
-            row.style.background = 'rgba(0,0,0,0.42)';
-            row.style.border = '1px solid rgba(255,255,255,0.12)';
-            row.style.borderRadius = '6px';
-            row.style.padding = intro ? '6px' : '4px';
-            row.style.backdropFilter = 'blur(2px)';
-            
-            const icon = createBuffIconElement(entry.id);
-            icon.style.width = intro ? '30px' : '24px';
-            icon.style.height = intro ? '30px' : '24px';
-            icon.style.fontSize = intro ? (getBuffIconSpec(entry.id).glyph.length > 1 ? '13px' : '17px') : (getBuffIconSpec(entry.id).glyph.length > 1 ? '11px' : '14px');
-            row.appendChild(icon);
-
-            if (entry.stack > 1) {
-                const count = document.createElement('span');
-                count.textContent = `x${entry.stack}`;
-                count.style.fontSize = intro ? '14px' : '11px';
-                count.style.fontWeight = '700';
-                count.style.textShadow = '0 0 8px #000';
-                row.appendChild(count);
-            }
-            stackRow.appendChild(row);
-        });
-        list.appendChild(stackRow);
-    }
 
     const nonStackableEntries = [...formEntries, ...otherEntries];
 
@@ -1621,7 +1526,7 @@ function updatePvpBuffSummaryPanel(panelId, dragon) {
         row.appendChild(icon);
 
         const text = document.createElement('span');
-        text.textContent = `${BUFFS[entry.id].name}${entry.stack > 1 ? ` x${entry.stack}` : ''}`;
+        text.textContent = BUFFS[entry.id].name;
         text.style.fontSize = intro ? '18px' : '12px';
         text.style.fontWeight = '700';
         text.style.textShadow = '0 0 8px #000';
@@ -1803,7 +1708,7 @@ function collectMysteryCandidates(dragon) {
         if (cfg.disabled) return false;
         if (cfg.implemented === false) return false;
         if (cfg.pvpExclude) return false;
-        if (!cfg.stackable && dragon.buffSystem.active.has(id)) return false;
+        if (dragon.buffSystem.active.has(id)) return false;
         return true;
     });
 }
@@ -1811,12 +1716,7 @@ function collectMysteryCandidates(dragon) {
 function applyMysteryBoxBuff(dragon, id) {
     const cfg = BUFFS[id];
     if (!cfg || !dragon || !dragon.buffSystem) return;
-    if (cfg.stackable) {
-        dragon.buffSystem.addStack(id);
-    } else {
-        // toggle 在新 id 不存在時自動清除同 group 並加入；候選池已過濾掉已啟用的非 stackable
-        dragon.buffSystem.toggle(id);
-    }
+    dragon.buffSystem.toggle(id);
     if (typeof refreshAllUI === 'function') refreshAllUI();
 }
 

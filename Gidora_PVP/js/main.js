@@ -100,6 +100,9 @@ function resetDragonForBattle(dragon, index, clearBuffs = false) {
     dragon.lastAttackInput = { p1: false, p2: false, p3: false, p4: false };
     dragon.tailSweepStartY = dragon.mesh.rotation.y;
     dragon.tailSweepImpactDone = false;
+    dragon.comboTripleOnceActive = false;
+    dragon.isTeamworkMoving = false;
+    dragon.inputOverloadActive = false;
     if (dragon.speedLines) {
         dragon.speedLines.forEach(line => disposeSceneObject(line.mesh));
         dragon.speedLines = [];
@@ -220,8 +223,7 @@ function applyRandomBuffs(dragon, countSetting) {
         return selectedIds.length >= count;
     });
     selectedIds.forEach(id => {
-        if (BUFFS[id].stackable) dragon.buffSystem.setStack(id, 1);
-        else dragon.buffSystem.toggle(id);
+        dragon.buffSystem.toggle(id);
     });
 }
 

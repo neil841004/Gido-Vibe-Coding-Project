@@ -16,31 +16,41 @@ const BUFFS = {
     comboRush: { name: '組合技型態：爆衝連擊', description: '已禁用：組合技型態改由「龍型態」決定，不會在 PVP/PVE/問號箱抽取，也無法手動啟用。', group: 'comboForm', implemented: false, disabled: true, pvpExclude: true, icon: { glyph: 'RS', color: '#9ef7ff', bg: '#12373b' } },
     comboRefractBeam: { name: '組合技型態：折光追獵炮', description: '已禁用：組合技型態改由「龍型態」決定，不會在 PVP/PVE/問號箱抽取，也無法手動啟用。', group: 'comboForm', implemented: false, disabled: true, pvpExclude: true, icon: { glyph: 'RB', color: '#e7fbff', bg: '#182a45' } },
 
-    speedBoost: { name: '移動、轉向速度提高', description: '每層速度與轉向 +30%。', stackable: true, implemented: true, icon: { glyph: '👟', color: '#59d8ff', bg: '#12303b' } },
-    meleeBoost: { name: 'Melee 攻擊力 +30%', description: '每層頭槌/尾巴近戰 +30%。', stackable: true, implemented: true, icon: { glyph: '🗡️', color: '#ffd166', bg: '#3a2c12' } },
-    defenseBoost: { name: '增加 20% 防禦率', description: '每層受傷減少 20%（疊加為相乘）。', stackable: true, implemented: true, icon: { glyph: '🛡️', color: '#9ad8ff', bg: '#152a3d' } },
+    speedBoost: { name: '移動速度+', description: '移動與轉向速度 +30%。', implemented: true, icon: { glyph: 'MV', color: '#59d8ff', bg: '#12303b' } },
+    meleeBoost: { name: '頭部攻擊力+', description: '頭部 Melee 傷害 +30%，不影響尾巴。', implemented: true, icon: { glyph: 'H+', color: '#ffd166', bg: '#3a2c12' } },
+    defenseBoost: { name: '防禦+', description: '受傷減少 20%，不影響受到的失衡值。', implemented: true, icon: { glyph: 'D+', color: '#9ad8ff', bg: '#152a3d' } },
 
-    comboCd: { name: '組合技 CD 縮短 50%', description: '組合技冷卻只剩 40%。', implemented: true, icon: { glyph: 'CD', color: '#c4a7ff', bg: '#231a3d' } },
-    comboDamage: { name: '組合技傷害 +100%', description: '組合技傷害加倍。', implemented: true, icon: { glyph: 'B', color: '#ff8cff', bg: '#39183c' } },
-    tailPower: { name: '尾巴攻擊力 +300%', description: '尾巴傷害變為 4 倍。', implemented: true, icon: { glyph: 'T', color: '#60efff', bg: '#12393d' } },
-    poisonTrail: { name: '走路留下毒液', description: '毒液殘留 10 秒，緩速並 DOT 敵人。', implemented: true, icon: { glyph: 'P', color: '#8cff5f', bg: '#173a14' } },
-    leafShield: { name: '葉子護盾', description: '4 片葉子環繞，投射物碰到葉子會直接反彈。', implemented: true, icon: { glyph: '4', color: '#a7ff83', bg: '#203714' } },
+    comboCd: { name: '組合技CD縮短', description: '組合技冷卻縮短。', implemented: true, icon: { glyph: 'CD', color: '#c4a7ff', bg: '#231a3d' } },
+    comboDamage: { name: '組合技攻擊力+', description: '組合技傷害加倍。', implemented: true, icon: { glyph: 'C+', color: '#ff8cff', bg: '#39183c' } },
+    tailPower: { name: '尾巴大幅強化', description: '尾巴傷害與蓄力橫掃範圍大幅提高。', implemented: true, icon: { glyph: 'T+', color: '#60efff', bg: '#12393d' } },
+    poisonTrail: { name: '毒毒毒', description: '走路留下毒液，並週期性噴出大範圍毒霧。', implemented: true, icon: { glyph: '毒', color: '#8cff5f', bg: '#173a14' } },
+    leafShield: { name: '葉子護盾', description: '4 片葉子反彈投射物；組合技期間變 8 片，且本體無敵。', implemented: true, icon: { glyph: '葉', color: '#a7ff83', bg: '#203714' } },
 
     stepShockwave: { name: '落腳震波', description: '每隔幾步，下一次落腳產生震波。', implemented: true, icon: { glyph: 'S', color: '#d9e7ff', bg: '#202d45' } },
-    comboRamp: { name: '連擊傷害提高', description: '2 秒內有效攻擊會逐步提高傷害。', implemented: true, icon: { glyph: 'x', color: '#ffe66d', bg: '#383312' } },
+    comboRamp: { name: '連擊傷害提高', description: '已禁用：此 Buff 不會在 PVP/PVE/問號箱抽取，也無法手動啟用。', implemented: false, disabled: true, pvpExclude: true, icon: { glyph: 'x', color: '#ffe66d', bg: '#383312' } },
     missileNest: { name: '背上飛彈巢', description: '定期發射追蹤飛彈。', implemented: true, icon: { glyph: 'M', color: '#ffb347', bg: '#3d2a10' } },
-    directionalGuard: { name: '正面減傷', description: '正面受傷降低。', implemented: true, icon: { glyph: 'G', color: '#9ad1ff', bg: '#162f45' } },
+    directionalGuard: { name: '正面硬鱗', description: '正面受傷降低，背面受傷提高。', implemented: true, icon: { glyph: 'FG', color: '#9ad1ff', bg: '#162f45' } },
     beamSlow: { name: '光束波緩速', description: '組合技命中時使敵方緩速。', implemented: true, icon: { glyph: 'SL', color: '#b7d7ff', bg: '#17283f' } },
-    poisonCloud: { name: '定期毒霧', description: '週期性噴出大範圍 DOT 毒霧。', implemented: true, icon: { glyph: 'C', color: '#78ff8f', bg: '#14351c' } },
-    staggerImmune: { name: '不容易跌倒', description: '受到的失衡值減少 50%，衰退速度 +50%。', implemented: true, icon: { glyph: 'I', color: '#ffffff', bg: '#303030' } },
+    poisonCloud: { name: '定期毒霧', description: '已併入「毒毒毒」：此 Buff 不會抽取，也無法手動啟用。', implemented: false, disabled: true, pvpExclude: true, icon: { glyph: 'C', color: '#78ff8f', bg: '#14351c' } },
+    staggerImmune: { name: '不屈爆發', description: '較不容易跌倒；跌倒後站起時向四周噴發一次大爆炸。', implemented: true, icon: { glyph: 'IB', color: '#ffffff', bg: '#303030' } },
     stationaryShield: { name: '停止不動護盾', description: '站定後免疫 30% 傷害。', implemented: true, icon: { glyph: 'D', color: '#d8fff5', bg: '#173631' } },
-    lowHpExplosion: { name: '跌倒反擊大爆炸', description: '失衡跌倒站起來時，向四周噴發一次大爆炸。', implemented: true, icon: { glyph: '!', color: '#ffef73', bg: '#4a2510' } },
+    lowHpExplosion: { name: '跌倒反擊大爆炸', description: '已併入「不屈爆發」：此 Buff 不會抽取，也無法手動啟用。', implemented: false, disabled: true, pvpExclude: true, icon: { glyph: '!', color: '#ffef73', bg: '#4a2510' } },
     knockbackBoost: { name: '把敵人推得遠遠的', description: '本龍造成的所有擊退力變為 3 倍。', implemented: true, icon: { glyph: 'KB', color: '#ffd166', bg: '#3a1f12' } },
-    comboInvincible: { name: '組合技期間無敵', description: '光束波施放期間免疫傷害。', implemented: true, icon: { glyph: 'V', color: '#f7f2ff', bg: '#2b1f42' } },
+    comboInvincible: { name: '組合技期間無敵', description: '已併入「葉子護盾」：此 Buff 不會抽取，也無法手動啟用。', implemented: false, disabled: true, pvpExclude: true, icon: { glyph: 'V', color: '#f7f2ff', bg: '#2b1f42' } },
+
+    staggerBoost: { name: '破勢重擊', description: '造成的失衡值 +50%。', implemented: true, icon: { glyph: 'ST', color: '#ffef8a', bg: '#3b3012' } },
+    teamworkSpark: { name: '同心火花', description: '同心協力移動時，角色周遭生成火花並對敵人造成 DOT 傷害。', implemented: true, icon: { glyph: '火', color: '#ffbd5a', bg: '#3b1d12' } },
+    instantCharge: { name: '一念蓄力', description: '蓄力攻擊可瞬間完成。', implemented: true, icon: { glyph: '快', color: '#e6f7ff', bg: '#173042' } },
+    comboTripleOnce: { name: '終極一發', description: '下一次組合技傷害變為 3 倍，施放後此 Buff 消失。', implemented: true, icon: { glyph: '1X', color: '#fff0a6', bg: '#3d3210' } },
+    speedRisk: { name: '暴走疾行', description: '移動與轉向速度 +60%，但受到失衡值 +40%。', implemented: true, icon: { glyph: '!!', color: '#ff7a7a', bg: '#3d1010' } },
+    armoredSlow: { name: '重甲守勢', description: '防禦率 +30%，但移動與轉向速度 -30%。', implemented: true, icon: { glyph: '甲', color: '#d6e2ff', bg: '#202838' } },
+    highAttackChaos: { name: '霸道輸出', description: '攻擊力 +70%；但四名玩家同時有輸入時，所有輸入都無效。', implemented: true, icon: { glyph: '霸', color: '#ffcf66', bg: '#3d1710' } },
+    noFallSlow: { name: '定海步', description: '不會跌倒，但移動與轉向速度 -20%。', implemented: true, icon: { glyph: '穩', color: '#d9fff2', bg: '#173631' } },
+    teamworkGuard: { name: '同心結界', description: '同心協力移動時無敵；不同心協力時受傷 +30%。', implemented: true, icon: { glyph: '結', color: '#9fffd4', bg: '#14352b' } },
 
     lifeSteal: { name: '有效傷害回血', description: '造成有效傷害時回復少量 HP。', implemented: true, pvpExclude: true, icon: { glyph: 'L', color: '#ff6b7a', bg: '#3d151b' } },
     teamworkRegen: { name: '同心協力回血', description: '同向加速時持續回血。', implemented: true, pvpExclude: true, icon: { glyph: 'H', color: '#73ff9a', bg: '#17351e' } },
-    hpBoost: { name: '增加血量 30%', description: '已禁用：此 Buff 不會在 PVP/PVE/問號箱抽取，也無法手動啟用。', stackable: true, implemented: false, disabled: true, pvpExclude: true, icon: { glyph: '+', color: '#62f28f', bg: '#14371f' } },
+    hpBoost: { name: '增加血量 30%', description: '已禁用：此 Buff 不會在 PVP/PVE/問號箱抽取，也無法手動啟用。', implemented: false, disabled: true, pvpExclude: true, icon: { glyph: '+', color: '#62f28f', bg: '#14371f' } },
     reflectProjectile: { name: '50% 反彈投射物', description: '已禁用：此 Buff 不會在 PVP/PVE/問號箱抽取，也無法手動啟用。', implemented: false, disabled: true, pvpExclude: true, icon: { glyph: 'R', color: '#b7ffdd', bg: '#12382a' } },
     ramStagger: { name: '高速衝撞', description: '已禁用：此 Buff 不會在 PVP/PVE 抽取，也無法手動啟用。', implemented: false, disabled: true, pvpExclude: true, icon: { glyph: 'R', color: '#ff5a5a', bg: '#3d1010' } }
 };
@@ -165,10 +175,7 @@ class BuffSystem {
         if (!cfg) return;
         if (cfg.disabled) return;
 
-        if (cfg.stackable) {
-            if (this.active.has(id)) this.active.delete(id);
-            else this.active.set(id, 1);
-        } else if (this.active.has(id)) {
+        if (this.active.has(id)) {
             this.active.delete(id);
         } else {
             if (cfg.group) {
@@ -183,25 +190,23 @@ class BuffSystem {
 
     addStack(id) {
         const cfg = BUFFS[id];
-        if (!cfg || cfg.disabled || !cfg.stackable) return;
-        this.active.set(id, (this.active.get(id) || 0) + 1);
+        if (!cfg || cfg.disabled) return;
+        this.active.set(id, 1);
         this.refreshPlayerStats();
     }
 
     removeStack(id) {
         const cfg = BUFFS[id];
-        if (!cfg || cfg.disabled || !cfg.stackable) return;
-        const next = (this.active.get(id) || 0) - 1;
-        if (next > 0) this.active.set(id, next);
-        else this.active.delete(id);
+        if (!cfg || cfg.disabled) return;
+        this.active.delete(id);
         this.refreshPlayerStats();
     }
 
     setStack(id, stack) {
         const cfg = BUFFS[id];
-        if (!cfg || cfg.disabled || !cfg.stackable) return;
+        if (!cfg || cfg.disabled) return;
         const next = Math.max(0, Math.floor(stack));
-        if (next > 0) this.active.set(id, next);
+        if (next > 0) this.active.set(id, 1);
         else this.active.delete(id);
         this.refreshPlayerStats();
     }
@@ -261,7 +266,7 @@ class BuffSystem {
     }
 
     getStack(id) {
-        return this.active.get(id) || 0;
+        return this.active.has(id) ? 1 : 0;
     }
 
     getActiveIconEntries() {
@@ -269,7 +274,7 @@ class BuffSystem {
     }
 
     getBodyVisualScale() {
-        return 1 + this.getStack('hpBoost') * CONFIG.buffs.hpVisualScalePerStack;
+        return 1 + (this.isActive('hpBoost') ? CONFIG.buffs.hpVisualScalePerStack : 0);
     }
 
     getMeleeForm() {
@@ -283,25 +288,40 @@ class BuffSystem {
     }
 
     getHpMultiplier() {
-        return 1 + CONFIG.buffs.hpBoostPct * this.getStack('hpBoost');
+        return this.isActive('hpBoost') ? 1 + CONFIG.buffs.hpBoostPct : 1;
     }
 
     getSpeedMultiplier() {
-        return 1 + CONFIG.buffs.speedBoostPct * this.getStack('speedBoost');
+        let multiplier = 1;
+        if (this.isActive('speedBoost')) multiplier *= 1 + CONFIG.buffs.speedBoostPct;
+        if (this.isActive('speedRisk')) multiplier *= 1 + CONFIG.buffs.speedRiskSpeedPct;
+        if (this.isActive('armoredSlow')) multiplier *= CONFIG.buffs.armoredSpeedMultiplier;
+        if (this.isActive('noFallSlow')) multiplier *= CONFIG.buffs.noFallSpeedMultiplier;
+        return multiplier;
     }
 
     getTurnMultiplier() {
         return this.getSpeedMultiplier();
     }
 
-    getMeleeMultiplier() {
-        return 1 + CONFIG.buffs.meleeBoostPct * this.getStack('meleeBoost');
+    getHeadAttackMultiplier() {
+        return this.isActive('meleeBoost') ? 1 + CONFIG.buffs.headAttackBoostPct : 1;
+    }
+
+    getAttackMultiplier() {
+        return this.isActive('highAttackChaos') ? 1 + CONFIG.buffs.globalAttackBoostPct : 1;
+    }
+
+    getMeleeMultiplier(playerIndex) {
+        const headMultiplier = playerIndex && playerIndex !== 'p4' ? this.getHeadAttackMultiplier() : 1;
+        return headMultiplier * this.getAttackMultiplier();
     }
 
     getDefenseMultiplier() {
-        const stack = this.getStack('defenseBoost');
-        if (stack <= 0) return 1;
-        return Math.pow(1 - CONFIG.buffs.defenseBoostPct, stack);
+        let multiplier = 1;
+        if (this.isActive('defenseBoost')) multiplier *= 1 - CONFIG.buffs.defenseBoostPct;
+        if (this.isActive('armoredSlow')) multiplier *= 1 - CONFIG.buffs.armoredDefensePct;
+        return multiplier;
     }
 
     getKnockbackMultiplier() {
@@ -313,7 +333,36 @@ class BuffSystem {
     }
 
     getComboDamageMultiplier() {
-        return this.isActive('comboDamage') ? CONFIG.buffs.comboDamageMultiplier : 1;
+        let multiplier = this.getAttackMultiplier();
+        if (this.isActive('comboDamage')) multiplier *= CONFIG.buffs.comboDamageMultiplier;
+        if (this.dragon && this.dragon.comboTripleOnceActive) multiplier *= CONFIG.buffs.comboTripleOnceMultiplier;
+        return multiplier;
+    }
+
+    getOutgoingStaggerMultiplier() {
+        return this.isActive('staggerBoost') ? CONFIG.buffs.outgoingStaggerMultiplier : 1;
+    }
+
+    getIncomingStaggerMultiplier() {
+        if (this.isActive('noFallSlow')) return 0;
+        let multiplier = 1;
+        if (this.isActive('staggerImmune')) multiplier *= CONFIG.buffs.staggerImmuneIncomingMultiplier;
+        if (this.isActive('speedRisk')) multiplier *= CONFIG.buffs.speedRiskIncomingStaggerMultiplier;
+        return multiplier;
+    }
+
+    isComboLeafInvincible() {
+        const dragon = this.dragon;
+        return this.isActive('leafShield') && dragon && dragon.beamPhase === 'firing';
+    }
+
+    isAllInputBlocked(players) {
+        const dragon = this.dragon;
+        if (!dragon || !this.isActive('highAttackChaos')) return false;
+        return players.every(p => {
+            const input = dragon.input[p];
+            return input && (input.attack || input.charge || input.move.lengthSq() > 0.01);
+        });
     }
 
     getComboRampWindow(stacks) {
@@ -403,6 +452,7 @@ class BuffSystem {
         this._updateStepShockwave(dragon);
         this._updatePoisonCloud(dt, dragon);
         this._updatePoisonClouds(dt);
+        this._updateTeamworkSpark(dt, dragon);
         this._updateLowHpExplosion(dragon);
         this._updateComboFormDecor(dt, dragon);
         this._updateBuffVisuals(dt, dragon);
@@ -426,19 +476,26 @@ class BuffSystem {
             return;
         }
 
-        while (this.objects.leafShields.length < CONFIG.buffs.leafShieldCount) {
+        const count = this.isComboLeafInvincible()
+            ? CONFIG.buffs.leafShieldComboCount
+            : CONFIG.buffs.leafShieldCount;
+        while (this.objects.leafShields.length < count) {
             const geo = new THREE.PlaneGeometry(0.55, 0.9);
             const mat = new THREE.MeshBasicMaterial({ color: 0x77dd55, side: THREE.DoubleSide, transparent: true, opacity: 0.9 });
             const mesh = new THREE.Mesh(geo, mat);
             scene.add(mesh);
             this.objects.leafShields.push({ mesh, angle: Math.random() * Math.PI * 2, cooldown: 0 });
         }
+        while (this.objects.leafShields.length > count) {
+            const shield = this.objects.leafShields.pop();
+            this._disposeMesh(shield.mesh);
+        }
 
         const t = Date.now() * 0.002;
         const radius = CONFIG.buffs.leafShieldRadius;
         this.objects.leafShields.forEach((s, i) => {
             s.mesh.visible = true;
-            s.angle = t + (i / CONFIG.buffs.leafShieldCount) * Math.PI * 2;
+            s.angle = t + (i / count) * Math.PI * 2;
             s.mesh.position.copy(dragon.mesh.position).add(new THREE.Vector3(Math.cos(s.angle) * radius, 1.8, Math.sin(s.angle) * radius));
             s.mesh.lookAt(camera.position);
         });
@@ -570,7 +627,7 @@ class BuffSystem {
     }
 
     _updatePoisonCloud(dt, dragon) {
-        if (!this.isActive('poisonCloud')) return;
+        if (!this.isActive('poisonTrail')) return;
         this.timers.poisonCloud = (this.timers.poisonCloud || CONFIG.buffs.poisonCloudInterval) - dt;
         if (this.timers.poisonCloud > 0) return;
         this.timers.poisonCloud = CONFIG.buffs.poisonCloudInterval;
@@ -641,13 +698,39 @@ class BuffSystem {
 
     onStandUpComplete() {
         const dragon = this.dragon;
-        if (!dragon || dragon.isDead || !this.isActive('lowHpExplosion')) return;
+        const suspendedHasBuff = this.suspendedActive && this.suspendedActive.has('staggerImmune');
+        if (!dragon || dragon.isDead || (!this.isActive('staggerImmune') && !suspendedHasBuff)) return;
         dragon.createAreaDamage(
             dragon.mesh.position.clone(),
             CONFIG.buffs.lowHpExplosionRadius,
             CONFIG.buffs.lowHpExplosionDamage,
             0xffaa00,
             { stagger: 100 }
+        );
+    }
+
+    _updateTeamworkSpark(dt, dragon) {
+        if (!this.isActive('teamworkSpark') || !dragon.isTeamworkMoving) return;
+        this.timers.teamworkSpark = (this.timers.teamworkSpark || 0) - dt;
+        if (this.timers.teamworkSpark > 0) return;
+        this.timers.teamworkSpark = CONFIG.buffs.teamworkSparkInterval;
+        const center = dragon.mesh.position.clone();
+        center.y = 0.6;
+        for (let i = 0; i < 8; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const radius = Math.random() * CONFIG.buffs.teamworkSparkRadius;
+            const pos = center.clone().add(new THREE.Vector3(Math.cos(angle) * radius, Math.random() * 1.4, Math.sin(angle) * radius));
+            const p = new Particle(pos, Math.random() > 0.45 ? 0xffaa22 : 0xffee66);
+            p.life = 0.32;
+            p.maxLife = 0.32;
+            p.mesh.scale.setScalar(0.35 + Math.random() * 0.25);
+            state.particles.push(p);
+        }
+        this._damageTargetsInRadius(
+            dragon.mesh.position,
+            CONFIG.buffs.teamworkSparkRadius,
+            CONFIG.buffs.teamworkSparkDamage * this.getAttackMultiplier(),
+            false
         );
     }
 
@@ -799,6 +882,7 @@ class BuffSystem {
         if (this.isActive('comboCd') && dragon.comboCooldown > 0) this._spawnRing(dragon.mesh.position, 0xaaaaaa, 1.1);
         if (this.isActive('comboDamage')) this._spawnBuffParticle(dragon, 0xff55ff, 2.8, 0.6);
         if (this.isActive('beamSlow')) this._spawnBuffParticle(dragon, 0xaaddff, 2.6, 0.6);
+        if (this.isActive('highAttackChaos')) this._spawnBuffParticle(dragon, 0xff7733, 2.5, 0.65);
     }
 
     _spawnBuffParticle(dragon, color, height, scale) {
@@ -881,7 +965,7 @@ class BuffSystem {
     }
 
     _updateInvincibleShieldVisual(dragon) {
-        const active = this.isActive('comboInvincible') && dragon.beamPhase === 'firing';
+        const active = this.isComboLeafInvincible();
         if (!active) {
             if (this.objects.invincibleShield) {
                 this._disposeMesh(this.objects.invincibleShield);
@@ -956,6 +1040,8 @@ class BuffSystem {
             state.enemyManager.enemies.forEach(e => {
                 if (e.isDead || e.mesh.position.distanceTo(pos) > radius + 0.8) return;
                 e.takeDamage(damage, pos, 0);
+                const staggerBonus = damage * (this.getOutgoingStaggerMultiplier() - 1);
+                if (staggerBonus > 0 && e.addStagger) e.addStagger(staggerBonus, pos);
                 this.onEffectiveDamage(damage);
                 if (slows && e.applySlow) e.applySlow(CONFIG.terrain.poisonSlowFactor, 0.7);
             });
@@ -963,7 +1049,7 @@ class BuffSystem {
         state.dragons.forEach(d => {
             if (!d || d === owner || d.isDead) return;
             if (d.mesh.position.distanceTo(pos) > radius + 0.8) return;
-            d.takeDamage(damage, pos, 0);
+            d.takeDamage(damage, pos, 0, { staggerMultiplier: this.getOutgoingStaggerMultiplier() });
             this.onEffectiveDamage(damage);
         });
     }

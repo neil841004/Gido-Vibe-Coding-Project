@@ -180,6 +180,9 @@ class Gidora {
         this.tailSweepForwardLockTimer = 0;
         this.comboRampStacks = 0;
         this.comboRampTimer = 0;
+        this.comboTripleOnceActive = false;
+        this.isTeamworkMoving = false;
+        this.inputOverloadActive = false;
         this.stationaryTimer = 0;
         this.lastRamHit = new Map();
         this.ramShockwaveFxTimer = 0;
@@ -221,33 +224,45 @@ class Gidora {
         }
     }
 
-    takeDamage(amount, sourcePos, knockbackForce) {
+    takeDamage(amount, sourcePos, knockbackForce, options = {}) {
         if (this.isDead) return;
-        if (this.buffSystem.isActive('comboInvincible') && this.beamPhase === 'firing') return;
+        if (this.buffSystem.isComboLeafInvincible && this.buffSystem.isComboLeafInvincible()) return;
+        if (this.buffSystem.isActive('teamworkGuard')) {
+            if (this.isTeamworkMoving) return;
+            amount *= CONFIG.buffs.teamworkGuardVulnerableMultiplier;
+        }
         if (this.buffSystem.blockIncomingDamage(sourcePos)) return;
 
         let finalAmount = amount;
+        let staggerAmount = amount;
         if (this.buffSystem.isActive('directionalGuard') && sourcePos) {
             const toSource = sourcePos.clone().sub(this.mesh.position).normalize();
             const facing = this.getForwardVector().normalize();
             const dot = facing.dot(toSource);
-            if (dot >= 0) finalAmount *= CONFIG.buffs.frontDamageMultiplier;
+            const directionalMultiplier = dot >= 0
+                ? CONFIG.buffs.frontDamageMultiplier
+                : CONFIG.buffs.backDamageMultiplier;
+            finalAmount *= directionalMultiplier;
+            staggerAmount *= directionalMultiplier;
         }
         if (this.buffSystem.isActive('stationaryShield') && this.stationaryTimer >= CONFIG.buffs.stationaryShieldDelay) {
             finalAmount *= CONFIG.buffs.stationaryShieldMultiplier;
+            staggerAmount *= CONFIG.buffs.stationaryShieldMultiplier;
         }
         finalAmount *= this.buffSystem.getDefenseMultiplier();
 
         const isStaggered = this.staggerValue > 0 || this.fallTimer > 0 || this.standUpTimer > 0;
         if (isStaggered) {
             finalAmount *= 1 + CONFIG.stagger.staggeredDamageBonusPct;
+            staggerAmount *= 1 + CONFIG.stagger.staggeredDamageBonusPct;
         }
 
         finalAmount = Math.max(0, finalAmount);
+        staggerAmount = Math.max(0, staggerAmount * (options.staggerMultiplier || 1));
         this.damageFlashTimer = 0.2;
         this.hp = Math.max(0, this.hp - finalAmount);
 
-        this.addStagger(finalAmount, sourcePos);
+        this.addStagger(staggerAmount, sourcePos);
 
         if (sourcePos && this.mesh.position) {
             const dir = this.mesh.position.clone().sub(sourcePos).normalize();
@@ -301,9 +316,7 @@ class Gidora {
 
     addStagger(amount, sourcePos) {
         if (this.fallTimer > 0 || this.standUpTimer > 0 || amount <= 0) return;
-        if (this.buffSystem.isActive('staggerImmune')) {
-            amount *= CONFIG.buffs.staggerImmuneIncomingMultiplier;
-        }
+        amount *= this.buffSystem.getIncomingStaggerMultiplier();
         if (amount <= 0) return;
         this.staggerWindowTimer = CONFIG.stagger.playerWindow;
         this.staggerValue = Math.min(CONFIG.stagger.playerThreshold, this.staggerValue + amount);
@@ -321,6 +334,7 @@ class Gidora {
             if (this.beamPhase === 'firing' || this.beamPhase === 'prefire') {
                 this.beamCharge = 0;
                 this.beamPhase = 'idle';
+                this.comboTripleOnceActive = false;
                 this._hideBeamFX();
                 this._hideSpecialComboFX();
                 if (this.mesh.position.y > 0) this.mesh.position.y = 0;
@@ -1121,7 +1135,7 @@ class Gidora {
         if (playerIndex === 'p4') {
             // P4 尾巴蓄力攻擊（獨立狀態，不走頭部流程）
             this.attackStates.p4 = 'tailCharging';
-            this.attackHoldTimers.p4 = 0;
+            this.attackHoldTimers.p4 = this.buffSystem.isActive('instantCharge') ? CONFIG.combat.tailChargeTime : 0;
             this.attackReleaseQueued.p4 = false;
             this.attackQueuedKinds.p4 = 'light';
             this.attackImpactDone.p4 = false;
@@ -1129,7 +1143,7 @@ class Gidora {
         } else if (this.canChargeAttack(playerIndex)) {
             this.resetChargeAim(playerIndex);
             this.attackStates[playerIndex] = 'charging';
-            this.attackHoldTimers[playerIndex] = 0;
+            this.attackHoldTimers[playerIndex] = this.buffSystem.isActive('instantCharge') ? CONFIG.combat.chargeTime : 0;
             this.attackReleaseQueued[playerIndex] = false;
             this.attackQueuedKinds[playerIndex] = 'light';
             this.attackImpactDone[playerIndex] = false;
@@ -1511,15 +1525,11 @@ class Gidora {
     }
 
     getMeleeDamage(playerIndex, kind) {
-        let damage = CONFIG.combat.meleeDamage * this.buffSystem.getMeleeMultiplier();
+        let damage = CONFIG.combat.meleeDamage * this.buffSystem.getMeleeMultiplier(playerIndex);
         if (playerIndex === 'p4' && this.buffSystem.isActive('tailPower')) {
             damage *= CONFIG.buffs.tailDamageMultiplier;
         }
         if (kind === 'heavy') damage *= CONFIG.combat.heavyDamageScale;
-        if (this.buffSystem.isActive('comboRamp')) {
-            const stacks = this.comboRampStacks || 0;
-            damage *= 1 + stacks * CONFIG.buffs.comboDamageStepPct;
-        }
         return damage;
     }
 
@@ -1540,6 +1550,7 @@ class Gidora {
         }
 
         const owner = this; // 命中時用作攻擊者，避免 closure 內 this 指到 particle entry
+        const staggerMultiplier = owner.buffSystem.getOutgoingStaggerMultiplier();
 
         state.particles.push({
             ring,
@@ -1564,10 +1575,12 @@ class Gidora {
                         if (e.isDead || this.hitList.has(e)) return;
                         if (e.mesh.position.distanceTo(ring.position) < radius + 0.5) {
                             e.takeDamage(damage, owner.mesh.position, hitKnockback);
+                            const damageStaggerBonus = damage * (staggerMultiplier - 1);
+                            if (damageStaggerBonus > 0 && e.addStagger) e.addStagger(damageStaggerBonus, ring.position);
                             if (e.addStagger) {
                                 const baseStagger = options.stagger || (options.heavy ? 35 : 0);
                                 const heavyBonus = options.heavy ? damage * CONFIG.combat.heavyStaggerBonusScale : 0;
-                                e.addStagger(baseStagger + heavyBonus, ring.position);
+                                e.addStagger((baseStagger + heavyBonus) * staggerMultiplier, ring.position);
                             }
                             this.hitList.add(e);
                             owner.buffSystem.onEffectiveDamage(damage);
@@ -1585,9 +1598,9 @@ class Gidora {
                 state.dragons.forEach(d => {
                     if (!d || d === owner || d.isDead || this.hitList.has(d)) return;
                     if (d.intersectsHitCircle && d.intersectsHitCircle(ring.position, radius)) {
-                        d.takeDamage(damage, owner.mesh.position, hitKnockback);
+                        d.takeDamage(damage, owner.mesh.position, hitKnockback, { staggerMultiplier });
                         if (options.heavy && d.addStagger) {
-                            d.addStagger(damage * CONFIG.combat.heavyStaggerBonusScale, ring.position);
+                            d.addStagger(damage * CONFIG.combat.heavyStaggerBonusScale * staggerMultiplier, ring.position);
                         }
                         this.hitList.add(d);
                         owner.buffSystem.onEffectiveDamage(damage);
@@ -1638,9 +1651,10 @@ class Gidora {
             80
         );
         if (state.enemyManager) {
+            const staggerMultiplier = this.buffSystem.getOutgoingStaggerMultiplier();
             state.enemyManager.enemies.forEach(e => {
                 if (!e.isDead && e.mesh.position.distanceTo(pos) < CONFIG.combat.shockwaveRadius + 0.5 && e.addStagger) {
-                    e.addStagger(CONFIG.stagger.enemyThreshold, pos);
+                    e.addStagger(CONFIG.stagger.enemyThreshold * staggerMultiplier, pos);
                 }
             });
         }
@@ -1716,7 +1730,8 @@ class Gidora {
         origin.y = 1.3;
         const range = CONFIG.combat.flamethrowerRange;
         const halfAngle = CONFIG.combat.flamethrowerAngle;
-        const damage = CONFIG.combat.flamethrowerDamagePerSecond * dt * this.buffSystem.getMeleeMultiplier();
+        const damage = CONFIG.combat.flamethrowerDamagePerSecond * dt * this.buffSystem.getMeleeMultiplier(playerIndex);
+        const staggerMultiplier = this.buffSystem.getOutgoingStaggerMultiplier();
 
         this.updateFlamethrowerIndicator(playerIndex, origin, forward);
         this.flamethrowerTimers[playerIndex] = (this.flamethrowerTimers[playerIndex] || 0) + dt;
@@ -1764,6 +1779,8 @@ class Gidora {
             state.enemyManager.enemies.forEach(e => {
                 if (e.isDead || !isInCone(e.mesh.position)) return;
                 e.takeDamage(damage, origin, CONFIG.combat.flamethrowerKnockback);
+                const damageStaggerBonus = damage * (staggerMultiplier - 1);
+                if (damageStaggerBonus > 0 && e.addStagger) e.addStagger(damageStaggerBonus, origin);
                 this.buffSystem.onEffectiveDamage(damage);
             });
         }
@@ -1774,7 +1791,7 @@ class Gidora {
                 ? d.getHitSpheres(CONFIG.hitbox.meleePadding).some(s => isInCone(s.pos, s.radius))
                 : isInCone(d.mesh.position, 1.2);
             if (!hit) return;
-            d.takeDamage(damage, origin, CONFIG.combat.flamethrowerKnockback);
+            d.takeDamage(damage, origin, CONFIG.combat.flamethrowerKnockback, { staggerMultiplier });
             this.buffSystem.onEffectiveDamage(damage);
         });
 
@@ -1895,6 +1912,10 @@ class Gidora {
     }
 
     startChargedCombo() {
+        if (this.buffSystem && this.buffSystem.isActive('comboTripleOnce')) {
+            this.comboTripleOnceActive = true;
+            this.buffSystem.clear('comboTripleOnce');
+        }
         this.activeComboForm = this.buffSystem && this.buffSystem.getComboForm
             ? this.buffSystem.getComboForm()
             : 'beam';
@@ -1989,6 +2010,7 @@ class Gidora {
         this.beamPhase = 'postfire';
         this.beamPostFireTimer = CONFIG.beam.postFireDelay;
         this.comboCooldown = this.comboCooldownMax;
+        this.comboTripleOnceActive = false;
         this.rushTarget = null;
         this._hideSpecialComboFX();
     }
@@ -1996,6 +2018,7 @@ class Gidora {
     applyComboAreaDamage(center, radius, damage, color, knockback, stagger = 70) {
         const baseKnockback = (knockback === undefined) ? CONFIG.combo.defaultAreaKnockback : knockback;
         knockback = baseKnockback * this.buffSystem.getKnockbackMultiplier();
+        const staggerMultiplier = this.buffSystem.getOutgoingStaggerMultiplier();
         const origin = center.clone();
         origin.y = 0.1;
         if (state.enemyManager) {
@@ -2006,7 +2029,9 @@ class Gidora {
                 const dist = Math.sqrt(dx * dx + dz * dz);
                 if (dist > radius + 1.0) return;
                 e.takeDamage(damage, origin, knockback);
-                if (e.addStagger) e.addStagger(stagger, origin);
+                const damageStaggerBonus = damage * (staggerMultiplier - 1);
+                if (damageStaggerBonus > 0 && e.addStagger) e.addStagger(damageStaggerBonus, origin);
+                if (e.addStagger) e.addStagger(stagger * staggerMultiplier, origin);
                 this.buffSystem.onEffectiveDamage(damage);
             });
         }
@@ -2016,8 +2041,8 @@ class Gidora {
                 ? d.intersectsHitCircle(origin, radius)
                 : d.mesh.position.distanceTo(origin) <= radius + 1.2;
             if (!hit) return;
-            d.takeDamage(damage, origin, knockback);
-            if (d.addStagger) d.addStagger(stagger, origin);
+            d.takeDamage(damage, origin, knockback, { staggerMultiplier });
+            if (d.addStagger) d.addStagger(stagger * staggerMultiplier, origin);
             this.buffSystem.onEffectiveDamage(damage);
         });
         if (state.levelManager && state.levelManager.blocks) {
@@ -2170,8 +2195,11 @@ class Gidora {
             from.y = Math.max(0.6, from.y);
             this.spawnRushAfterimageSlash(from, targetPos);
             const damage = CONFIG.combo.rushBarrageDamage * this.buffSystem.getComboDamageMultiplier();
-            this.rushTarget.takeDamage(damage, from, CONFIG.combo.rushKnockback);
-            if (this.rushTarget.addStagger) this.rushTarget.addStagger(35, from);
+            const staggerMultiplier = this.buffSystem.getOutgoingStaggerMultiplier();
+            this.rushTarget.takeDamage(damage, from, CONFIG.combo.rushKnockback, { staggerMultiplier });
+            const damageStaggerBonus = damage * (staggerMultiplier - 1);
+            if (damageStaggerBonus > 0 && !(this.rushTarget instanceof Gidora) && this.rushTarget.addStagger) this.rushTarget.addStagger(damageStaggerBonus, from);
+            if (this.rushTarget.addStagger) this.rushTarget.addStagger(35 * staggerMultiplier, from);
             this.buffSystem.onEffectiveDamage(damage);
         }
 
@@ -2567,13 +2595,16 @@ class Gidora {
         if (this.beamDotTimer < beamCfg.tickInterval) return;
         this.beamDotTimer = 0;
         const damage = beamCfg.damagePerTick * beamCfg.damageScale * this.buffSystem.getComboDamageMultiplier();
+        const staggerMultiplier = this.buffSystem.getOutgoingStaggerMultiplier();
         const hitRadius = beamWidth + 0.25;
         if (state.enemyManager) {
             state.enemyManager.enemies.forEach(e => {
                 if (e.isDead) return;
                 if (!this._isPointNearRefractPath(e.mesh.position, hitRadius + 1.2, points)) return;
                 e.takeDamage(damage, origin, CONFIG.beam.tickKnockback);
-                if (e.addStagger) e.addStagger(damage * CONFIG.combo.refractBeamStaggerBonusPct, origin);
+                const damageStaggerBonus = damage * (staggerMultiplier - 1);
+                if (damageStaggerBonus > 0 && e.addStagger) e.addStagger(damageStaggerBonus, origin);
+                if (e.addStagger) e.addStagger(damage * CONFIG.combo.refractBeamStaggerBonusPct * staggerMultiplier, origin);
                 if (this.buffSystem.isActive('beamSlow') && e.applySlow) {
                     e.applySlow(CONFIG.buffs.beamSlowFactor, CONFIG.buffs.beamSlowDuration);
                 }
@@ -2586,8 +2617,8 @@ class Gidora {
                 ? d.getHitSpheres(CONFIG.hitbox.beamPadding).some(s => this._isPointNearRefractPath(s.pos, hitRadius + s.radius, points))
                 : this._isPointNearRefractPath(d.mesh.position, hitRadius + 1.2, points);
             if (!hit) return;
-            d.takeDamage(damage, origin, CONFIG.beam.tickKnockback);
-            if (d.addStagger) d.addStagger(damage * CONFIG.combo.refractBeamStaggerBonusPct, origin);
+            d.takeDamage(damage, origin, CONFIG.beam.tickKnockback, { staggerMultiplier });
+            if (d.addStagger) d.addStagger(damage * CONFIG.combo.refractBeamStaggerBonusPct * staggerMultiplier, origin);
             if (this.buffSystem.isActive('beamSlow') && d.applySlow) {
                 d.applySlow(CONFIG.buffs.beamSlowFactor, CONFIG.buffs.beamSlowDuration);
             }
@@ -2636,6 +2667,7 @@ class Gidora {
                 this.beamPostFireTimer = beamCfg.postFireDelay;
                 // Phase 1: 啟動合體技 CD
                 this.comboCooldown = this.comboCooldownMax;
+                this.comboTripleOnceActive = false;
                 this._hideBeamFX();
                 return;
             }
@@ -2715,6 +2747,7 @@ class Gidora {
             if (this.beamDotTimer >= beamCfg.tickInterval) {
                 this.beamDotTimer = 0;
                 const damage = beamCfg.damagePerTick * beamCfg.damageScale * this.buffSystem.getComboDamageMultiplier();
+                const staggerMultiplier = this.buffSystem.getOutgoingStaggerMultiplier();
 
                 if (state.enemyManager) {
                     state.enemyManager.enemies.forEach(e => {
@@ -2725,6 +2758,8 @@ class Gidora {
                         const perp = toE.clone().sub(forward.clone().multiplyScalar(along));
                         if (perp.length() < 1.2 + hitRadius) {
                             e.takeDamage(damage, origin, CONFIG.beam.tickKnockback);
+                            const damageStaggerBonus = damage * (staggerMultiplier - 1);
+                            if (damageStaggerBonus > 0 && e.addStagger) e.addStagger(damageStaggerBonus, origin);
                             if (this.buffSystem.isActive('beamSlow') && e.applySlow) {
                                 e.applySlow(CONFIG.buffs.beamSlowFactor, CONFIG.buffs.beamSlowDuration);
                             }
@@ -2739,7 +2774,7 @@ class Gidora {
                         ? d.intersectsHitRay(origin, forward, beamLength + 1.2, hitRadius)
                         : Infinity;
                     if (along < Infinity) {
-                        d.takeDamage(damage, origin, CONFIG.beam.tickKnockback);
+                        d.takeDamage(damage, origin, CONFIG.beam.tickKnockback, { staggerMultiplier });
                         if (this.buffSystem.isActive('beamSlow') && d.applySlow) {
                             d.applySlow(CONFIG.buffs.beamSlowFactor, CONFIG.buffs.beamSlowDuration);
                         }
@@ -2837,6 +2872,12 @@ class Gidora {
         const isBeamActive = (this.beamPhase !== 'idle');
         const isFloraComboActive = this.activeComboForm === 'flora' && this.beamPhase !== 'idle';
         const isRushComboActive = this.activeComboForm === 'rush' && this.beamPhase === 'firing';
+        const inputOverloaded = this.buffSystem.isAllInputBlocked(players);
+        this.inputOverloadActive = inputOverloaded;
+        const getMoveInput = (p) => inputOverloaded ? new THREE.Vector2() : this.input[p].move;
+        const isAttackInput = (p) => !inputOverloaded && this.input[p].attack;
+        const isChargeInput = (p) => !inputOverloaded && this.input[p].charge;
+        if (inputOverloaded && !isBeamActive) this.cancelAllMeleeForCombo();
 
         if (isBeamActive) {
             this.cancelAllMeleeForCombo();
@@ -2853,10 +2894,10 @@ class Gidora {
         // 互斥：Melee 進行中的玩家不計入集氣；正在 tailCharging 的 P4 也不計入
         if (this.beamPhase === 'idle') {
             players.forEach(p => {
-                if (this.input[p].charge) this.cancelMeleeForCombo(p);
+                if (isChargeInput(p)) this.cancelMeleeForCombo(p);
             });
             const chargeCount = players.filter(p =>
-                this.input[p].charge && !this.isPlayerMeleeBusy(p)
+                isChargeInput(p) && !this.isPlayerMeleeBusy(p)
             ).length;
             const rates = beamCfg.chargeRates;
             const onCooldown = this.comboCooldown > 0;
@@ -2880,13 +2921,14 @@ class Gidora {
 
         // Attack input；互斥：集氣期間鎖定 Melee
         players.forEach(p => {
-            const isDown = this.input[p].attack;
+            if (inputOverloaded) return;
+            const isDown = isAttackInput(p);
             const isPress = isDown && !this.lastAttackInput[p];
             const isRelease = !isDown && this.lastAttackInput[p];
             this.lastAttackInput[p] = isDown;
             if (isBeamActive) return;
             if (isRelease) this.releaseAttackPress(p);
-            if (this.input[p].charge) return; // 集氣時忽略新的 Melee 按下
+            if (isChargeInput(p)) return; // 集氣時忽略新的 Melee 按下
             if (isPress) this.startAttackPress(p);
         });
 
@@ -2911,7 +2953,7 @@ class Gidora {
                 return;
             }
             // 集氣發光（按住集氣且正在貢獻蓄力時，發出光束色光）
-            const isContributing = this.input[p].charge && !this.isPlayerMeleeBusy(p) &&
+            const isContributing = isChargeInput(p) && !this.isPlayerMeleeBusy(p) &&
                                    this.beamPhase === 'idle' && this.comboCooldown <= 0 && chargeGlowRatio > 0;
             if (isContributing) {
                 const flicker = 0.5 + 0.5 * Math.sin(t * 12 * (1 + chargeGlowRatio * 3));
@@ -2943,10 +2985,10 @@ class Gidora {
         else forcedForwardInput.set(0, 0, 1);
 
         players.forEach(p => {
-            const moveInput = this.input[p].move;
+            const moveInput = getMoveInput(p);
             const hasInput = moveInput.lengthSq() > 0.01;
             const playerLocked = this.isPlayerMovementLocked(p);
-            const tailForwardOverride = tailSweepForwardLocked && !this.input[p].charge;
+            const tailForwardOverride = tailSweepForwardLocked && !isChargeInput(p);
 
             const arrowMap = { p1: this.p1Arrow, p2: this.p2Arrow, p3: this.p3Arrow, p4: this.p4Arrow };
             const arrow = arrowMap[p];
@@ -2979,7 +3021,8 @@ class Gidora {
                 if (speedMult > 1.0) break;
             }
         }
-        if (this.buffSystem.isActive('teamworkRegen') && speedMult > 1.0) {
+        this.isTeamworkMoving = speedMult > 1.0;
+        if (this.buffSystem.isActive('teamworkRegen') && this.isTeamworkMoving) {
             this.heal(CONFIG.buffs.teamworkRegenPerSecond * dt);
             if (!this.teamworkRegenFxTimer || this.teamworkRegenFxTimer <= 0) {
                 this.teamworkRegenFxTimer = 0.28;

@@ -291,21 +291,26 @@ const CONFIG = {
     // Buff 數值
     // -----------------------------------------------------------------
     buffs: {
-        hpBoostPct: 0.3,                  // 可疊加血量 Buff：每層最大血量增加比例
-        speedBoostPct: 0.3,               // 可疊加速度 Buff：每層速度與轉向增加比例
-        meleeBoostPct: 0.3,               // 可疊加近戰 Buff：每層近戰傷害增加比例
+        hpBoostPct: 0.3,                  // 禁用血量 Buff：最大血量增加比例
+        speedBoostPct: 0.3,               // 移動速度+ Buff：速度與轉向增加比例
+        headAttackBoostPct: 0.3,          // 頭部攻擊力+ Buff：頭部 Melee 傷害增加比例
         comboCooldownMultiplier: 0.5,     // 組合技 CD 縮短 Buff：冷卻倍率
-        comboDamageMultiplier: 2.0,       // 組合技傷害 Buff：傷害倍率
+        comboDamageMultiplier: 2.0,       // 組合技攻擊力+ Buff：傷害倍率
+        comboTripleOnceMultiplier: 3.0,   // 終極一發 Buff：單次組合技傷害倍率
+        globalAttackBoostPct: 0.7,        // 霸道輸出 Buff：所有攻擊傷害增加比例
         lifeStealPct: 0.12,               // 有效傷害回血 Buff：造成傷害轉換回血比例
         tailDamageMultiplier: 2.6,        // 尾巴攻擊力 Buff：尾巴傷害倍率
         tailPowerSweepRadiusMultiplier: 1.45, // 尾巴攻擊力 Buff：尾巴蓄力橫掃範圍倍率
         leafShieldCount: 4,               // 葉子護盾 Buff：護盾葉片數量
+        leafShieldComboCount: 8,           // 葉子護盾 Buff：組合技期間護盾葉片數量
         leafShieldRadius: 2.1,            // 葉子護盾 Buff：葉子環繞身體的半徑
         leafShieldHitRadius: 0.8,         // 葉子護盾 Buff：投射物碰葉子反彈的判定半徑
         reflectedBulletKnockback: 12,     // 葉子護盾 Buff：投射物反彈後擊退力
         reflectedBulletDamageMin: 10,     // 葉子護盾 Buff：投射物反彈後最低傷害下限
         missileKnockback: 18,             // 飛彈巢 Buff：發射飛彈的擊退力
-        defenseBoostPct: 0.2,             // 防禦率 Buff：每層減少受傷比例（每層乘 (1 - 0.2)）
+        defenseBoostPct: 0.2,             // 防禦+ Buff：受傷減少比例，不影響受到的失衡值
+        armoredDefensePct: 0.3,           // 重甲守勢 Buff：受傷減少比例，不影響受到的失衡值
+        armoredSpeedMultiplier: 0.7,      // 重甲守勢 Buff：移動與轉向速度倍率
         knockbackBoostMultiplier: 3,      // 把敵人推得遠遠的 Buff：所有由本龍造成的擊退力倍率
         missileInterval: 2.5,             // 飛彈巢 Buff：發射間隔秒數
         missileDamage: 12,                // 飛彈巢 Buff：單發飛彈傷害
@@ -316,7 +321,8 @@ const CONFIG = {
         comboDamageMinWindow: 1.5,        // 連擊 Buff：高 Combo 時最低斷 Combo 倒數秒數
         comboDamageStepPct: 0.18,         // 連擊 Buff：每層傷害增加比例
         comboDamageMaxStacks: 7,          // 連擊 Buff：最高層數
-        frontDamageMultiplier: 0.7,      // 正面減傷 Buff：正面受傷倍率
+        frontDamageMultiplier: 0.7,      // 正面硬鱗 Buff：正面受傷倍率
+        backDamageMultiplier: 1.3,       // 正面硬鱗 Buff：背面受傷倍率
         projectileReflectChance: 0.5,     // 反彈投射物 Buff：反彈機率
         beamSlowDuration: 2.0,            // 光束緩速 Buff：緩速持續秒數
         beamSlowFactor: 0.4,             // 光束緩速 Buff：敵人速度倍率
@@ -328,11 +334,19 @@ const CONFIG = {
         ramDamage: 45,                    // 高速衝撞 Buff：撞擊傷害
         ramKnockback: 55,                 // 高速衝撞 Buff：撞擊擊退力
         ramStagger: 100,                   // 高速衝撞 Buff：額外失衡值
-        staggerImmuneIncomingMultiplier: 0.6, // 不容易跌倒 Buff：受到失衡值倍率（0.5 = 減少 50%）
-        staggerImmuneRecoveryMultiplier: 1.2, // 不容易跌倒 Buff：失衡值衰退速度倍率（1.5 = +50%）
+        staggerImmuneIncomingMultiplier: 0.6, // 不屈爆發 Buff：受到失衡值倍率
+        staggerImmuneRecoveryMultiplier: 1.2, // 不屈爆發 Buff：失衡值衰退速度倍率
+        outgoingStaggerMultiplier: 1.5,    // 破勢重擊 Buff：造成失衡值倍率
+        speedRiskSpeedPct: 0.6,            // 暴走疾行 Buff：移動與轉向速度增加比例
+        speedRiskIncomingStaggerMultiplier: 1.4, // 暴走疾行 Buff：受到失衡值倍率
+        noFallSpeedMultiplier: 0.8,        // 定海步 Buff：移動與轉向速度倍率
         stationaryShieldDelay: 2.0,       // 靜止護盾 Buff：站定多久後啟用
         stationaryShieldMultiplier: 0.8,  // 靜止護盾 Buff：受傷倍率
         teamworkRegenPerSecond: 25,        // 同心協力回血 Buff：每秒回血量
+        teamworkSparkInterval: 0.35,       // 同心火花 Buff：火花傷害 tick 間隔秒數
+        teamworkSparkDamage: 7,            // 同心火花 Buff：每次 DOT 傷害
+        teamworkSparkRadius: 3.6,          // 同心火花 Buff：傷害半徑
+        teamworkGuardVulnerableMultiplier: 1.3, // 同心結界 Buff：不同心協力時受傷倍率
         lowHpExplosionDamage: 180,        // 半血爆炸 Buff：爆炸傷害
         lowHpExplosionRadius: 15,         // 半血爆炸 Buff：爆炸半徑
         comboFloraDecorVineCount: 3,      // 藤蔓掃場型態 Buff：身體周圍點綴藤蔓數量
