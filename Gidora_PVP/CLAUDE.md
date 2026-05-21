@@ -106,7 +106,7 @@ PVP 配對 overlay 開啟時 `state.pvp.configuring = true`，主迴圈只 poll 
 - `comboRamp` 連擊傷害提高已禁用並移至 UI 底部。
 - `directionalGuard` 顯示為「正面硬鱗」；正面受傷降低，背面受傷提高。
 - `staggerImmune` 顯示為「不屈爆發」，合併不容易跌倒與跌倒站起大爆炸；舊 `lowHpExplosion` 已禁用並移至 UI 底部。
-- 新增 Buff：`staggerBoost` 破勢重擊（造成失衡值 +50%）、`teamworkSpark` 同心火花（同心協力移動時周圍火花 DOT）、`instantCharge` 一念蓄力（蓄力攻擊瞬間完成）、`comboTripleOnce` 終極一發（下一次組合技 3 倍傷害並消耗）、`speedRisk` 暴走疾行（速度 +60%，受到失衡 +40%）、`armoredSlow` 重甲守勢（防禦 +30%，速度 -30%）、`highAttackChaos` 霸道輸出（攻擊 +70%，四人同時輸入時所有輸入無效）、`noFallSlow` 定海步（不會跌倒，速度 -20%）、`teamworkGuard` 同心結界（同心協力移動時無敵，不同心協力時受傷 +30%）。
+- 新增 Buff：`staggerBoost` 破勢重擊（造成失衡值 +50%）、`teamworkSpark` 放電（同心協力移動時周遭閃電環繞，靠近敵人或可破壞物件會持續放電 DOT）、`instantCharge` 一念蓄力（蓄力攻擊瞬間完成）、`comboTripleOnce` 終極一發（下一次組合技 3 倍傷害並消耗）、`speedRisk` 暴走疾行（速度 +60%，受到失衡 +40%）、`armoredSlow` 重甲守勢（防禦 +30%，速度 -30%）、`highAttackChaos` 霸道輸出（攻擊 +70%，四人同時輸入時所有輸入無效）、`noFallSlow` 定海步（不會跌倒，速度 -20%）、`teamworkGuard` 同心結界（同心協力移動時無敵，不同心協力時受傷 +30%）。
 
 ## Game Mode
 
@@ -144,8 +144,8 @@ PVE CPU 規範：
 
 | Target | 移動 | Melee | 合體技蓄力 |
 |---|---|---|---|
-| Dragon A | WASD | 上排 `1/2/3/4` | 上排 `5/6/7/8` |
-| Dragon B | 方向鍵 | 右側數字鍵 `1/2/3/4` (`Numpad1~4`) | 右側數字鍵 `5/6/7/8` (`Numpad5~8`) |
+| Dragon A | WASD（P1） / 方向鍵（P1~P4 同步） | 上排 `1/2/3/4` | 上排 `5/6/7/8` |
+| Dragon B | PVP debug 仍可用方向鍵；一般測試模式方向鍵優先給 Dragon A | 右側數字鍵 `1/2/3/4` (`Numpad1~4`) | 右側數字鍵 `5/6/7/8` (`Numpad5~8`) |
 
 Dragon A P1 仍保留滑鼠左鍵 Melee、滑鼠右鍵蓄力、滑鼠位置瞄準。
 

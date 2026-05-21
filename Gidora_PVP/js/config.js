@@ -343,9 +343,14 @@ const CONFIG = {
         stationaryShieldDelay: 2.0,       // 靜止護盾 Buff：站定多久後啟用
         stationaryShieldMultiplier: 0.8,  // 靜止護盾 Buff：受傷倍率
         teamworkRegenPerSecond: 25,        // 同心協力回血 Buff：每秒回血量
-        teamworkSparkInterval: 0.35,       // 同心火花 Buff：火花傷害 tick 間隔秒數
-        teamworkSparkDamage: 7,            // 同心火花 Buff：每次 DOT 傷害
-        teamworkSparkRadius: 3.6,          // 同心火花 Buff：傷害半徑
+        teamworkSparkInterval: 0.28,       // 放電 Buff：雷電 DOT tick 間隔秒數
+        teamworkSparkDamage: 14,            // 放電 Buff：每次 DOT 傷害
+        teamworkSparkRadius: 9,          // 放電 Buff：自動電擊敵人與可破壞物件的距離
+        teamworkSparkOrbitRadius: 2.35,    // 放電 Buff：角色周遭閃電粒子環繞半徑
+        teamworkSparkOrbitCount: 9,       // 放電 Buff：每次更新生成的環狀閃電粒子數量
+        teamworkSparkArcLife: 0.16,        // 放電 Buff：打向目標的雷電視覺存活秒數
+        teamworkSparkArcRadius: 0.11,      // 放電 Buff：打向目標的雷電核心粗細
+        teamworkSparkArcGlowRadius: 0.26,  // 放電 Buff：打向目標的雷電外光粗細
         teamworkGuardVulnerableMultiplier: 1.3, // 同心結界 Buff：不同心協力時受傷倍率
         lowHpExplosionDamage: 180,        // 半血爆炸 Buff：爆炸傷害
         lowHpExplosionRadius: 15,         // 半血爆炸 Buff：爆炸半徑

@@ -16,6 +16,7 @@ function setupInputs() {
 
     const setKey = (e, isDown) => {
         keys[e.code] = isDown;
+        if (e.code && e.code.startsWith('Arrow')) e.preventDefault();
         if (isDown) {
             SoundSystem.init();
             if (state.pvp && state.pvp.configuring) {
@@ -87,6 +88,12 @@ function setupInputs() {
         const dragonA = state.dragons[0];
         const dragonB = state.dragons[1];
         const canCharge = true;
+        let arrowVx = 0, arrowVy = 0;
+        if (keys['ArrowUp']) arrowVy -= 1;
+        if (keys['ArrowDown']) arrowVy += 1;
+        if (keys['ArrowLeft']) arrowVx -= 1;
+        if (keys['ArrowRight']) arrowVx += 1;
+        const hasArrowMove = arrowVx !== 0 || arrowVy !== 0;
 
         if (dragonA) {
             let vx = 0, vy = 0;
@@ -94,7 +101,11 @@ function setupInputs() {
             if (keys['KeyS']) vy += 1;
             if (keys['KeyA']) vx -= 1;
             if (keys['KeyD']) vx += 1;
-            assignMove(dragonA, 'p1', vx, vy);
+            if (hasArrowMove) {
+                ['p1', 'p2', 'p3', 'p4'].forEach(player => assignMove(dragonA, player, arrowVx, arrowVy));
+            } else {
+                assignMove(dragonA, 'p1', vx, vy);
+            }
             dragonA.input.p1.pointer.copy(mousePos);
             dragonA.input.p1.pointerActive = true;
             dragonA.input.p1.attack = mouseAttack || !!keys['Digit1'];
@@ -108,12 +119,7 @@ function setupInputs() {
         }
 
         if (dragonB) {
-            let vx = 0, vy = 0;
-            if (keys['ArrowUp']) vy -= 1;
-            if (keys['ArrowDown']) vy += 1;
-            if (keys['ArrowLeft']) vx -= 1;
-            if (keys['ArrowRight']) vx += 1;
-            assignMove(dragonB, 'p1', vx, vy);
+            if (!dragonA && hasArrowMove) assignMove(dragonB, 'p1', arrowVx, arrowVy);
             dragonB.input.p1.attack = !!keys['Numpad1'];
             dragonB.input.p3.attack = !!keys['Numpad2'];
             dragonB.input.p2.attack = !!keys['Numpad3'];

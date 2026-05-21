@@ -39,7 +39,7 @@ const BUFFS = {
     comboInvincible: { name: '組合技期間無敵', description: '已併入「葉子護盾」：此 Buff 不會抽取，也無法手動啟用。', implemented: false, disabled: true, pvpExclude: true, icon: { glyph: 'V', color: '#f7f2ff', bg: '#2b1f42' } },
 
     staggerBoost: { name: '破勢重擊', description: '造成的失衡值 +50%。', implemented: true, icon: { glyph: 'ST', color: '#ffef8a', bg: '#3b3012' } },
-    teamworkSpark: { name: '同心火花', description: '同心協力移動時，角色周遭生成火花並對敵人造成 DOT 傷害。', implemented: true, icon: { glyph: '火', color: '#ffbd5a', bg: '#3b1d12' } },
+    teamworkSpark: { name: '放電', description: '同心協力移動時，周遭閃電環繞；靠近敵人或可破壞物件會持續放電造成 DOT。', implemented: true, icon: { glyph: '雷', color: '#bdefff', bg: '#122b3b' } },
     instantCharge: { name: '一念蓄力', description: '蓄力攻擊可瞬間完成。', implemented: true, icon: { glyph: '快', color: '#e6f7ff', bg: '#173042' } },
     comboTripleOnce: { name: '終極一發', description: '下一次組合技傷害變為 3 倍，施放後此 Buff 消失。', implemented: true, icon: { glyph: '1X', color: '#fff0a6', bg: '#3d3210' } },
     speedRisk: { name: '暴走疾行', description: '移動與轉向速度 +60%，但受到失衡值 +40%。', implemented: true, icon: { glyph: '!!', color: '#ff7a7a', bg: '#3d1010' } },
@@ -711,27 +711,139 @@ class BuffSystem {
 
     _updateTeamworkSpark(dt, dragon) {
         if (!this.isActive('teamworkSpark') || !dragon.isTeamworkMoving) return;
+        this._spawnElectricOrbit(dragon);
         this.timers.teamworkSpark = (this.timers.teamworkSpark || 0) - dt;
         if (this.timers.teamworkSpark > 0) return;
         this.timers.teamworkSpark = CONFIG.buffs.teamworkSparkInterval;
-        const center = dragon.mesh.position.clone();
-        center.y = 0.6;
-        for (let i = 0; i < 8; i++) {
-            const angle = Math.random() * Math.PI * 2;
-            const radius = Math.random() * CONFIG.buffs.teamworkSparkRadius;
-            const pos = center.clone().add(new THREE.Vector3(Math.cos(angle) * radius, Math.random() * 1.4, Math.sin(angle) * radius));
-            const p = new Particle(pos, Math.random() > 0.45 ? 0xffaa22 : 0xffee66);
-            p.life = 0.32;
-            p.maxLife = 0.32;
-            p.mesh.scale.setScalar(0.35 + Math.random() * 0.25);
+
+        const origin = dragon.mesh.position.clone();
+        origin.y = 1.25;
+        const radius = CONFIG.buffs.teamworkSparkRadius;
+        const damage = CONFIG.buffs.teamworkSparkDamage * this.getAttackMultiplier();
+        const hitTargets = [];
+
+        if (state.enemyManager) {
+            state.enemyManager.enemies.forEach(e => {
+                if (e.isDead || e.mesh.position.distanceTo(dragon.mesh.position) > radius + 0.8) return;
+                e.takeDamage(damage, origin, 0);
+                const staggerBonus = damage * (this.getOutgoingStaggerMultiplier() - 1);
+                if (staggerBonus > 0 && e.addStagger) e.addStagger(staggerBonus, origin);
+                this.onEffectiveDamage(damage);
+                hitTargets.push(e.mesh.position.clone().add(new THREE.Vector3(0, 1.0, 0)));
+            });
+        }
+
+        state.dragons.forEach(d => {
+            if (!d || d === dragon || d.isDead) return;
+            if (d.mesh.position.distanceTo(dragon.mesh.position) > radius + 1.2) return;
+            d.takeDamage(damage, origin, 0, { staggerMultiplier: this.getOutgoingStaggerMultiplier() });
+            this.onEffectiveDamage(damage);
+            hitTargets.push(d.mesh.position.clone().add(new THREE.Vector3(0, 1.25, 0)));
+        });
+
+        if (state.levelManager && state.levelManager.blocks) {
+            state.levelManager.blocks.forEach(block => {
+                if (block.isDead || !block.destructible) return;
+                if (block.mesh.position.distanceTo(dragon.mesh.position) > radius + 1.5) return;
+                const didDamage = state.levelManager.damageBlock(block, damage, dragon);
+                if (!didDamage) return;
+                this.onEffectiveDamage(damage);
+                hitTargets.push(block.mesh.position.clone().add(new THREE.Vector3(0, 1.0, 0)));
+            });
+        }
+
+        hitTargets.slice(0, 5).forEach(targetPos => this._spawnLightningArc(origin, targetPos));
+    }
+
+    _spawnElectricOrbit(dragon) {
+        const count = CONFIG.buffs.teamworkSparkOrbitCount;
+        const radius = CONFIG.buffs.teamworkSparkOrbitRadius;
+        const t = Date.now() * 0.012;
+        for (let i = 0; i < count; i++) {
+            if (Math.random() > 0.35) continue;
+            const angle = t + (i / count) * Math.PI * 2 + (Math.random() - 0.5) * 0.22;
+            const pos = dragon.mesh.position.clone().add(new THREE.Vector3(
+                Math.cos(angle) * radius,
+                0.65 + Math.random() * 1.55,
+                Math.sin(angle) * radius
+            ));
+            const p = new Particle(pos, Math.random() > 0.5 ? 0x8fe8ff : 0xf2fbff);
+            p.life = 0.18 + Math.random() * 0.08;
+            p.maxLife = p.life;
+            p.velocity.set((Math.random() - 0.5) * 0.8, 0.35 + Math.random() * 0.5, (Math.random() - 0.5) * 0.8);
+            p.mesh.scale.setScalar(0.18 + Math.random() * 0.22);
             state.particles.push(p);
         }
-        this._damageTargetsInRadius(
-            dragon.mesh.position,
-            CONFIG.buffs.teamworkSparkRadius,
-            CONFIG.buffs.teamworkSparkDamage * this.getAttackMultiplier(),
+    }
+
+    _spawnLightningArc(from, to) {
+        const segments = 5;
+        const points = [];
+        const side = new THREE.Vector3(to.z - from.z, 0, from.x - to.x);
+        if (side.lengthSq() > 0.001) side.normalize();
+        for (let i = 0; i <= segments; i++) {
+            const t = i / segments;
+            const pos = from.clone().lerp(to, t);
+            if (i > 0 && i < segments) {
+                pos.add(side.clone().multiplyScalar((Math.random() - 0.5) * 0.8));
+                pos.y += (Math.random() - 0.5) * 0.55;
+            }
+            points.push(pos);
+        }
+        const curve = new THREE.CatmullRomCurve3(points);
+        const group = new THREE.Group();
+        const tubeSegments = segments * 4;
+        const glowGeo = new THREE.TubeGeometry(
+            curve,
+            tubeSegments,
+            CONFIG.buffs.teamworkSparkArcGlowRadius,
+            8,
             false
         );
+        const glowMat = new THREE.MeshBasicMaterial({
+            color: 0x5edfff,
+            transparent: true,
+            opacity: 0.32,
+            depthWrite: false,
+            blending: THREE.AdditiveBlending
+        });
+        const glow = new THREE.Mesh(glowGeo, glowMat);
+        const coreGeo = new THREE.TubeGeometry(
+            curve,
+            tubeSegments,
+            CONFIG.buffs.teamworkSparkArcRadius,
+            7,
+            false
+        );
+        const coreMat = new THREE.MeshBasicMaterial({
+            color: 0xf3fdff,
+            transparent: true,
+            opacity: 0.98,
+            blending: THREE.AdditiveBlending
+        });
+        const core = new THREE.Mesh(coreGeo, coreMat);
+        group.add(glow);
+        group.add(core);
+        scene.add(group);
+        state.particles.push({
+            life: CONFIG.buffs.teamworkSparkArcLife,
+            maxLife: CONFIG.buffs.teamworkSparkArcLife,
+            update(dt) {
+                this.life -= dt;
+                const pct = Math.max(0, this.life / this.maxLife);
+                glow.material.opacity = 0.32 * pct;
+                core.material.opacity = 0.98 * pct;
+                if (this.life <= 0) {
+                    scene.remove(group);
+                    group.children.forEach(child => {
+                        child.geometry.dispose();
+                        child.material.dispose();
+                    });
+                    return false;
+                }
+                return true;
+            }
+        });
     }
 
     _updateComboFormDecor(dt, dragon) {
