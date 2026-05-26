@@ -10,6 +10,7 @@ let pvpDevices = [];
 let selectedPvpDeviceId = null;
 let pvpDeviceFocus = {};
 let pvpNewDeviceConfirmBlock = {};
+let staggerTestDragging = false;
 
 const PVP_KEYBOARD_DEVICE = { type: 'keyboard', id: 'keyboard', label: 'Keyboard / Mouse' };
 
@@ -113,9 +114,91 @@ function setupUI() {
     info.appendChild(pveBtn);
     pveBtn.addEventListener('click', openPveSetupOverlay);
 
+    setupStaggerTestUI(info);
     setupBuffUI();
     setupMysteryBoxRollUI();
     refreshTopLeftUI();
+}
+
+function setupStaggerTestUI(info) {
+    const panel = document.createElement('div');
+    panel.id = 'stagger-test-panel';
+    panel.style.pointerEvents = 'auto';
+    panel.style.background = 'rgba(0,0,0,0.56)';
+    panel.style.border = '1px solid rgba(255,210,80,0.35)';
+    panel.style.borderRadius = '6px';
+    panel.style.padding = '8px 9px';
+    panel.style.boxShadow = '0 0 12px rgba(255,210,80,0.12)';
+
+    const header = document.createElement('div');
+    header.style.display = 'flex';
+    header.style.justifyContent = 'space-between';
+    header.style.alignItems = 'center';
+    header.style.gap = '8px';
+    header.style.marginBottom = '6px';
+
+    const title = document.createElement('span');
+    title.textContent = 'Dragon A 失衡';
+    title.style.fontSize = '12px';
+    title.style.fontWeight = '900';
+    title.style.color = '#ffe48a';
+    header.appendChild(title);
+
+    const value = document.createElement('span');
+    value.id = 'stagger-test-value';
+    value.textContent = '0%';
+    value.style.fontSize = '12px';
+    value.style.fontWeight = '900';
+    value.style.color = 'white';
+    header.appendChild(value);
+    panel.appendChild(header);
+
+    const slider = document.createElement('input');
+    slider.id = 'stagger-test-slider';
+    slider.type = 'range';
+    slider.min = '0';
+    slider.max = String(CONFIG.stagger.playerThreshold);
+    slider.step = '1';
+    slider.value = '0';
+    slider.style.width = '100%';
+    slider.style.accentColor = '#ffcc33';
+    slider.addEventListener('pointerdown', () => { staggerTestDragging = true; });
+    slider.addEventListener('pointerup', () => { staggerTestDragging = false; });
+    slider.addEventListener('pointercancel', () => { staggerTestDragging = false; });
+    slider.addEventListener('blur', () => { staggerTestDragging = false; });
+    slider.addEventListener('input', () => {
+        const dragon = state.dragons[0];
+        if (!dragon || dragon.isDead) return;
+        dragon.staggerValue = THREE.MathUtils.clamp(Number(slider.value) || 0, 0, CONFIG.stagger.playerThreshold);
+        dragon.staggerWindowTimer = 0;
+        if (dragon.fallTimer > 0 || dragon.standUpTimer > 0) {
+            dragon.fallTimer = 0;
+            dragon.standUpTimer = 0;
+            dragon.mesh.rotation.x = 0;
+        }
+        updateStaggerTestUI();
+    });
+    panel.appendChild(slider);
+
+    info.appendChild(panel);
+}
+
+function updateStaggerTestUI() {
+    const panel = document.getElementById('stagger-test-panel');
+    const slider = document.getElementById('stagger-test-slider');
+    const value = document.getElementById('stagger-test-value');
+    if (!panel || !slider || !value) return;
+
+    const dragon = state.dragons[0];
+    const show = !!dragon && !state.pvp.active && !state.pve.active;
+    panel.style.display = show ? 'block' : 'none';
+    if (!show) return;
+
+    const max = Math.max(1, CONFIG.stagger.playerThreshold);
+    const current = THREE.MathUtils.clamp(dragon.staggerValue || 0, 0, max);
+    const pct = Math.round((current / max) * 100);
+    value.textContent = `${pct}%`;
+    if (!staggerTestDragging) slider.value = String(Math.round(current));
 }
 
 function refreshTopLeftUI() {
@@ -1589,6 +1672,7 @@ function updateUI() {
     updatePvpBuffSummaryPanel('pvp-buff-summary-b', state.dragons[1]);
     updatePvpComboRampSummary('pvp-combo-ramp-a', state.dragons[0]);
     updatePvpComboRampSummary('pvp-combo-ramp-b', state.dragons[1]);
+    updateStaggerTestUI();
     updatePvpCountdownUI();
     updatePvpTimerUI();
 }
