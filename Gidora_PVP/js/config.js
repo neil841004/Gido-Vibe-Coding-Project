@@ -523,6 +523,24 @@ const CONFIG = {
     // -----------------------------------------------------------------
     visuals: {
         arrowLength: 4, // 玩家輸入方向箭頭長度
+        staggerCues: {
+            wobbleStartPct: 0.18,          // 玩家失衡達到此比例後，身體開始前傾與左右晃動
+            heavyCueStartPct: 0.55,        // 玩家失衡達到此比例後，星星暈眩與尾巴拖地更明顯
+            bodyForwardLeanMax: 0.22,      // 失衡滿值時，身體視覺前傾最大弧度
+            bodySideWobbleMax: 0.24,       // 失衡滿值時，身體左右踉蹌最大弧度
+            bodyWobbleSpeed: 8.0,          // 失衡踉蹌左右晃動速度
+            footSlipDistance: 0.28,        // 失衡滿值且移動時，腳步視覺打滑最大位移距離
+            footSlipSpeed: 10.0,           // 失衡腳步打滑擺動速度
+            headDroopMax: 0.28,            // 失衡滿值時，三顆頭各自歪斜最大弧度；Melee 中不套用
+            tailDragYMax: 0.68,            // 失衡滿值時，尾巴往地面下沉的最大距離
+            tailDragTiltMax: 0.42,         // 失衡滿值時，尾巴拖地的最大下垂弧度
+            dizzyStarCount: 5,             // 失衡暈眩星星數量
+            dizzyStarOrbitRadius: 1.75,    // 暈眩星星繞身體/頭部的半徑
+            dizzyStarMinOpacity: 0.18,     // 暈眩星星顯示時的最低透明度
+            dizzyStarMaxOpacity: 0.85,     // 暈眩星星顯示時的最高透明度
+            hitCrackDuration: 0.22,        // 每次受擊後黃色裂光維持秒數
+            hitCrackCount: 9               // 每次受擊後身上顯示的黃色裂光數量
+        },
         colors: {
             // 預設第一隻三頭龍配色 (Dragon A)
             p1: 0xff4444,          // P1 紅頭顏色

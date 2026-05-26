@@ -94,6 +94,9 @@ class Gidora {
         this.maxHP = CONFIG.stats.playerHP;
         this.isDead = false;
         this.damageFlashTimer = 0;
+        this.hitCrackTimer = 0;
+        this.staggerStarPulseTimer = 0;
+        this.staggerStarCooldown = 0;
 
         this.hpBar = new HealthBar(scene, 4.5, 4.0, 0.2);
 
@@ -260,6 +263,8 @@ class Gidora {
         finalAmount = Math.max(0, finalAmount);
         staggerAmount = Math.max(0, staggerAmount * (options.staggerMultiplier || 1));
         this.damageFlashTimer = 0.2;
+        this.hitCrackTimer = CONFIG.visuals.staggerCues.hitCrackDuration;
+        this.randomizeHitCracks();
         this.hp = Math.max(0, this.hp - finalAmount);
 
         this.addStagger(staggerAmount, sourcePos);
@@ -376,9 +381,11 @@ class Gidora {
 
     getHitSpheres(extraRadius = 0) {
         const cfg = CONFIG.hitbox;
+        const root = this.visualRoot || this.mesh;
         const spheres = [];
         const addLocal = (local, radius) => {
-            const pos = local.clone().applyQuaternion(this.mesh.quaternion).add(this.mesh.position);
+            const pos = local.clone();
+            root.localToWorld(pos);
             spheres.push({ pos, radius: radius + extraRadius });
         };
 
@@ -456,6 +463,8 @@ class Gidora {
 
     buildModel() {
         const colors = this.colors;
+        this.visualRoot = new THREE.Group();
+        this.mesh.add(this.visualRoot);
         const bodyMat = new THREE.MeshLambertMaterial({ color: colors.body });
         const p1Mat = new THREE.MeshLambertMaterial({ color: colors.p1 });
         const p2Mat = new THREE.MeshLambertMaterial({ color: colors.p2 });
@@ -468,7 +477,7 @@ class Gidora {
         this.body.position.y = 1.2;
         this.body.scale.set(1, 0.8, 1.5);
         this.body.castShadow = true;
-        this.mesh.add(this.body);
+        this.visualRoot.add(this.body);
 
         // Legs (4)
         this.legs = [];
@@ -486,8 +495,8 @@ class Gidora {
             leg.position.y = -0.5;
             leg.castShadow = true;
             legGroup.add(leg);
-            this.mesh.add(legGroup);
-            this.legs.push({ group: legGroup, id: cfg.id, isFront: cfg.isFront });
+            this.visualRoot.add(legGroup);
+            this.legs.push({ group: legGroup, id: cfg.id, isFront: cfg.isFront, basePosition: legGroup.position.clone() });
         });
 
         // Necks & Heads (P1/P2/P3)
@@ -527,7 +536,7 @@ class Gidora {
             const eyeR = new THREE.Mesh(eyeGeo, eyeMat); eyeR.position.set(0.22, 0.1, 0.35); headMesh.add(eyeR);
 
             pivotGroup.add(headMesh);
-            this.mesh.add(neckGroup);
+            this.visualRoot.add(neckGroup);
 
             this.necks.push({ group: neckGroup, pivot: pivotGroup, head: headMesh, id: cfg.id, baseLean: leanAngle, baseYaw: cfg.angle, baseZ: cfg.z });
 
@@ -539,6 +548,7 @@ class Gidora {
         // Tail (P4)
         this.tailGroup = new THREE.Group();
         this.tailGroup.position.set(0, 1.2, -1.2);
+        this.tailBasePosition = this.tailGroup.position.clone();
         const tailGeo = new THREE.ConeGeometry(0.6, 2.5, 8);
         tailGeo.rotateX(-Math.PI / 2);
         this.tailBase = new THREE.Mesh(tailGeo, p4Mat);
@@ -550,7 +560,7 @@ class Gidora {
         this.tailTip.position.z = -1.5;
         this.tailGroup.add(this.tailTip);
 
-        this.mesh.add(this.tailGroup);
+        this.visualRoot.add(this.tailGroup);
         this.p4Part = this.tailGroup;
         this.p4HeadPart = this.tailTip;
 
@@ -602,6 +612,170 @@ class Gidora {
         scene.add(this.beamChargeRing);
 
         this.buildComboFormFx();
+        this.buildStaggerVisuals();
+    }
+
+    buildStaggerVisuals() {
+        const cfg = CONFIG.visuals.staggerCues;
+
+        this.staggerStarGroup = new THREE.Group();
+        this.staggerStarGroup.visible = false;
+        this.mesh.add(this.staggerStarGroup);
+
+        const starShape = new THREE.Shape();
+        const spikes = 5;
+        for (let i = 0; i < spikes * 2; i++) {
+            const radius = (i % 2 === 0) ? 0.18 : 0.075;
+            const angle = -Math.PI / 2 + i * Math.PI / spikes;
+            const x = Math.cos(angle) * radius;
+            const y = Math.sin(angle) * radius;
+            if (i === 0) starShape.moveTo(x, y);
+            else starShape.lineTo(x, y);
+        }
+        starShape.closePath();
+        const starGeo = new THREE.ShapeGeometry(starShape);
+        this.staggerStars = [];
+        for (let i = 0; i < cfg.dizzyStarCount; i++) {
+            const mat = new THREE.MeshBasicMaterial({
+                color: 0xfff06a,
+                transparent: true,
+                opacity: 0,
+                depthWrite: false,
+                blending: THREE.AdditiveBlending,
+                side: THREE.DoubleSide
+            });
+            const star = new THREE.Mesh(starGeo.clone(), mat);
+            this.staggerStarGroup.add(star);
+            this.staggerStars.push(star);
+        }
+
+        this.hitCrackGroup = new THREE.Group();
+        this.hitCrackGroup.visible = false;
+        this.visualRoot.add(this.hitCrackGroup);
+        this.hitCracks = [];
+        for (let i = 0; i < cfg.hitCrackCount; i++) {
+            const geo = new THREE.PlaneGeometry(0.055, 0.65);
+            const mat = new THREE.MeshBasicMaterial({
+                color: 0xfff15a,
+                transparent: true,
+                opacity: 0,
+                depthWrite: false,
+                blending: THREE.AdditiveBlending,
+                side: THREE.DoubleSide
+            });
+            const crack = new THREE.Mesh(geo, mat);
+            this.hitCrackGroup.add(crack);
+            this.hitCracks.push(crack);
+        }
+        this.randomizeHitCracks();
+    }
+
+    randomizeHitCracks() {
+        if (!this.hitCracks || !this.hitCracks.length) return;
+        this.hitCracks.forEach((crack, i) => {
+            const angle = (i / this.hitCracks.length) * Math.PI * 2 + Math.random() * 0.65;
+            const height = 0.62 + Math.random() * 1.15;
+            const radius = 0.9 + Math.random() * 0.7;
+            crack.position.set(Math.cos(angle) * radius, height, Math.sin(angle) * radius * 1.18);
+            crack.rotation.set(
+                (Math.random() - 0.5) * 0.8,
+                -angle + Math.PI / 2,
+                (Math.random() - 0.5) * 1.8
+            );
+            const s = 0.75 + Math.random() * 0.65;
+            crack.scale.set(s, s, 1);
+        });
+    }
+
+    getStaggerRatio() {
+        if (this.fallTimer > 0 || this.standUpTimer > 0) return 0;
+        const threshold = Math.max(1, CONFIG.stagger.playerThreshold);
+        return THREE.MathUtils.clamp(this.staggerValue / threshold, 0, 1);
+    }
+
+    getStaggerCueStrength(ratio = this.getStaggerRatio()) {
+        const cfg = CONFIG.visuals.staggerCues;
+        if (ratio <= cfg.wobbleStartPct) return 0;
+        return THREE.MathUtils.clamp((ratio - cfg.wobbleStartPct) / (1 - cfg.wobbleStartPct), 0, 1);
+    }
+
+    updateStaggerVisuals(dt, ratio, strength, isMoving) {
+        const cfg = CONFIG.visuals.staggerCues;
+        const now = Date.now() * 0.002;
+
+        if (this.visualRoot) {
+            const targetX = -cfg.bodyForwardLeanMax * strength + Math.sin(now * cfg.bodyWobbleSpeed * 0.7 + this.index) * 0.045 * strength;
+            const targetZ = Math.sin(now * cfg.bodyWobbleSpeed + this.index * 2.1) * cfg.bodySideWobbleMax * strength;
+            this.visualRoot.rotation.x = THREE.MathUtils.lerp(this.visualRoot.rotation.x, targetX, dt * 8);
+            this.visualRoot.rotation.z = THREE.MathUtils.lerp(this.visualRoot.rotation.z, targetZ, dt * 8);
+        }
+
+        if (this.legs && this.legs.length > 0) {
+            const slipStrength = strength * (isMoving ? 1 : 0.18);
+            this.legs.forEach((l, i) => {
+                if (!l.basePosition) return;
+                const side = l.basePosition.x >= 0 ? 1 : -1;
+                const phase = now * cfg.footSlipSpeed + i * 1.7;
+                const targetX = l.basePosition.x + Math.sin(phase) * cfg.footSlipDistance * slipStrength * side;
+                const targetZ = l.basePosition.z - Math.cos(phase * 0.85) * cfg.footSlipDistance * 0.65 * slipStrength;
+                l.group.position.x = THREE.MathUtils.lerp(l.group.position.x, targetX, dt * 10);
+                l.group.position.z = THREE.MathUtils.lerp(l.group.position.z, targetZ, dt * 10);
+                l.group.rotation.z = THREE.MathUtils.lerp(l.group.rotation.z, Math.sin(phase + 0.8) * 0.18 * slipStrength, dt * 10);
+            });
+        }
+
+        this.updateDizzyStars(dt, ratio, strength, now);
+        this.updateHitCracks(dt);
+    }
+
+    updateDizzyStars(dt, ratio, strength, now) {
+        const cfg = CONFIG.visuals.staggerCues;
+        const heavyT = ratio <= cfg.heavyCueStartPct
+            ? 0
+            : THREE.MathUtils.clamp((ratio - cfg.heavyCueStartPct) / (1 - cfg.heavyCueStartPct), 0, 1);
+
+        if (this.staggerStarCooldown > 0) this.staggerStarCooldown -= dt;
+        if (heavyT > 0 && this.staggerStarPulseTimer <= 0 && this.staggerStarCooldown <= 0) {
+            this.staggerStarPulseTimer = 0.42;
+            this.staggerStarCooldown = THREE.MathUtils.lerp(1.15, 0.32, heavyT);
+        }
+        if (this.staggerStarPulseTimer > 0) this.staggerStarPulseTimer = Math.max(0, this.staggerStarPulseTimer - dt);
+
+        const active = this.staggerStarPulseTimer > 0 && heavyT > 0;
+        if (!this.staggerStarGroup || !this.staggerStars) return;
+        this.staggerStarGroup.visible = active;
+        if (!active) return;
+
+        const pulse = this.staggerStarPulseTimer / 0.42;
+        const opacityBase = THREE.MathUtils.lerp(cfg.dizzyStarMinOpacity, cfg.dizzyStarMaxOpacity, heavyT) * Math.sin(pulse * Math.PI);
+        this.staggerStars.forEach((star, i) => {
+            const a = now * (1.4 + heavyT * 1.8) + i * (Math.PI * 2 / this.staggerStars.length);
+            const bob = Math.sin(now * 4 + i) * 0.18;
+            star.position.set(
+                Math.cos(a) * cfg.dizzyStarOrbitRadius,
+                2.7 + bob,
+                Math.sin(a) * cfg.dizzyStarOrbitRadius * 0.55 + 0.35
+            );
+            const scale = (0.9 + heavyT * 0.8) * (0.75 + 0.25 * Math.sin(now * 9 + i));
+            star.scale.set(scale, scale, scale);
+            star.material.opacity = opacityBase;
+            if (window.camera) star.quaternion.copy(window.camera.quaternion);
+            star.rotateZ(now * 5 + i);
+        });
+    }
+
+    updateHitCracks(dt) {
+        if (!this.hitCrackGroup || !this.hitCracks) return;
+        if (this.hitCrackTimer > 0) this.hitCrackTimer = Math.max(0, this.hitCrackTimer - dt);
+        const duration = Math.max(0.001, CONFIG.visuals.staggerCues.hitCrackDuration);
+        const active = this.hitCrackTimer > 0;
+        this.hitCrackGroup.visible = active;
+        if (!active) return;
+        const t = this.hitCrackTimer / duration;
+        const opacity = Math.sin(t * Math.PI) * 0.95;
+        this.hitCracks.forEach((crack, i) => {
+            crack.material.opacity = opacity * (0.65 + 0.35 * Math.sin(Date.now() * 0.02 + i));
+        });
     }
 
     buildComboFormFx() {
@@ -647,6 +821,9 @@ class Gidora {
 
     updateDragon(dt) {
         const t = Date.now() * 0.002;
+        const staggerRatio = this.getStaggerRatio();
+        const staggerStrength = this.getStaggerCueStrength(staggerRatio);
+        const isStaggerMoving = this.velocity.lengthSq() > 0.001;
 
         if (this.legs && this.legs.length > 0) {
             const speedSq = this.velocity.lengthSq();
@@ -770,9 +947,15 @@ class Gidora {
                     if (this.attackTimers[p] <= 0) this.finishHeadRecovery(p);
                 } else {
                     const lag = -this.angularVelocity * 0.1;
-                    n.group.rotation.z = Math.sin(t * 5 + (p === 'p2' ? 1 : (p === 'p3' ? 2 : 0))) * 0.05 + lag;
-                    n.group.rotation.y = THREE.MathUtils.lerp(n.group.rotation.y, n.baseYaw, dt * 8);
-                    n.pivot.rotation.x = n.baseLean + Math.sin(t * 8) * 0.05;
+                    const staggerHead = {
+                        p1: { roll: -1.0, yaw: -0.45, pitch: 0.85 },
+                        p2: { roll: 0.95, yaw: 0.4, pitch: 0.65 },
+                        p3: { roll: 0.35, yaw: -0.12, pitch: 1.05 }
+                    }[p];
+                    const droop = CONFIG.visuals.staggerCues.headDroopMax * staggerStrength;
+                    n.group.rotation.z = Math.sin(t * 5 + (p === 'p2' ? 1 : (p === 'p3' ? 2 : 0))) * 0.05 + lag + staggerHead.roll * droop;
+                    n.group.rotation.y = THREE.MathUtils.lerp(n.group.rotation.y, n.baseYaw + staggerHead.yaw * droop, dt * 8);
+                    n.pivot.rotation.x = n.baseLean + Math.sin(t * 8) * 0.05 + staggerHead.pitch * droop;
                     n.group.position.z = THREE.MathUtils.lerp(n.group.position.z, n.baseZ, dt * 10);
                 }
             });
@@ -885,7 +1068,30 @@ class Gidora {
                 this.tailGroup.rotation.y = Math.sin(t * 2.0) * 0.1;
                 this.tailGroup.rotation.x = THREE.MathUtils.lerp(this.tailGroup.rotation.x, 0, dt * 6);
             }
+
+            const tailDragAllowed = currentState === 'idle';
+            if (tailDragAllowed && this.tailBasePosition) {
+                const cfg = CONFIG.visuals.staggerCues;
+                const dragPulse = Math.sin(t * cfg.bodyWobbleSpeed + 1.8) * 0.08 * staggerStrength;
+                const targetY = this.tailBasePosition.y - cfg.tailDragYMax * staggerStrength;
+                this.tailGroup.position.y = THREE.MathUtils.lerp(this.tailGroup.position.y, targetY, dt * 8);
+                this.tailGroup.rotation.x = THREE.MathUtils.lerp(
+                    this.tailGroup.rotation.x,
+                    cfg.tailDragTiltMax * staggerStrength + dragPulse,
+                    dt * 8
+                );
+                this.tailGroup.rotation.z = THREE.MathUtils.lerp(
+                    this.tailGroup.rotation.z,
+                    Math.sin(t * cfg.footSlipSpeed * 0.5) * 0.16 * staggerStrength * (isStaggerMoving ? 1 : 0.35),
+                    dt * 7
+                );
+            } else if (this.tailBasePosition) {
+                this.tailGroup.position.y = THREE.MathUtils.lerp(this.tailGroup.position.y, this.tailBasePosition.y, dt * 10);
+                this.tailGroup.rotation.z = THREE.MathUtils.lerp(this.tailGroup.rotation.z, 0, dt * 10);
+            }
         }
+
+        this.updateStaggerVisuals(dt, staggerRatio, staggerStrength, isStaggerMoving);
     }
 
     updateSpeedLines(dt) {
@@ -2812,7 +3018,7 @@ class Gidora {
         const t = Date.now() * 0.002;
         this.updateDragon(dt);
         if (this.hpBar) {
-            this.hpBar.update(this.mesh.position, this.hp, this.maxHP, this.staggerValue, CONFIG.stagger.playerThreshold);
+            this.hpBar.update(this.mesh.position, this.hp, this.maxHP);
             this.hpBar.setBuffIcons(this.buffSystem.getActiveIconEntries());
         }
 

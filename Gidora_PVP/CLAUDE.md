@@ -81,6 +81,12 @@ PVP 配對 overlay 開啟時 `state.pvp.configuring = true`，主迴圈只 poll 
   - 例外：P4 尾巴蓄力重擊完成 180 度轉向後，`CONFIG.combat.tailSweepForwardLockDuration` 秒內所有部位的移動輸入會被強制轉成新面向前進；輸入方向只代表「有在推」，不改變移動方向。
 - **組合技（光束波）施放期間**：若失衡，直接中斷組合技（beamPhase 強制回 idle）。
 
+### 玩家失衡視覺表現
+
+- 玩家三頭龍的失衡值不直接顯示在血量 UI 下方；敵人 HealthBar 仍可顯示架勢條。
+- 玩家失衡比例由 `Gidora.getStaggerRatio()` / `getStaggerCueStrength()` 驅動，並透過 `CONFIG.visuals.staggerCues` 調整身體前傾、左右踉蹌、腳步打滑、星星暈眩、受擊黃色裂光、尾巴拖地與三顆頭歪斜。
+- 三顆頭的失衡歪斜只在 idle 動作套用，Melee / 蓄力 / 後搖期間維持原本攻擊動畫，避免干擾手感與命中判定。
+
 ### 龍型態與型態 Buff
 
 - Melee / 組合技型態不再由 Buff 決定；`BuffSystem.getMeleeForm()` / `getComboForm()` 會依 `dragon.dragonType` 讀取 `CONFIG.dragonTypes`。
