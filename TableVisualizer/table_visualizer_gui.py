@@ -114,7 +114,8 @@ class WorkingDirectoryDialog(QDialog):
     
     def browse_directory(self):
         """瀏覽選擇目錄"""
-        start_dir = self.selected_directory or str(Path.home())
+        # 無已選目錄時不指定初始位置（傳空字串），交由系統決定，不跳到家目錄
+        start_dir = self.selected_directory or ""
         directory = QFileDialog.getExistingDirectory(
             self,
             "選擇工作目錄",
@@ -752,6 +753,7 @@ class RelationGraphView(BaseGraphView):
                 item.adjust()
 
     def show_empty_state(self):
+        self._user_zoomed = False
         self.scene.clear()
         self.setBackgroundBrush(QBrush(QColor("#1e1e1e")))
         text = self.scene.addText("Select a node to view relations")
@@ -1060,6 +1062,10 @@ class BaseGraphView(QGraphicsView):
         self.viewport().setMouseTracking(True)
         self.middle_mouse_pressed = False
         self.last_pan_pos = QPointF()
+        # 使用者一旦以滾輪縮放，便停止「resize 時自動 fitInView」，
+        # 否則 PC 上縮放放大→出現捲軸→viewport 縮小→resizeEvent→fitInView 縮回，
+        # 造成「無法拉近」。reset_view 時會清除此旗標。
+        self._user_zoomed = False
 
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.MiddleButton:
@@ -1094,14 +1100,16 @@ class BaseGraphView(QGraphicsView):
         zoom_in = 1.15
         zoom_out = 1 / zoom_in
         factor = zoom_in if event.angleDelta().y() > 0 else zoom_out
+        self._user_zoomed = True
         self.scale(factor, factor)
+        event.accept()
 
     def on_node_double_clicked(self, node_item):
         pass
 
 
 class MainGraphView(BaseGraphView):
-    node_selected = pyqtSignal(dict) 
+    node_selected = pyqtSignal(dict)
     node_deselected = pyqtSignal()
     
     def __init__(self, parent, config_manager, excel_handler):
@@ -1760,6 +1768,7 @@ class RelationGraphView(BaseGraphView):
                 item.adjust()
 
     def show_empty_state(self):
+        self._user_zoomed = False
         self.scene.clear()
         self.setBackgroundBrush(QBrush(QColor("#1e1e1e")))
         text = self.scene.addText("Select a node to view relations")
@@ -1901,8 +1910,10 @@ class RelationGraphView(BaseGraphView):
                 self.scene.addItem(edge)
 
         self.scene.setSceneRect(self.scene.itemsBoundingRect().adjusted(-50, -50, 50, 50))
-        
+
         if reset_view:
+            # 切換到新節點：回到「自動 fit」狀態並重新填滿視圖
+            self._user_zoomed = False
             self.fitInView(self.scene.sceneRect(), Qt.AspectRatioMode.KeepAspectRatio)
 
     def on_node_clicked(self, item):
@@ -1916,10 +1927,10 @@ class RelationGraphView(BaseGraphView):
     
     def resizeEvent(self, event):
         super().resizeEvent(event)
-        if self.scene.items():
-             # Only auto-fit if we haven't manipulated view manually? 
-             # Or just keep it. User requested "no refresh" during edit, resize is different.
-             self.fitInView(self.scene.sceneRect(), Qt.AspectRatioMode.KeepAspectRatio)
+        # 使用者尚未手動縮放時才自動 fit；否則保留目前縮放，
+        # 避免放大時捲軸出現觸發的 resize 把畫面縮回（PC 無法拉近的 Bug）。
+        if self.scene.items() and not self._user_zoomed:
+            self.fitInView(self.scene.sceneRect(), Qt.AspectRatioMode.KeepAspectRatio)
 
     def on_node_moved(self, item): pass
 
@@ -3161,7 +3172,9 @@ class SheetChip(QFrame):
     """右欄上方的子表格方塊：顯示子表格名稱（含表格顏色），可點擊切換預覽；釘選時右上角顯示圖釘。"""
 
     clicked = pyqtSignal(dict)
-    unpin_requested = pyqtSignal(str)  # 滾輪中鍵 → 取消釘選（傳 node id）
+    # node id 可能是 int（來自 relationship_graph.json）或 str，必須用 object，
+    # 否則以 QueuedConnection 傳遞 int 給 str 型別的訊號時，跨執行緒序列化會直接閃退。
+    unpin_requested = pyqtSignal(object)  # 滾輪中鍵 → 取消釘選（傳 node id）
 
     def __init__(self, node_data, color_hex, font_size, pinned=False, active=False, parent=None):
         super().__init__(parent)
@@ -3237,6 +3250,7 @@ class QuickBrowsePanel(QWidget):
         self.sheet = None
         self.dirty_cells = {}  # (row, col) -> new_value
         self.pinned = []       # 釘選的 node_data（依序，僅存於記憶體，關閉 app 即解除）
+        self.preview_zoom = config_manager.get_preview_zoom()  # 右欄預覽縮放百分比
         self.init_ui()
 
     def init_ui(self):
@@ -3288,8 +3302,24 @@ class QuickBrowsePanel(QWidget):
         self.table.verticalScrollBar().valueChanged.connect(self._position_header_line)
         self.table.horizontalScrollBar().valueChanged.connect(self._position_header_line)
 
+        # 底部狀態列 + 右下角縮放拉條（類似 Excel 右下角縮放）
+        bottom = QHBoxLayout()
         self.lbl_status = QLabel()
-        layout.addWidget(self.lbl_status)
+        bottom.addWidget(self.lbl_status, 1)
+
+        self.zoom_slider = QSlider(Qt.Orientation.Horizontal)
+        self.zoom_slider.setRange(50, 300)   # 50% ~ 300%
+        self.zoom_slider.setFixedWidth(160)
+        self.zoom_slider.setValue(self.preview_zoom)
+        self.zoom_slider.setToolTip("調整右欄預覽表格大小")
+        self.zoom_slider.valueChanged.connect(self.set_preview_zoom)
+        bottom.addWidget(self.zoom_slider, 0)
+
+        self.zoom_label = QLabel(f"{self.preview_zoom}%")
+        self.zoom_label.setMinimumWidth(44)
+        self.zoom_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        bottom.addWidget(self.zoom_label, 0)
+        layout.addLayout(bottom)
 
         self.clear()
 
@@ -3435,24 +3465,55 @@ class QuickBrowsePanel(QWidget):
                         item.setForeground(QColor(self._contrast_text_color(hex_color)))
                     self.table.setItem(r, c, item)
 
-        # 儲存格與表頭使用相同字體大小：QHeaderView（凍結首列）有獨立字體，
-        # 不會跟著 table.setFont 變大，需另外設定，否則標題列字會偏小。
-        cell_font = QFont(FONT_FAMILY, self.config_manager.get_global_font_size())
-        self.table.setFont(cell_font)
-        self.table.horizontalHeader().setFont(cell_font)
-        self.table.verticalHeader().setFont(cell_font)
-
-        self.table.resizeColumnsToContents()
-        # 欄寬上限（字數截斷門檻）：由 Settings 設定，預設 PREVIEW_MAX_COL_WIDTH_DEFAULT
-        max_col_width = self.config_manager.get_preview_max_col_width()
-        for c in range(self.table.columnCount()):
-            if self.table.columnWidth(c) > max_col_width:
-                self.table.setColumnWidth(c, max_col_width)
+        self._apply_zoom_to_table()
 
         self.table.blockSignals(False)
         self.dirty_cells.clear()
         self._position_header_line()
         self.lbl_status.setText("Tips: 雙擊儲存格可編輯，按 Save to Excel 寫回。")
+
+    def _apply_zoom_to_table(self):
+        """依全域字體大小 × 預覽縮放百分比，套用字體與欄 / 列尺寸。
+
+        QHeaderView（凍結的首列標題與首欄列號）有獨立字體，且本表格已套用
+        stylesheet（捲軸樣式），在 Windows 上 setFont 會被 stylesheet 蓋掉而維持
+        預設小字；因此額外以 stylesheet 指定 header 字體大小，PC 才會跟著放大。
+        """
+        base = self.config_manager.get_global_font_size()
+        zoom = max(10, int(self.preview_zoom))  # 百分比，避免 0
+        size = max(6, round(base * zoom / 100))
+
+        cell_font = QFont(FONT_FAMILY, size)
+        self.table.setFont(cell_font)
+        header_qss = f'QHeaderView::section {{ font-family: "{FONT_FAMILY}"; font-size: {size}pt; }}'
+        hh = self.table.horizontalHeader()
+        vh = self.table.verticalHeader()
+        hh.setFont(cell_font)
+        vh.setFont(cell_font)
+        hh.setStyleSheet(header_qss)
+        vh.setStyleSheet(header_qss)
+
+        self.table.resizeColumnsToContents()
+        self.table.resizeRowsToContents()
+        # 欄寬上限（字數截斷門檻）隨縮放等比放大，使截斷的「字數」維持一致
+        max_col_width = self.config_manager.get_preview_max_col_width() * zoom / 100
+        for c in range(self.table.columnCount()):
+            if self.table.columnWidth(c) > max_col_width:
+                self.table.setColumnWidth(c, int(max_col_width))
+
+    def set_preview_zoom(self, percent):
+        """調整右欄預覽縮放（右下角拉條）：存檔並即時套用，不重新讀取 Excel。"""
+        self.preview_zoom = int(percent)
+        self.config_manager.set_preview_zoom(self.preview_zoom)
+        self.config_manager.save_config()
+        self.zoom_label.setText(f"{self.preview_zoom}%")
+        if self.zoom_slider.value() != self.preview_zoom:
+            self.zoom_slider.blockSignals(True)
+            self.zoom_slider.setValue(self.preview_zoom)
+            self.zoom_slider.blockSignals(False)
+        if self.table.rowCount() > 0:
+            self._apply_zoom_to_table()
+            self._position_header_line()
 
     @staticmethod
     def _contrast_text_color(hex_color):
@@ -3559,7 +3620,10 @@ class MainWindow(QMainWindow):
         
         # 載入數據並初始化 UI
         self.load_and_init()
-    
+
+        # 每次開啟 APP 自動刷新一次資料（等同 Rescan Data，但不跳出成功 / 失敗對話框）
+        self.reload_data(silent=True)
+
     def check_and_select_working_directory(self):
         """檢查並選擇工作目錄
         
@@ -3572,19 +3636,13 @@ class MainWindow(QMainWindow):
         
         # 驗證已保存的目錄
         if saved_dir:
-            is_valid, error_msg = temp_config.validate_working_directory(saved_dir)
+            is_valid, _ = temp_config.validate_working_directory(saved_dir)
             if is_valid:
                 return saved_dir
-            else:
-                # 目錄無效，顯示警告並重新選擇
-                QMessageBox.warning(
-                    self,
-                    "工作目錄無效",
-                    f"已保存的工作目錄無效：\n{error_msg}\n\n請重新選擇工作目錄。"
-                )
-        
-        # 顯示目錄選擇對話框
-        dialog = WorkingDirectoryDialog(self, saved_dir)
+            # 已保存目錄無效：不跳警告，直接進選擇視窗，且不預設初始位置
+
+        # 顯示目錄選擇對話框（無效 / 未設定時皆不帶入初始目錄）
+        dialog = WorkingDirectoryDialog(self, None)
         if dialog.exec() == QDialog.DialogCode.Accepted:
             selected_dir = dialog.get_selected_directory()
             # 保存選擇的目錄到全局配置
@@ -3636,8 +3694,11 @@ class MainWindow(QMainWindow):
         data['edges'] = final_edges
         return data
 
-    def reload_data(self):
-        """重新載入數據 (v3.15 Optimized)"""
+    def reload_data(self, silent=False):
+        """重新載入數據 (v3.15 Optimized)
+
+        silent=True 時（如開啟 APP 自動刷新）不跳出成功 / 失敗對話框，僅輸出至 console。
+        """
         # 在 Frozen 環境下 (PyInstaller)，我們不能輕易使用 subprocess 呼叫 python 腳本
         # 因為環境變數和路徑可能不同。
         # 最好的方式是直接導入模組並執行函數。
@@ -3701,13 +3762,17 @@ class MainWindow(QMainWindow):
             self.main_view.load_nodes(nodes)
             
             QApplication.restoreOverrideCursor()
-            QMessageBox.information(self, "Success", "Data rescanned and reloaded successfully.")
-            
+            if not silent:
+                QMessageBox.information(self, "Success", "Data rescanned and reloaded successfully.")
+            else:
+                print("Startup auto-refresh completed.")
+
         except Exception as e:
             QApplication.restoreOverrideCursor()
             import traceback
             traceback.print_exc()
-            QMessageBox.critical(self, "Error", f"Reload failed:\n{str(e)}")
+            if not silent:
+                QMessageBox.critical(self, "Error", f"Reload failed:\n{str(e)}")
 
     def init_ui(self, all_nodes, unique_tables):
         # ... (Similar structure, removed tabs)

@@ -1,5 +1,5 @@
 {
-  "working_directory": "/Users/halaa/Desktop/Unity Project/ProjectGidora/GidoraCommon/Table/ExcelFiles",
+  "working_directory": "F:\\Unity\\Project_Gidora\\GidoraCommon\\Table\\ExcelFiles",
   "node_positions": {
     "Airdrop.Airdrop_Pattern": [
       715.5,
@@ -386,12 +386,12 @@
   },
   "layout_settings": {
     "h_splitter": [
-      777,
-      1451
+      780,
+      1456
     ],
     "v_splitter": [
-      625,
-      421
+      630,
+      425
     ]
   },
   "window_state": {
@@ -400,7 +400,8 @@
     "maximized": false
   },
   "global_settings": {
-    "font_size": 18
+    "font_size": 18,
+    "preview_zoom": 109
   },
   "view_settings": {
     "main_view_transform": [

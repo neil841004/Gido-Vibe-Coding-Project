@@ -190,6 +190,14 @@ class ConfigManager:
         if 'global_settings' not in self.config: self.config['global_settings'] = {}
         self.config['global_settings']['preview_max_col_width'] = int(width)
 
+    def get_preview_zoom(self):
+        """右欄預覽縮放百分比（類似 Excel 右下角縮放），預設 100。"""
+        return self.config.get('global_settings', {}).get('preview_zoom', 100)
+
+    def set_preview_zoom(self, percent):
+        if 'global_settings' not in self.config: self.config['global_settings'] = {}
+        self.config['global_settings']['preview_zoom'] = int(percent)
+
     def get_main_view_transform(self):
         return self.config.get('view_settings', {})
 

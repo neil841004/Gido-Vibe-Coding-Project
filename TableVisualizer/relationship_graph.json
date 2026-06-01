@@ -1,6 +1,564 @@
 {
   "nodes": [
     {
+      "id": 3039205605,
+      "table": "Airdrop",
+      "sheet": "Airdrop_Pattern",
+      "full_name": "Airdrop.Airdrop_Pattern",
+      "type": "other",
+      "filename": "Airdrop.xlsm",
+      "headers": [
+        "#流水號",
+        "生成時間",
+        "Airdrop",
+        "生成時間(秒)",
+        "生成道具箱數量",
+        "生成在落後陣營機率(%)",
+        "生成在領先陣營機率(%)"
+      ],
+      "row_count": 58
+    },
+    {
+      "id": 2738893301,
+      "table": "Airdrop",
+      "sheet": "Airdrop_Thereafter",
+      "full_name": "Airdrop.Airdrop_Thereafter",
+      "type": "other",
+      "filename": "Airdrop.xlsm",
+      "headers": [
+        "#流水號",
+        "Airdrop_Pattern_id",
+        "後續道具箱生成頻率(秒)",
+        "生成道具箱數量",
+        "生成在落後陣營機率(%)",
+        "生成在領先陣營機率(%)"
+      ],
+      "row_count": 6
+    },
+    {
+      "id": 3899155388,
+      "table": "Broadcast",
+      "sheet": "Broadcast",
+      "full_name": "Broadcast.Broadcast",
+      "type": "other",
+      "filename": "Broadcast.xlsm",
+      "headers": [
+        "#編號",
+        "道具名稱"
+      ],
+      "row_count": 15
+    },
+    {
+      "id": 698197522,
+      "table": "Broadcast",
+      "sheet": "Broadcast_c",
+      "full_name": "Broadcast.Broadcast_c",
+      "type": "other",
+      "filename": "Broadcast.xlsm",
+      "headers": [
+        "#編號",
+        "道具名稱",
+        "字串id"
+      ],
+      "row_count": 15
+    },
+    {
+      "id": 2884855552,
+      "table": "Building",
+      "sheet": "Building",
+      "full_name": "Building.Building",
+      "type": "building",
+      "filename": "Building.xlsm",
+      "headers": [
+        "#流水號",
+        "說明",
+        "類型",
+        "血量",
+        "掉落表Id",
+        "掉落表Id_Duo限定取得"
+      ],
+      "row_count": 37
+    },
+    {
+      "id": 3243883238,
+      "table": "Building",
+      "sheet": "Building_Turret",
+      "full_name": "Building.Building_Turret",
+      "type": "building",
+      "filename": "Building.xlsm",
+      "headers": [
+        "#流水號",
+        "說明",
+        "Skill_Turret_ID",
+        "警戒時間(毫秒)",
+        "攻擊CD(毫秒)",
+        "治療波CD(毫秒)",
+        "治療波治療血量",
+        "庇護圈範圍(半徑公分)",
+        "自身被動效果"
+      ],
+      "row_count": 4
+    },
+    {
+      "id": 162995944,
+      "table": "Building",
+      "sheet": "Building_MainTurret",
+      "full_name": "Building.Building_MainTurret",
+      "type": "building",
+      "filename": "Building.xlsm",
+      "headers": [
+        "#流水號",
+        "說明",
+        "Skill_Turret_ID",
+        "警戒時間(毫秒)",
+        "攻擊CD(毫秒)",
+        "攻擊前搖時間(毫秒)",
+        "偵測敵人範圍(半徑公分)"
+      ],
+      "row_count": 3
+    },
+    {
+      "id": 2235120777,
+      "table": "Building",
+      "sheet": "Building_Fountain",
+      "full_name": "Building.Building_Fountain",
+      "type": "building",
+      "filename": "Building.xlsm",
+      "headers": [
+        "#流水號",
+        "說明",
+        "治療回血量",
+        "治療間隔時間(毫秒)",
+        "Damage_ID",
+        "傷害間隔時間(毫秒)"
+      ],
+      "row_count": 3
+    },
+    {
+      "id": 2766699913,
+      "table": "Common",
+      "sheet": "Common",
+      "full_name": "Common.Common",
+      "type": "other",
+      "filename": "Common.xlsm",
+      "headers": [
+        "#流水號",
+        "數值",
+        "說明",
+        "Col_3",
+        "Col_4"
+      ],
+      "row_count": 87
+    },
+    {
+      "id": 986290926,
+      "table": "Damage",
+      "sheet": "Damage",
+      "full_name": "Damage.Damage",
+      "type": "damage",
+      "filename": "Damage.xlsm",
+      "headers": [
+        "#流水號",
+        "角色",
+        "招式",
+        "傷害",
+        "傷害(對建築)",
+        "攻擊屬性\n(For音效判斷)",
+        "攻擊屬性\n(For音效判斷)",
+        "驗證用1",
+        "驗證用2",
+        "驗證用3",
+        "AttackType對照表",
+        "Col_11"
+      ],
+      "row_count": 68
+    },
+    {
+      "id": 4147932027,
+      "table": "DropObject",
+      "sheet": "DropObject",
+      "full_name": "DropObject.DropObject",
+      "type": "other",
+      "filename": "DropObject.xlsm",
+      "headers": [
+        "#流水號",
+        "說明",
+        "Parameter",
+        "Parameter",
+        "Value",
+        "存在時間(秒)"
+      ],
+      "row_count": 30
+    },
+    {
+      "id": 3670186166,
+      "table": "Effect",
+      "sheet": "Effect",
+      "full_name": "Effect.Effect",
+      "type": "effect",
+      "filename": "Effect.xlsm",
+      "headers": [
+        "#流水號",
+        "Effect ID",
+        "Type",
+        "Type",
+        "Parameter",
+        "Parameter",
+        "Value",
+        "說明"
+      ],
+      "row_count": 203
+    },
+    {
+      "id": 4195824706,
+      "table": "Entity",
+      "sheet": "Entity",
+      "full_name": "Entity.Entity",
+      "type": "other",
+      "filename": "Entity.xlsm",
+      "headers": [
+        "#流水號",
+        "說明",
+        "名字",
+        "說明",
+        "Col_4"
+      ],
+      "row_count": 10
+    },
+    {
+      "id": 101529462,
+      "table": "EventTracking",
+      "sheet": "EventTracking",
+      "full_name": "EventTracking.EventTracking",
+      "type": "other",
+      "filename": "EventTracking.xlsm",
+      "headers": [
+        "#事件ID",
+        "啟用(1/0)",
+        "說明",
+        "事件類型",
+        "Game Analytics-Feature",
+        "Game Analytics-EventKey",
+        "Col_6",
+        "Col_7",
+        "Col_8",
+        "Col_9",
+        "Col_10",
+        "Col_11",
+        "Col_12",
+        "Col_13"
+      ],
+      "row_count": 44
+    },
+    {
+      "id": 3246128726,
+      "table": "Item",
+      "sheet": "Item_Usage",
+      "full_name": "Item.Item_Usage",
+      "type": "item",
+      "filename": "Item.xlsm",
+      "headers": [
+        "#流水號",
+        "Item_ID",
+        "道具名稱",
+        "說明",
+        "Parameter",
+        "Parameter",
+        "Value"
+      ],
+      "row_count": 33
+    },
+    {
+      "id": 3617346105,
+      "table": "Kaiju",
+      "sheet": "Kaiju_Solo",
+      "full_name": "Kaiju.Kaiju_Solo",
+      "type": "kaiju",
+      "filename": "Kaiju.xlsm",
+      "headers": [
+        "#流水號",
+        "說明",
+        "職業",
+        "速度(千分之一)",
+        "轉向速度(角度/每秒)",
+        "血量",
+        "Dash CD(毫秒)",
+        "Dash速度(千分之一)",
+        "Dash時間(毫秒)",
+        "Dash轉向速度(角度/每秒)",
+        "精力值",
+        "技能消耗閾值",
+        "精力恢復頻率(頻率，毫秒)",
+        "精力恢復量",
+        "吃人範圍扇形半徑(千分之一公尺)",
+        "吃人範圍扇形角度",
+        "自身被動效果",
+        "掉落表Id",
+        "掉落表Id_Duo限定取得"
+      ],
+      "row_count": 8
+    },
+    {
+      "id": 1408528072,
+      "table": "Kaiju",
+      "sheet": "Kaiju_Solo_c",
+      "full_name": "Kaiju.Kaiju_Solo_c",
+      "type": "kaiju",
+      "filename": "Kaiju.xlsm",
+      "headers": [
+        "#流水號",
+        "說明",
+        "名字字串id",
+        "技能提示字串id"
+      ],
+      "row_count": 8
+    },
+    {
+      "id": 2823911306,
+      "table": "Kaiju",
+      "sheet": "Kaiju_Fused",
+      "full_name": "Kaiju.Kaiju_Fused",
+      "type": "kaiju",
+      "filename": "Kaiju.xlsm",
+      "headers": [
+        "#流水號",
+        "說明",
+        "怪獸能源",
+        "怪獸能源消耗頻率(毫秒)",
+        "怪獸能源消耗量",
+        "移動速度(千分之一)",
+        "轉向速度(角度/每秒)",
+        "起步加速度",
+        "慣性減速度",
+        "產生速度加成之輸入夾角度\n(所有成員朝相同方向角度內移動，產生速度加成)",
+        "脈衝最大值",
+        "共鳴值偵測變化頻率(毫秒)",
+        "1人集氣 脈衝值增加量",
+        "2人集氣 脈衝值增加量",
+        "3人集氣 脈衝值增加量",
+        "4人集氣 脈衝值增加量",
+        "無人集氣 脈衝值倒扣量",
+        "自身被動效果",
+        "Col_18"
+      ],
+      "row_count": 4
+    },
+    {
+      "id": 4045781629,
+      "table": "Kaiju",
+      "sheet": "Kaiju_Fullness",
+      "full_name": "Kaiju.Kaiju_Fullness",
+      "type": "kaiju",
+      "filename": "Kaiju.xlsm",
+      "headers": [
+        "#流水號",
+        "飽足等級",
+        "疊加Effect(每級額外疊加)",
+        "體型放大倍率(%)"
+      ],
+      "row_count": 6
+    },
+    {
+      "id": 1629171507,
+      "table": "Language",
+      "sheet": "Language_c",
+      "full_name": "Language.Language_c",
+      "type": "other",
+      "filename": "Language.xlsm",
+      "headers": [
+        "#編號",
+        "用途說明",
+        "參數總數(不需手動填寫)",
+        "參數定義",
+        "英文",
+        "繁中",
+        "簡中",
+        "日文",
+        "韓文"
+      ],
+      "row_count": 183
+    },
+    {
+      "id": 2343521243,
+      "table": "Loot",
+      "sheet": "Loot",
+      "full_name": "Loot.Loot",
+      "type": "other",
+      "filename": "Loot.xlsm",
+      "headers": [
+        "#編號",
+        "掉落者",
+        "掉落表Id",
+        "資源Id",
+        "資源名稱",
+        "掉落類型",
+        "機率(千分之一%)",
+        "數量",
+        "機率權重",
+        "Col_9",
+        "Col_10"
+      ],
+      "row_count": 89
+    },
+    {
+      "id": 3516493207,
+      "table": "Melee",
+      "sheet": "Melee_Solo",
+      "full_name": "Melee.Melee_Solo",
+      "type": "melee",
+      "filename": "Melee.xlsm",
+      "headers": [
+        "#流水號",
+        "說明",
+        "#角色ID",
+        "Damage ID",
+        "Combo第幾下",
+        "必定位移(1為True)",
+        "初速度倍率(千分之一)",
+        "最終速度倍率(千分之一)",
+        "Frame",
+        "前搖持續時間(毫秒)",
+        "Frame",
+        "攻擊狀態持續時間(毫秒)",
+        "Frame",
+        "後搖持續時間(毫秒)",
+        "連段可輸入時間(毫秒)",
+        "移動過程曲線",
+        "Frame",
+        "延遲位移時間(毫秒)",
+        "Frame",
+        "位移時間(毫秒)",
+        "被動效果集合",
+        "接段所需時間",
+        "硬直時間 Effect",
+        "硬直時間 ",
+        "擊退力 Effect",
+        "擊退力"
+      ],
+      "row_count": 23
+    },
+    {
+      "id": 2173322555,
+      "table": "Melee",
+      "sheet": "Melee_Fused",
+      "full_name": "Melee.Melee_Fused",
+      "type": "melee",
+      "filename": "Melee.xlsm",
+      "headers": [
+        "#流水號",
+        "說明",
+        "Damage ID",
+        "融合獸頭 ID",
+        "融合獸 ID",
+        "Combo第幾下",
+        "後座力速度(千分之一)",
+        "後座力時間(毫秒)",
+        "Frame",
+        "前搖持續時間(毫秒)",
+        "Frame",
+        "攻擊狀態持續時間(毫秒)",
+        "Frame",
+        "後搖持續時間(毫秒)",
+        "硬直時間ID",
+        "毫秒",
+        "擊退力ID",
+        "擊退力",
+        "被動效果集合"
+      ],
+      "row_count": 11
+    },
+    {
+      "id": 476719733,
+      "table": "NeutralUnits",
+      "sheet": "NeutralUnits",
+      "full_name": "NeutralUnits.NeutralUnits",
+      "type": "other",
+      "filename": "NeutralUnits.xlsm",
+      "headers": [
+        "#流水號",
+        "說明",
+        "類型",
+        "血量",
+        "掉落表Id"
+      ],
+      "row_count": 11
+    },
+    {
+      "id": 3849286850,
+      "table": "NeutralUnits",
+      "sheet": "NeutralUnits_Tank",
+      "full_name": "NeutralUnits.NeutralUnits_Tank",
+      "type": "other",
+      "filename": "NeutralUnits.xlsm",
+      "headers": [
+        "#流水號",
+        "說明",
+        "Damage_ID",
+        "跟隨範圍(半徑，公分)",
+        "攻擊範圍(半徑，公分)",
+        "巡邏移動速度(千分之一)",
+        "追擊移動速度(千分之一)",
+        "轉向速度(角度/每秒)",
+        "預備攻擊時間(毫秒)",
+        "停止跟隨時間(毫秒)"
+      ],
+      "row_count": 3
+    },
+    {
+      "id": 705805667,
+      "table": "NeutralUnits",
+      "sheet": "NeutralUnits_Human_AI",
+      "full_name": "NeutralUnits.NeutralUnits_Human_AI",
+      "type": "other",
+      "filename": "NeutralUnits.xlsm",
+      "headers": [
+        "#流水號",
+        "說明",
+        "生成機率權重",
+        "觸發恐懼扇形半徑\n(半徑，千分之一公尺)",
+        "觸發恐懼扇形角度",
+        "逃跑目標距離\n(半徑，千分之一公尺)",
+        "巡邏移動速度(千分之一)",
+        "逃跑移動速度(千分之一)",
+        "轉向速度(角度/每秒)",
+        "特殊恐懼行為持續時間(毫秒)",
+        "特殊恐懼行為觸發機率(千分之一)",
+        "恐懼行為 ID"
+      ],
+      "row_count": 8
+    },
+    {
+      "id": 1543350172,
+      "table": "NeutralUnits",
+      "sheet": "NeutralUnits_Human_FearBehavior",
+      "full_name": "NeutralUnits.NeutralUnits_Human_FearBehavior",
+      "type": "other",
+      "filename": "NeutralUnits.xlsm",
+      "headers": [
+        "#流水號",
+        "特殊恐懼行為",
+        "觸發機率權重"
+      ],
+      "row_count": 7
+    },
+    {
+      "id": 289370786,
+      "table": "Resource",
+      "sheet": "Resource",
+      "full_name": "Resource.Resource",
+      "type": "other",
+      "filename": "Resource.xlsm",
+      "headers": [
+        "#編號",
+        "資源名稱",
+        "稀有度",
+        "Parameter",
+        "Parameter",
+        "Value"
+      ],
+      "row_count": 38
+    },
+    {
       "id": 1868040658,
       "table": "Skill",
       "sheet": "Skill_Shooter",
@@ -446,7 +1004,6 @@
         "傷害頻率(毫秒)",
         "光束最遠距離(千分之一)",
         "自身效果_ID",
-        "組合技CD(毫秒)",
         "前搖時間(毫秒)",
         "技能作用時間(毫秒)",
         "收尾時間(毫秒)",
@@ -614,175 +1171,6 @@
       "row_count": 3
     },
     {
-      "id": 3513595676,
-      "table": "Stage",
-      "sheet": "Stage",
-      "full_name": "Stage.Stage",
-      "type": "other",
-      "filename": "Stage.xlsm",
-      "headers": [
-        "#UUID",
-        "Json File Name",
-        "Airdrop_Pattern_id"
-      ],
-      "row_count": 5
-    },
-    {
-      "id": 2171228891,
-      "table": "Stage",
-      "sheet": "Stage_Stage002_Rule",
-      "full_name": "Stage.Stage_Stage002_Rule",
-      "type": "other",
-      "filename": "Stage.xlsm",
-      "headers": [
-        "#流水號",
-        "說明",
-        "數值"
-      ],
-      "row_count": 4
-    },
-    {
-      "id": 3617346105,
-      "table": "Kaiju",
-      "sheet": "Kaiju_Solo",
-      "full_name": "Kaiju.Kaiju_Solo",
-      "type": "kaiju",
-      "filename": "Kaiju.xlsm",
-      "headers": [
-        "#流水號",
-        "說明",
-        "職業",
-        "速度(千分之一)",
-        "轉向速度(角度/每秒)",
-        "血量",
-        "Dash CD(毫秒)",
-        "Dash速度(千分之一)",
-        "Dash時間(毫秒)",
-        "Dash轉向速度(角度/每秒)",
-        "精力值",
-        "技能消耗閾值",
-        "精力恢復頻率(頻率，毫秒)",
-        "精力恢復量",
-        "吃人範圍扇形半徑(千分之一公尺)",
-        "吃人範圍扇形角度",
-        "自身被動效果",
-        "掉落表Id",
-        "掉落表Id_Duo限定取得"
-      ],
-      "row_count": 8
-    },
-    {
-      "id": 1408528072,
-      "table": "Kaiju",
-      "sheet": "Kaiju_Solo_c",
-      "full_name": "Kaiju.Kaiju_Solo_c",
-      "type": "kaiju",
-      "filename": "Kaiju.xlsm",
-      "headers": [
-        "#流水號",
-        "說明",
-        "名字字串id",
-        "技能提示字串id"
-      ],
-      "row_count": 8
-    },
-    {
-      "id": 2823911306,
-      "table": "Kaiju",
-      "sheet": "Kaiju_Fused",
-      "full_name": "Kaiju.Kaiju_Fused",
-      "type": "kaiju",
-      "filename": "Kaiju.xlsm",
-      "headers": [
-        "#流水號",
-        "說明",
-        "怪獸能源",
-        "怪獸能源消耗頻率(毫秒)",
-        "怪獸能源消耗量",
-        "移動速度(千分之一)",
-        "轉向速度(角度/每秒)",
-        "起步加速度",
-        "慣性減速度",
-        "產生速度加成之輸入夾角度\n(所有成員朝相同方向角度內移動，產生速度加成)",
-        "失衡條滿值",
-        "失衡值延遲衰退時間(毫秒)",
-        "失衡衰退頻率(毫秒)",
-        "失衡衰退量",
-        "失衡持續時間(毫秒)",
-        "脈衝最大值",
-        "共鳴值偵測變化頻率(毫秒)",
-        "1人集氣 脈衝值增加量",
-        "2人集氣 脈衝值增加量",
-        "3人集氣 脈衝值增加量",
-        "4人集氣 脈衝值增加量",
-        "無人集氣 脈衝值倒扣量",
-        "進食範圍(千分之一公尺)",
-        "掉落表Id",
-        "自身被動效果",
-        "Col_25"
-      ],
-      "row_count": 4
-    },
-    {
-      "id": 4045781629,
-      "table": "Kaiju",
-      "sheet": "Kaiju_Fullness",
-      "full_name": "Kaiju.Kaiju_Fullness",
-      "type": "kaiju",
-      "filename": "Kaiju.xlsm",
-      "headers": [
-        "#流水號",
-        "飽足等級",
-        "疊加Effect(每級額外疊加)",
-        "體型放大倍率(%)"
-      ],
-      "row_count": 6
-    },
-    {
-      "id": 101529462,
-      "table": "EventTracking",
-      "sheet": "EventTracking",
-      "full_name": "EventTracking.EventTracking",
-      "type": "other",
-      "filename": "EventTracking.xlsm",
-      "headers": [
-        "#事件ID",
-        "啟用(1/0)",
-        "說明",
-        "事件類型",
-        "Game Analytics-Feature",
-        "Game Analytics-EventKey",
-        "Col_6",
-        "Col_7",
-        "Col_8",
-        "Col_9",
-        "Col_10",
-        "Col_11",
-        "Col_12",
-        "Col_13"
-      ],
-      "row_count": 44
-    },
-    {
-      "id": 3670186166,
-      "table": "Effect",
-      "sheet": "Effect",
-      "full_name": "Effect.Effect",
-      "type": "effect",
-      "filename": "Effect.xlsm",
-      "headers": [
-        "#流水號",
-        "Effect ID",
-        "Type",
-        "Type",
-        "Parameter",
-        "Parameter",
-        "Value",
-        "說明"
-      ],
-      "row_count": 213
-    },
-    {
       "id": 2968854487,
       "table": "SpawnedObject",
       "sheet": "SpawnedObject",
@@ -875,8 +1263,6 @@
         "#流水號",
         "說明",
         "範圍內的Solo-Gido治療量",
-        "範圍內的Duo治療量",
-        "範圍內的Ultra治療量",
         "範圍內的Turret, 主堡治療量",
         "治療範圍(半徑，千分之一公尺)",
         "延遲治療時間(毫秒)"
@@ -939,553 +1325,6 @@
       "row_count": 4
     },
     {
-      "id": 476719733,
-      "table": "NeutralUnits",
-      "sheet": "NeutralUnits",
-      "full_name": "NeutralUnits.NeutralUnits",
-      "type": "other",
-      "filename": "NeutralUnits.xlsm",
-      "headers": [
-        "#流水號",
-        "說明",
-        "類型",
-        "血量",
-        "掉落表Id_Solo吃掉取得",
-        "掉落表Id_融合獸吃掉取得"
-      ],
-      "row_count": 11
-    },
-    {
-      "id": 3849286850,
-      "table": "NeutralUnits",
-      "sheet": "NeutralUnits_Tank",
-      "full_name": "NeutralUnits.NeutralUnits_Tank",
-      "type": "other",
-      "filename": "NeutralUnits.xlsm",
-      "headers": [
-        "#流水號",
-        "說明",
-        "Damage_ID",
-        "跟隨範圍(半徑，公分)",
-        "攻擊範圍(半徑，公分)",
-        "巡邏移動速度(千分之一)",
-        "追擊移動速度(千分之一)",
-        "轉向速度(角度/每秒)",
-        "預備攻擊時間(毫秒)",
-        "停止跟隨時間(毫秒)"
-      ],
-      "row_count": 3
-    },
-    {
-      "id": 705805667,
-      "table": "NeutralUnits",
-      "sheet": "NeutralUnits_Human_AI",
-      "full_name": "NeutralUnits.NeutralUnits_Human_AI",
-      "type": "other",
-      "filename": "NeutralUnits.xlsm",
-      "headers": [
-        "#流水號",
-        "說明",
-        "生成機率權重",
-        "觸發恐懼扇形半徑\n(半徑，千分之一公尺)",
-        "觸發恐懼扇形角度",
-        "逃跑目標距離\n(半徑，千分之一公尺)",
-        "巡邏移動速度(千分之一)",
-        "逃跑移動速度(千分之一)",
-        "轉向速度(角度/每秒)",
-        "特殊恐懼行為持續時間(毫秒)",
-        "特殊恐懼行為觸發機率(千分之一)",
-        "恐懼行為 ID"
-      ],
-      "row_count": 8
-    },
-    {
-      "id": 1543350172,
-      "table": "NeutralUnits",
-      "sheet": "NeutralUnits_Human_FearBehavior",
-      "full_name": "NeutralUnits.NeutralUnits_Human_FearBehavior",
-      "type": "other",
-      "filename": "NeutralUnits.xlsm",
-      "headers": [
-        "#流水號",
-        "特殊恐懼行為",
-        "觸發機率權重"
-      ],
-      "row_count": 7
-    },
-    {
-      "id": 289370786,
-      "table": "Resource",
-      "sheet": "Resource",
-      "full_name": "Resource.Resource",
-      "type": "other",
-      "filename": "Resource.xlsm",
-      "headers": [
-        "#編號",
-        "資源名稱",
-        "稀有度",
-        "Parameter",
-        "Parameter",
-        "Value",
-        "Mode",
-        "Col_7",
-        "Col_8"
-      ],
-      "row_count": 36
-    },
-    {
-      "id": 2343521243,
-      "table": "Loot",
-      "sheet": "Loot",
-      "full_name": "Loot.Loot",
-      "type": "other",
-      "filename": "Loot.xlsm",
-      "headers": [
-        "#編號",
-        "掉落者",
-        "掉落表Id",
-        "資源Id",
-        "資源名稱",
-        "掉落類型",
-        "機率(千分之一%)",
-        "數量",
-        "機率權重",
-        "Col_9",
-        "Col_10"
-      ],
-      "row_count": 127
-    },
-    {
-      "id": 3516493207,
-      "table": "Melee",
-      "sheet": "Melee_Solo",
-      "full_name": "Melee.Melee_Solo",
-      "type": "melee",
-      "filename": "Melee.xlsm",
-      "headers": [
-        "#流水號",
-        "說明",
-        "#角色ID",
-        "Damage ID",
-        "Combo第幾下",
-        "必定位移(1為True)",
-        "初速度倍率(千分之一)",
-        "最終速度倍率(千分之一)",
-        "Frame",
-        "前搖持續時間(毫秒)",
-        "Frame",
-        "攻擊狀態持續時間(毫秒)",
-        "Frame",
-        "後搖持續時間(毫秒)",
-        "連段可輸入時間(毫秒)",
-        "移動過程曲線",
-        "Frame",
-        "延遲位移時間(毫秒)",
-        "Frame",
-        "位移時間(毫秒)",
-        "被動效果集合",
-        "接段所需時間",
-        "硬直時間 Effect",
-        "硬直時間 ",
-        "擊退力 Effect",
-        "擊退力"
-      ],
-      "row_count": 23
-    },
-    {
-      "id": 2173322555,
-      "table": "Melee",
-      "sheet": "Melee_Fused",
-      "full_name": "Melee.Melee_Fused",
-      "type": "melee",
-      "filename": "Melee.xlsm",
-      "headers": [
-        "#流水號",
-        "說明",
-        "Damage ID",
-        "融合獸頭 ID",
-        "融合獸 ID",
-        "Combo第幾下",
-        "可瞄準角度",
-        "後座力速度(千分之一)",
-        "後座力時間(毫秒)",
-        "Frame",
-        "前搖持續時間(毫秒)",
-        "Frame",
-        "攻擊狀態持續時間(毫秒)",
-        "Frame",
-        "後搖持續時間(毫秒)",
-        "硬直時間ID",
-        "毫秒",
-        "擊退力ID",
-        "擊退力",
-        "被動效果集合"
-      ],
-      "row_count": 11
-    },
-    {
-      "id": 3039205605,
-      "table": "Airdrop",
-      "sheet": "Airdrop_Pattern",
-      "full_name": "Airdrop.Airdrop_Pattern",
-      "type": "other",
-      "filename": "Airdrop.xlsm",
-      "headers": [
-        "#流水號",
-        "生成時間",
-        "Airdrop",
-        "生成時間(秒)",
-        "生成道具箱數量",
-        "生成在落後陣營機率(%)",
-        "生成在領先陣營機率(%)"
-      ],
-      "row_count": 58
-    },
-    {
-      "id": 2738893301,
-      "table": "Airdrop",
-      "sheet": "Airdrop_Thereafter",
-      "full_name": "Airdrop.Airdrop_Thereafter",
-      "type": "other",
-      "filename": "Airdrop.xlsm",
-      "headers": [
-        "#流水號",
-        "Airdrop_Pattern_id",
-        "後續道具箱生成頻率(秒)",
-        "生成道具箱數量",
-        "生成在落後陣營機率(%)",
-        "生成在領先陣營機率(%)"
-      ],
-      "row_count": 6
-    },
-    {
-      "id": 4031881784,
-      "table": "UltraMutation",
-      "sheet": "UltraMutation",
-      "full_name": "UltraMutation.UltraMutation",
-      "type": "other",
-      "filename": "UltraMutation.xlsm",
-      "headers": [
-        "#流水號",
-        "說明",
-        "說明",
-        "說明",
-        "說明"
-      ],
-      "row_count": 8
-    },
-    {
-      "id": 2426724451,
-      "table": "UltraMutation",
-      "sheet": "UltraMutation_VenomTrail",
-      "full_name": "UltraMutation.UltraMutation_VenomTrail",
-      "type": "other",
-      "filename": "UltraMutation.xlsm",
-      "headers": [
-        "#流水號",
-        "說明",
-        "地面毒水ID"
-      ],
-      "row_count": 3
-    },
-    {
-      "id": 1470761805,
-      "table": "UltraMutation",
-      "sheet": "UltraMutation_LeafShield",
-      "full_name": "UltraMutation.UltraMutation_LeafShield",
-      "type": "other",
-      "filename": "UltraMutation.xlsm",
-      "headers": [
-        "#流水號",
-        "說明",
-        "環繞盾牌數量",
-        "盾牌旋轉速度(角度/每秒)",
-        "盾牌距離(半徑，千分之一)"
-      ],
-      "row_count": 4
-    },
-    {
-      "id": 1892589416,
-      "table": "UltraMutation",
-      "sheet": "UltraMutation_ZoomZap",
-      "full_name": "UltraMutation.UltraMutation_ZoomZap",
-      "type": "other",
-      "filename": "UltraMutation.xlsm",
-      "headers": [
-        "#流水號",
-        "說明",
-        "Damage_ID",
-        "電擊間隔時間(毫秒)",
-        "電擊對象數量上限",
-        "產生電圈速度門檻\n(千分之一)",
-        "電擊影響範圍(半徑，千分之一)",
-        "HIT效果集合",
-        "硬直時間ID",
-        "毫秒",
-        "擊退力ID",
-        "擊退力",
-        "被動效果"
-      ],
-      "row_count": 3
-    },
-    {
-      "id": 1971082973,
-      "table": "UltraMutation",
-      "sheet": "UltraMutation_RapidCast",
-      "full_name": "UltraMutation.UltraMutation_RapidCast",
-      "type": "other",
-      "filename": "UltraMutation.xlsm",
-      "headers": [
-        "#流水號",
-        "說明",
-        "Self_Effect_ID"
-      ],
-      "row_count": 3
-    },
-    {
-      "id": 1769332526,
-      "table": "UltraMutation",
-      "sheet": "UltraMutation_ToughSkin",
-      "full_name": "UltraMutation.UltraMutation_ToughSkin",
-      "type": "other",
-      "filename": "UltraMutation.xlsm",
-      "headers": [
-        "#流水號",
-        "說明",
-        "Self_Effect_ID"
-      ],
-      "row_count": 3
-    },
-    {
-      "id": 431196094,
-      "table": "UltraMutation",
-      "sheet": "UltraMutation_AllInStrike",
-      "full_name": "UltraMutation.UltraMutation_AllInStrike",
-      "type": "other",
-      "filename": "UltraMutation.xlsm",
-      "headers": [
-        "#流水號",
-        "說明",
-        "Self_Effect_ID"
-      ],
-      "row_count": 3
-    },
-    {
-      "id": 986290926,
-      "table": "Damage",
-      "sheet": "Damage",
-      "full_name": "Damage.Damage",
-      "type": "damage",
-      "filename": "Damage.xlsm",
-      "headers": [
-        "#流水號",
-        "角色",
-        "招式",
-        "傷害",
-        "傷害(對建築)",
-        "攻擊屬性\n(For音效判斷)",
-        "攻擊屬性\n(For音效判斷)",
-        "驗證用1",
-        "驗證用2",
-        "驗證用3",
-        "AttackType對照表",
-        "Col_11"
-      ],
-      "row_count": 69
-    },
-    {
-      "id": 2766699913,
-      "table": "Common",
-      "sheet": "Common",
-      "full_name": "Common.Common",
-      "type": "other",
-      "filename": "Common.xlsm",
-      "headers": [
-        "#流水號",
-        "數值",
-        "說明",
-        "Col_3",
-        "Col_4"
-      ],
-      "row_count": 99
-    },
-    {
-      "id": 2884855552,
-      "table": "Building",
-      "sheet": "Building",
-      "full_name": "Building.Building",
-      "type": "building",
-      "filename": "Building.xlsm",
-      "headers": [
-        "#流水號",
-        "說明",
-        "類型",
-        "血量",
-        "掉落表Id",
-        "掉落表Id_Duo限定取得"
-      ],
-      "row_count": 38
-    },
-    {
-      "id": 3243883238,
-      "table": "Building",
-      "sheet": "Building_Turret",
-      "full_name": "Building.Building_Turret",
-      "type": "building",
-      "filename": "Building.xlsm",
-      "headers": [
-        "#流水號",
-        "說明",
-        "Skill_Turret_ID",
-        "警戒時間(毫秒)",
-        "攻擊CD(毫秒)",
-        "治療波CD(毫秒)",
-        "治療波治療血量",
-        "庇護圈範圍(半徑公分)",
-        "自身被動效果"
-      ],
-      "row_count": 4
-    },
-    {
-      "id": 162995944,
-      "table": "Building",
-      "sheet": "Building_MainTurret",
-      "full_name": "Building.Building_MainTurret",
-      "type": "building",
-      "filename": "Building.xlsm",
-      "headers": [
-        "#流水號",
-        "說明",
-        "Skill_Turret_ID",
-        "警戒時間(毫秒)",
-        "攻擊CD(毫秒)",
-        "攻擊前搖時間(毫秒)",
-        "偵測敵人範圍(半徑公分)"
-      ],
-      "row_count": 3
-    },
-    {
-      "id": 2326068401,
-      "table": "Building",
-      "sheet": "Building_UltraCocoon",
-      "full_name": "Building.Building_UltraCocoon",
-      "type": "building",
-      "filename": "Building.xlsm",
-      "headers": [
-        "#流水號",
-        "說明",
-        "超合融合圈範圍(千分之一)",
-        "異變最大值",
-        "異變值偵測變化頻率(毫秒)",
-        "1人進圈 異變值增加量",
-        "2人進圈 異變值增加量",
-        "3人進圈 異變值增加量",
-        "4人進圈 異變值增加量",
-        "無人進圈 異變值倒扣量",
-        "自身被動效果"
-      ],
-      "row_count": 3
-    },
-    {
-      "id": 2235120777,
-      "table": "Building",
-      "sheet": "Building_Fountain",
-      "full_name": "Building.Building_Fountain",
-      "type": "building",
-      "filename": "Building.xlsm",
-      "headers": [
-        "#流水號",
-        "說明",
-        "治療回血量",
-        "治療間隔時間(毫秒)",
-        "Damage_ID",
-        "傷害間隔時間(毫秒)"
-      ],
-      "row_count": 3
-    },
-    {
-      "id": 4147932027,
-      "table": "DropObject",
-      "sheet": "DropObject",
-      "full_name": "DropObject.DropObject",
-      "type": "other",
-      "filename": "DropObject.xlsm",
-      "headers": [
-        "#流水號",
-        "說明",
-        "Parameter",
-        "Parameter",
-        "Value",
-        "存在時間(秒)",
-        "掉落表Id_Solo吃掉取得",
-        "掉落表Id_融合獸吃掉取得"
-      ],
-      "row_count": 30
-    },
-    {
-      "id": 1629171507,
-      "table": "Language",
-      "sheet": "Language_c",
-      "full_name": "Language.Language_c",
-      "type": "other",
-      "filename": "Language.xlsm",
-      "headers": [
-        "#編號",
-        "用途說明",
-        "參數總數(不需手動填寫)",
-        "參數定義",
-        "英文",
-        "繁中",
-        "簡中",
-        "日文",
-        "韓文"
-      ],
-      "row_count": 188
-    },
-    {
-      "id": 4195824706,
-      "table": "Entity",
-      "sheet": "Entity",
-      "full_name": "Entity.Entity",
-      "type": "other",
-      "filename": "Entity.xlsm",
-      "headers": [
-        "#流水號",
-        "說明",
-        "名字",
-        "說明",
-        "Col_4"
-      ],
-      "row_count": 10
-    },
-    {
-      "id": 3899155388,
-      "table": "Broadcast",
-      "sheet": "Broadcast",
-      "full_name": "Broadcast.Broadcast",
-      "type": "other",
-      "filename": "Broadcast.xlsm",
-      "headers": [
-        "#編號",
-        "道具名稱"
-      ],
-      "row_count": 15
-    },
-    {
-      "id": 698197522,
-      "table": "Broadcast",
-      "sheet": "Broadcast_c",
-      "full_name": "Broadcast.Broadcast_c",
-      "type": "other",
-      "filename": "Broadcast.xlsm",
-      "headers": [
-        "#編號",
-        "道具名稱",
-        "字串id"
-      ],
-      "row_count": 15
-    },
-    {
       "id": 1398131978,
       "table": "Spawner",
       "sheet": "Spawner",
@@ -1497,34 +1336,79 @@
         "EntityType",
         "說明",
         "生產單位",
-        "Loot生產ID",
         "生產上限"
       ],
       "row_count": 24
     },
     {
-      "id": 3246128726,
-      "table": "Item",
-      "sheet": "Item_Usage",
-      "full_name": "Item.Item_Usage",
-      "type": "item",
-      "filename": "Item.xlsm",
+      "id": 3513595676,
+      "table": "Stage",
+      "sheet": "Stage",
+      "full_name": "Stage.Stage",
+      "type": "other",
+      "filename": "Stage.xlsm",
+      "headers": [
+        "#UUID",
+        "Json File Name",
+        "Airdrop_Pattern_id"
+      ],
+      "row_count": 5
+    },
+    {
+      "id": 2171228891,
+      "table": "Stage",
+      "sheet": "Stage_Stage002_Rule",
+      "full_name": "Stage.Stage_Stage002_Rule",
+      "type": "other",
+      "filename": "Stage.xlsm",
       "headers": [
         "#流水號",
-        "Item_ID",
-        "道具名稱",
         "說明",
-        "Parameter",
-        "Parameter",
-        "Value"
+        "數值"
       ],
-      "row_count": 33
+      "row_count": 4
     }
   ],
   "edges": [
     {
-      "from": 3513595676,
-      "to": 2171228891,
+      "from": 3899155388,
+      "to": 698197522,
+      "type": "naming_hierarchy",
+      "label": "inherits"
+    },
+    {
+      "from": 2884855552,
+      "to": 3243883238,
+      "type": "naming_hierarchy",
+      "label": "inherits"
+    },
+    {
+      "from": 2884855552,
+      "to": 162995944,
+      "type": "naming_hierarchy",
+      "label": "inherits"
+    },
+    {
+      "from": 2884855552,
+      "to": 2235120777,
+      "type": "naming_hierarchy",
+      "label": "inherits"
+    },
+    {
+      "from": 476719733,
+      "to": 3849286850,
+      "type": "naming_hierarchy",
+      "label": "inherits"
+    },
+    {
+      "from": 476719733,
+      "to": 705805667,
+      "type": "naming_hierarchy",
+      "label": "inherits"
+    },
+    {
+      "from": 476719733,
+      "to": 1543350172,
       "type": "naming_hierarchy",
       "label": "inherits"
     },
@@ -1577,88 +1461,73 @@
       "label": "inherits"
     },
     {
-      "from": 476719733,
-      "to": 3849286850,
+      "from": 3513595676,
+      "to": 2171228891,
       "type": "naming_hierarchy",
       "label": "inherits"
     },
     {
-      "from": 476719733,
-      "to": 705805667,
-      "type": "naming_hierarchy",
-      "label": "inherits"
+      "from": 2738893301,
+      "to": 3039205605,
+      "type": "string_reference",
+      "label": "Airdrop_Pattern_id",
+      "column": "Airdrop_Pattern_id"
     },
     {
-      "from": 476719733,
-      "to": 1543350172,
-      "type": "naming_hierarchy",
-      "label": "inherits"
+      "from": 3243883238,
+      "to": 2356357325,
+      "type": "string_reference",
+      "label": "Skill_Turret_ID",
+      "column": "Skill_Turret_ID"
     },
     {
-      "from": 4031881784,
-      "to": 2426724451,
-      "type": "naming_hierarchy",
-      "label": "inherits"
+      "from": 162995944,
+      "to": 2356357325,
+      "type": "string_reference",
+      "label": "Skill_Turret_ID",
+      "column": "Skill_Turret_ID"
     },
     {
-      "from": 4031881784,
-      "to": 1470761805,
-      "type": "naming_hierarchy",
-      "label": "inherits"
+      "from": 2235120777,
+      "to": 986290926,
+      "type": "string_reference",
+      "label": "Damage_ID",
+      "column": "Damage_ID"
     },
     {
-      "from": 4031881784,
-      "to": 1892589416,
-      "type": "naming_hierarchy",
-      "label": "inherits"
+      "from": 4045781629,
+      "to": 3670186166,
+      "type": "string_reference",
+      "label": "疊加Effect(每級額外疊加)",
+      "column": "疊加Effect(每級額外疊加)"
     },
     {
-      "from": 4031881784,
-      "to": 1971082973,
-      "type": "naming_hierarchy",
-      "label": "inherits"
+      "from": 3516493207,
+      "to": 986290926,
+      "type": "string_reference",
+      "label": "Damage ID",
+      "column": "Damage ID"
     },
     {
-      "from": 4031881784,
-      "to": 1769332526,
-      "type": "naming_hierarchy",
-      "label": "inherits"
+      "from": 3516493207,
+      "to": 3670186166,
+      "type": "string_reference",
+      "label": "硬直時間 Effect",
+      "column": "硬直時間 Effect"
     },
     {
-      "from": 4031881784,
-      "to": 431196094,
-      "type": "naming_hierarchy",
-      "label": "inherits"
+      "from": 2173322555,
+      "to": 986290926,
+      "type": "string_reference",
+      "label": "Damage ID",
+      "column": "Damage ID"
     },
     {
-      "from": 2884855552,
-      "to": 3243883238,
-      "type": "naming_hierarchy",
-      "label": "inherits"
-    },
-    {
-      "from": 2884855552,
-      "to": 162995944,
-      "type": "naming_hierarchy",
-      "label": "inherits"
-    },
-    {
-      "from": 2884855552,
-      "to": 2326068401,
-      "type": "naming_hierarchy",
-      "label": "inherits"
-    },
-    {
-      "from": 2884855552,
-      "to": 2235120777,
-      "type": "naming_hierarchy",
-      "label": "inherits"
-    },
-    {
-      "from": 3899155388,
-      "to": 698197522,
-      "type": "naming_hierarchy",
-      "label": "inherits"
+      "from": 3849286850,
+      "to": 986290926,
+      "type": "string_reference",
+      "label": "Damage_ID",
+      "column": "Damage_ID"
     },
     {
       "from": 589821009,
@@ -1829,104 +1698,6 @@
       "column": "Hit_Effect"
     },
     {
-      "from": 3513595676,
-      "to": 3039205605,
-      "type": "string_reference",
-      "label": "Airdrop_Pattern_id",
-      "column": "Airdrop_Pattern_id"
-    },
-    {
-      "from": 4045781629,
-      "to": 3670186166,
-      "type": "string_reference",
-      "label": "疊加Effect(每級額外疊加)",
-      "column": "疊加Effect(每級額外疊加)"
-    },
-    {
-      "from": 3849286850,
-      "to": 986290926,
-      "type": "string_reference",
-      "label": "Damage_ID",
-      "column": "Damage_ID"
-    },
-    {
-      "from": 3516493207,
-      "to": 986290926,
-      "type": "string_reference",
-      "label": "Damage ID",
-      "column": "Damage ID"
-    },
-    {
-      "from": 3516493207,
-      "to": 3670186166,
-      "type": "string_reference",
-      "label": "硬直時間 Effect",
-      "column": "硬直時間 Effect"
-    },
-    {
-      "from": 2173322555,
-      "to": 986290926,
-      "type": "string_reference",
-      "label": "Damage ID",
-      "column": "Damage ID"
-    },
-    {
-      "from": 2738893301,
-      "to": 3039205605,
-      "type": "string_reference",
-      "label": "Airdrop_Pattern_id",
-      "column": "Airdrop_Pattern_id"
-    },
-    {
-      "from": 1892589416,
-      "to": 986290926,
-      "type": "string_reference",
-      "label": "Damage_ID",
-      "column": "Damage_ID"
-    },
-    {
-      "from": 1971082973,
-      "to": 3670186166,
-      "type": "string_reference",
-      "label": "Self_Effect_ID",
-      "column": "Self_Effect_ID"
-    },
-    {
-      "from": 1769332526,
-      "to": 3670186166,
-      "type": "string_reference",
-      "label": "Self_Effect_ID",
-      "column": "Self_Effect_ID"
-    },
-    {
-      "from": 431196094,
-      "to": 3670186166,
-      "type": "string_reference",
-      "label": "Self_Effect_ID",
-      "column": "Self_Effect_ID"
-    },
-    {
-      "from": 3243883238,
-      "to": 2356357325,
-      "type": "string_reference",
-      "label": "Skill_Turret_ID",
-      "column": "Skill_Turret_ID"
-    },
-    {
-      "from": 162995944,
-      "to": 2356357325,
-      "type": "string_reference",
-      "label": "Skill_Turret_ID",
-      "column": "Skill_Turret_ID"
-    },
-    {
-      "from": 2235120777,
-      "to": 986290926,
-      "type": "string_reference",
-      "label": "Damage_ID",
-      "column": "Damage_ID"
-    },
-    {
       "from": 1398131978,
       "to": 4195824706,
       "type": "string_reference",
@@ -1934,11 +1705,137 @@
       "column": "EntityType"
     },
     {
-      "from": 1398131978,
-      "to": 2343521243,
+      "from": 3513595676,
+      "to": 3039205605,
       "type": "string_reference",
-      "label": "Loot生產ID",
-      "column": "Loot生產ID"
+      "label": "Airdrop_Pattern_id",
+      "column": "Airdrop_Pattern_id"
+    },
+    {
+      "from": 2884855552,
+      "to": 289370786,
+      "type": "value_reference",
+      "label": "類型: NoResource",
+      "column": "類型"
+    },
+    {
+      "from": 2884855552,
+      "to": 2343521243,
+      "type": "value_reference",
+      "label": "掉落表Id: Loot_Id",
+      "column": "掉落表Id"
+    },
+    {
+      "from": 3243883238,
+      "to": 3670186166,
+      "type": "value_reference",
+      "label": "自身被動效果: Self_Effect_ID",
+      "column": "自身被動效果"
+    },
+    {
+      "from": 162995944,
+      "to": 4015632626,
+      "type": "value_reference",
+      "label": "Skill_Turret_ID: Skill_MainTurret_ID",
+      "column": "Skill_Turret_ID"
+    },
+    {
+      "from": 2766699913,
+      "to": 3670186166,
+      "type": "value_reference",
+      "label": "說明: 移至Effect表\n解體後虛弱時間(毫秒) (虛弱：精力鎖在0、無法使用共鳴)",
+      "column": "說明"
+    },
+    {
+      "from": 986290926,
+      "to": 2884855552,
+      "type": "value_reference",
+      "label": "傷害(對建築): DamageToBuilding",
+      "column": "傷害(對建築)"
+    },
+    {
+      "from": 3670186166,
+      "to": 986290926,
+      "type": "value_reference",
+      "label": "說明: 中毒傷害(Damage_ID)",
+      "column": "說明"
+    },
+    {
+      "from": 4195824706,
+      "to": 3617346105,
+      "type": "value_reference",
+      "label": "說明: Kaiju_Solo",
+      "column": "說明"
+    },
+    {
+      "from": 4195824706,
+      "to": 2884855552,
+      "type": "value_reference",
+      "label": "名字: Building",
+      "column": "名字"
+    },
+    {
+      "from": 3246128726,
+      "to": 3080241877,
+      "type": "value_reference",
+      "label": "說明: Skill_Item_HomingMissile",
+      "column": "說明"
+    },
+    {
+      "from": 3617346105,
+      "to": 3670186166,
+      "type": "value_reference",
+      "label": "自身被動效果: Self_Effect_ID",
+      "column": "自身被動效果"
+    },
+    {
+      "from": 3617346105,
+      "to": 2343521243,
+      "type": "value_reference",
+      "label": "掉落表Id: Loot_Id",
+      "column": "掉落表Id"
+    },
+    {
+      "from": 2823911306,
+      "to": 3670186166,
+      "type": "value_reference",
+      "label": "自身被動效果: Self_Effect_ID",
+      "column": "自身被動效果"
+    },
+    {
+      "from": 3516493207,
+      "to": 3617346105,
+      "type": "value_reference",
+      "label": "#角色ID: Kaiju_Solo_ID",
+      "column": "#角色ID"
+    },
+    {
+      "from": 2173322555,
+      "to": 2823911306,
+      "type": "value_reference",
+      "label": "融合獸頭 ID: Kaiju_Fused_Head_ID",
+      "column": "融合獸頭 ID"
+    },
+    {
+      "from": 2173322555,
+      "to": 3670186166,
+      "type": "value_reference",
+      "label": "被動效果集合: Hit_Effect_ID",
+      "column": "被動效果集合"
+    },
+    {
+      "from": 476719733,
+      "to": 2343521243,
+      "type": "value_reference",
+      "label": "掉落表Id: Loot_Id",
+      "column": "掉落表Id"
+    },
+    {
+      "from": 705805667,
+      "to": 1543350172,
+      "type": "value_reference",
+      "label": "恐懼行為 ID: NeutralUnits_Human_FearBehavior_ID",
+      "column": "恐懼行為 ID"
     },
     {
       "from": 1868040658,
@@ -2144,41 +2041,6 @@
       "column": "HIT效果集合"
     },
     {
-      "from": 3617346105,
-      "to": 3670186166,
-      "type": "value_reference",
-      "label": "自身被動效果: Self_Effect_ID",
-      "column": "自身被動效果"
-    },
-    {
-      "from": 3617346105,
-      "to": 2343521243,
-      "type": "value_reference",
-      "label": "掉落表Id: Loot_Id",
-      "column": "掉落表Id"
-    },
-    {
-      "from": 2823911306,
-      "to": 2343521243,
-      "type": "value_reference",
-      "label": "掉落表Id: Loot_Id",
-      "column": "掉落表Id"
-    },
-    {
-      "from": 2823911306,
-      "to": 3670186166,
-      "type": "value_reference",
-      "label": "自身被動效果: Self_Effect_ID",
-      "column": "自身被動效果"
-    },
-    {
-      "from": 3670186166,
-      "to": 986290926,
-      "type": "value_reference",
-      "label": "說明: 中毒傷害(Damage_ID)",
-      "column": "說明"
-    },
-    {
       "from": 1648652512,
       "to": 2343521243,
       "type": "value_reference",
@@ -2226,137 +2088,11 @@
       "type": "value_reference",
       "label": "Skill_ID: Skill_SlicerLeaf",
       "column": "Skill_ID"
-    },
-    {
-      "from": 476719733,
-      "to": 2343521243,
-      "type": "value_reference",
-      "label": "掉落表Id_Solo吃掉取得: Loot_Id_Solo",
-      "column": "掉落表Id_Solo吃掉取得"
-    },
-    {
-      "from": 705805667,
-      "to": 1543350172,
-      "type": "value_reference",
-      "label": "恐懼行為 ID: NeutralUnits_Human_FearBehavior_ID",
-      "column": "恐懼行為 ID"
-    },
-    {
-      "from": 3516493207,
-      "to": 3617346105,
-      "type": "value_reference",
-      "label": "#角色ID: Kaiju_Solo_ID",
-      "column": "#角色ID"
-    },
-    {
-      "from": 2173322555,
-      "to": 2823911306,
-      "type": "value_reference",
-      "label": "融合獸頭 ID: Kaiju_Fused_Head_ID",
-      "column": "融合獸頭 ID"
-    },
-    {
-      "from": 2173322555,
-      "to": 3670186166,
-      "type": "value_reference",
-      "label": "被動效果集合: Hit_Effect_ID",
-      "column": "被動效果集合"
-    },
-    {
-      "from": 2426724451,
-      "to": 2686299979,
-      "type": "value_reference",
-      "label": "地面毒水ID: SpawnedObject_VenomPuddle_ID",
-      "column": "地面毒水ID"
-    },
-    {
-      "from": 1892589416,
-      "to": 3670186166,
-      "type": "value_reference",
-      "label": "HIT效果集合: Hit_Effect_ID",
-      "column": "HIT效果集合"
-    },
-    {
-      "from": 986290926,
-      "to": 2884855552,
-      "type": "value_reference",
-      "label": "傷害(對建築): DamageToBuilding",
-      "column": "傷害(對建築)"
-    },
-    {
-      "from": 2766699913,
-      "to": 3670186166,
-      "type": "value_reference",
-      "label": "說明: 移至Effect表\n解體後虛弱時間(毫秒) (虛弱：精力鎖在0、無法使用共鳴)",
-      "column": "說明"
-    },
-    {
-      "from": 2884855552,
-      "to": 289370786,
-      "type": "value_reference",
-      "label": "類型: NoResource",
-      "column": "類型"
-    },
-    {
-      "from": 2884855552,
-      "to": 2343521243,
-      "type": "value_reference",
-      "label": "掉落表Id: Loot_Id",
-      "column": "掉落表Id"
-    },
-    {
-      "from": 3243883238,
-      "to": 3670186166,
-      "type": "value_reference",
-      "label": "自身被動效果: Self_Effect_ID",
-      "column": "自身被動效果"
-    },
-    {
-      "from": 162995944,
-      "to": 4015632626,
-      "type": "value_reference",
-      "label": "Skill_Turret_ID: Skill_MainTurret_ID",
-      "column": "Skill_Turret_ID"
-    },
-    {
-      "from": 2326068401,
-      "to": 3670186166,
-      "type": "value_reference",
-      "label": "自身被動效果: Self_Effect_ID",
-      "column": "自身被動效果"
-    },
-    {
-      "from": 4147932027,
-      "to": 2343521243,
-      "type": "value_reference",
-      "label": "掉落表Id_Solo吃掉取得: Loot_Id_Solo",
-      "column": "掉落表Id_Solo吃掉取得"
-    },
-    {
-      "from": 4195824706,
-      "to": 3617346105,
-      "type": "value_reference",
-      "label": "說明: Kaiju_Solo",
-      "column": "說明"
-    },
-    {
-      "from": 4195824706,
-      "to": 2884855552,
-      "type": "value_reference",
-      "label": "名字: Building",
-      "column": "名字"
-    },
-    {
-      "from": 3246128726,
-      "to": 3080241877,
-      "type": "value_reference",
-      "label": "說明: Skill_Item_HomingMissile",
-      "column": "說明"
     }
   ],
   "metadata": {
-    "total_tables": 21,
-    "total_sheets": 75,
-    "total_relationships": 122
+    "total_tables": 20,
+    "total_sheets": 67,
+    "total_relationships": 105
   }
 }

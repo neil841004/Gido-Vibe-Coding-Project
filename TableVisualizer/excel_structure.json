@@ -1,5 +1,3187 @@
 {
   "tables": {
+    "Airdrop": {
+      "filename": "Airdrop.xlsm",
+      "sheets": {
+        "Airdrop_Pattern": {
+          "headers": [
+            "#流水號",
+            "生成時間",
+            "Airdrop",
+            "生成時間(秒)",
+            "生成道具箱數量",
+            "生成在落後陣營機率(%)",
+            "生成在領先陣營機率(%)"
+          ],
+          "row_count": 58,
+          "columns": {
+            "#流水號": {
+              "samples": [
+                "uint",
+                "id",
+                "#Pattern1",
+                "1001",
+                "1002"
+              ]
+            },
+            "生成時間": {
+              "samples": [
+                "#string",
+                "0:48",
+                "0:48",
+                "1:12",
+                "1:36"
+              ]
+            },
+            "Airdrop": {
+              "samples": [
+                "uint",
+                "Airdrop_Pattern_id",
+                "101",
+                "101",
+                "101"
+              ]
+            },
+            "生成時間(秒)": {
+              "samples": [
+                "uint",
+                "SpawnTime",
+                "48",
+                "48",
+                "72"
+              ]
+            },
+            "生成道具箱數量": {
+              "samples": [
+                "uint",
+                "SpawnCount",
+                "1",
+                "1",
+                "1"
+              ]
+            },
+            "生成在落後陣營機率(%)": {
+              "samples": [
+                "uint",
+                "LosingSideSpawnProbability",
+                "100",
+                "0",
+                "25"
+              ]
+            },
+            "生成在領先陣營機率(%)": {
+              "samples": [
+                "uint",
+                "LeadingSideSpawnProbability",
+                "0",
+                "100",
+                "0"
+              ]
+            }
+          }
+        },
+        "Airdrop_Thereafter": {
+          "headers": [
+            "#流水號",
+            "Airdrop_Pattern_id",
+            "後續道具箱生成頻率(秒)",
+            "生成道具箱數量",
+            "生成在落後陣營機率(%)",
+            "生成在領先陣營機率(%)"
+          ],
+          "row_count": 6,
+          "columns": {
+            "#流水號": {
+              "samples": [
+                "uint",
+                "id",
+                "#Pattern1",
+                "1001",
+                "#Pattern2"
+              ]
+            },
+            "Airdrop_Pattern_id": {
+              "samples": [
+                "uint",
+                "Airdrop_Pattern_id",
+                "101",
+                "102"
+              ]
+            },
+            "後續道具箱生成頻率(秒)": {
+              "samples": [
+                "uint",
+                "ThereafterSpawnInterval",
+                "15",
+                "15"
+              ]
+            },
+            "生成道具箱數量": {
+              "samples": [
+                "uint",
+                "SpawnCount",
+                "1",
+                "1"
+              ]
+            },
+            "生成在落後陣營機率(%)": {
+              "samples": [
+                "uint",
+                "LosingSideSpawnProbability",
+                "15",
+                "15"
+              ]
+            },
+            "生成在領先陣營機率(%)": {
+              "samples": [
+                "uint",
+                "LeadingSideSpawnProbability",
+                "0",
+                "0"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "Broadcast": {
+      "filename": "Broadcast.xlsm",
+      "sheets": {
+        "Broadcast": {
+          "headers": [
+            "#編號",
+            "道具名稱"
+          ],
+          "row_count": 15,
+          "columns": {
+            "#編號": {
+              "samples": [
+                "uint",
+                "id",
+                "# In-game ",
+                "1001",
+                "1002"
+              ]
+            },
+            "道具名稱": {
+              "samples": [
+                "#string",
+                "context",
+                "首殺 (不論是敵我任一方達成)",
+                "敵方全滅時",
+                "我方隊伍完成雙殺 (每一殺相隔10秒內"
+              ]
+            }
+          }
+        },
+        "Broadcast_c": {
+          "headers": [
+            "#編號",
+            "道具名稱",
+            "字串id"
+          ],
+          "row_count": 15,
+          "columns": {
+            "#編號": {
+              "samples": [
+                "uint",
+                "id",
+                "# In-game ",
+                "1001",
+                "1002"
+              ]
+            },
+            "道具名稱": {
+              "samples": [
+                "#string",
+                "context",
+                "首殺 (不論是敵我任一方達成)",
+                "敵方全滅時",
+                "我方隊伍完成雙殺 (每一殺相隔10秒內"
+              ]
+            },
+            "字串id": {
+              "samples": [
+                "string",
+                "StringId",
+                "1001",
+                "1002",
+                "1003"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "Building": {
+      "filename": "Building.xlsm",
+      "sheets": {
+        "Building": {
+          "headers": [
+            "#流水號",
+            "說明",
+            "類型",
+            "血量",
+            "掉落表Id",
+            "掉落表Id_Duo限定取得"
+          ],
+          "row_count": 37,
+          "columns": {
+            "#流水號": {
+              "samples": [
+                "uint",
+                "id",
+                "#低資源",
+                "10001",
+                "10002"
+              ]
+            },
+            "說明": {
+              "samples": [
+                "#string",
+                "建築",
+                "無資源建築A",
+                "無資源建築B",
+                "無資源建築C"
+              ]
+            },
+            "類型": {
+              "samples": [
+                "string",
+                "Type",
+                "NoResource",
+                "NoResource",
+                "NoResource"
+              ]
+            },
+            "血量": {
+              "samples": [
+                "uint",
+                "Health",
+                "31",
+                "46",
+                "60"
+              ]
+            },
+            "掉落表Id": {
+              "samples": [
+                "uint",
+                "Loot_Id",
+                "0",
+                "0",
+                "0"
+              ]
+            },
+            "掉落表Id_Duo限定取得": {
+              "samples": [
+                "uint",
+                "Loot_Id_Duo",
+                "10001",
+                "10001",
+                "10001"
+              ]
+            }
+          }
+        },
+        "Building_Turret": {
+          "headers": [
+            "#流水號",
+            "說明",
+            "Skill_Turret_ID",
+            "警戒時間(毫秒)",
+            "攻擊CD(毫秒)",
+            "治療波CD(毫秒)",
+            "治療波治療血量",
+            "庇護圈範圍(半徑公分)",
+            "自身被動效果"
+          ],
+          "row_count": 4,
+          "columns": {
+            "#流水號": {
+              "samples": [
+                "uint",
+                "id",
+                "2001",
+                "2002"
+              ]
+            },
+            "說明": {
+              "samples": [
+                "#string",
+                "物件",
+                "Lv1砲塔",
+                "Lv2砲塔"
+              ]
+            },
+            "Skill_Turret_ID": {
+              "samples": [
+                "uint",
+                "Skill_Turret_ID",
+                "2001",
+                "2002"
+              ]
+            },
+            "警戒時間(毫秒)": {
+              "samples": [
+                "uint",
+                "AlertDuration",
+                "2000",
+                "700"
+              ]
+            },
+            "攻擊CD(毫秒)": {
+              "samples": [
+                "uint",
+                "AttackCD",
+                "1500",
+                "900"
+              ]
+            },
+            "治療波CD(毫秒)": {
+              "samples": [
+                "uint",
+                "HealWaveCD",
+                "90",
+                "90"
+              ]
+            },
+            "治療波治療血量": {
+              "samples": [
+                "uint",
+                "HealingAmount",
+                "1",
+                "1"
+              ]
+            },
+            "庇護圈範圍(半徑公分)": {
+              "samples": [
+                "uint",
+                "FOVRadius",
+                "2000",
+                "2000"
+              ]
+            },
+            "自身被動效果": {
+              "samples": [
+                "string",
+                "Self_Effect_ID",
+                "4902",
+                "4902"
+              ]
+            }
+          }
+        },
+        "Building_MainTurret": {
+          "headers": [
+            "#流水號",
+            "說明",
+            "Skill_Turret_ID",
+            "警戒時間(毫秒)",
+            "攻擊CD(毫秒)",
+            "攻擊前搖時間(毫秒)",
+            "偵測敵人範圍(半徑公分)"
+          ],
+          "row_count": 3,
+          "columns": {
+            "#流水號": {
+              "samples": [
+                "uint",
+                "id",
+                "3001"
+              ]
+            },
+            "說明": {
+              "samples": [
+                "#string",
+                "物件",
+                "主塔"
+              ]
+            },
+            "Skill_Turret_ID": {
+              "samples": [
+                "uint",
+                "Skill_MainTurret_ID",
+                "3001"
+              ]
+            },
+            "警戒時間(毫秒)": {
+              "samples": [
+                "uint",
+                "AlertDuration",
+                "700"
+              ]
+            },
+            "攻擊CD(毫秒)": {
+              "samples": [
+                "uint",
+                "AttackCD",
+                "750"
+              ]
+            },
+            "攻擊前搖時間(毫秒)": {
+              "samples": [
+                "uint",
+                "AttackSetupTime",
+                "600"
+              ]
+            },
+            "偵測敵人範圍(半徑公分)": {
+              "samples": [
+                "uint",
+                "FOVRadius",
+                "2500"
+              ]
+            }
+          }
+        },
+        "Building_Fountain": {
+          "headers": [
+            "#流水號",
+            "說明",
+            "治療回血量",
+            "治療間隔時間(毫秒)",
+            "Damage_ID",
+            "傷害間隔時間(毫秒)"
+          ],
+          "row_count": 3,
+          "columns": {
+            "#流水號": {
+              "samples": [
+                "uint",
+                "id",
+                "4001"
+              ]
+            },
+            "說明": {
+              "samples": [
+                "#string",
+                "物件",
+                "溫泉"
+              ]
+            },
+            "治療回血量": {
+              "samples": [
+                "uint",
+                "HealAmount",
+                "7"
+              ]
+            },
+            "治療間隔時間(毫秒)": {
+              "samples": [
+                "uint",
+                "HealInterval",
+                "100"
+              ]
+            },
+            "Damage_ID": {
+              "samples": [
+                "uint",
+                "Damage_ID",
+                "50004"
+              ]
+            },
+            "傷害間隔時間(毫秒)": {
+              "samples": [
+                "uint",
+                "DamageInterval",
+                "100"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "Common": {
+      "filename": "Common.xlsm",
+      "sheets": {
+        "Common": {
+          "headers": [
+            "#流水號",
+            "數值",
+            "說明",
+            "Col_3",
+            "Col_4"
+          ],
+          "row_count": 87,
+          "columns": {
+            "#流水號": {
+              "samples": [
+                "uint",
+                "id",
+                "#融合/解體",
+                "1001",
+                "1002"
+              ]
+            },
+            "數值": {
+              "samples": [
+                "uint",
+                "Value_1",
+                "5000",
+                "8000",
+                "21000"
+              ]
+            },
+            "說明": {
+              "samples": [
+                "#string",
+                "項目",
+                "共鳴狀態持續時間(毫秒)，若無與其他玩家連線，時間到停止共鳴",
+                "移至Effect表\n解體後虛弱時間(毫秒) (虛弱：精力鎖在0、無法使用共鳴)",
+                "融合連線距離(萬分之一)"
+              ]
+            },
+            "Col_3": {
+              "samples": []
+            },
+            "Col_4": {
+              "samples": []
+            }
+          }
+        },
+        "#數值驗證": {
+          "headers": [
+            "Col_0",
+            "Col_1",
+            "Col_2",
+            "Col_3"
+          ],
+          "row_count": 6,
+          "columns": {
+            "Col_0": {
+              "samples": []
+            },
+            "Col_1": {
+              "samples": [
+                "X (基數)",
+                "Y (被破壞塔數)",
+                "Z (時間)",
+                "總時間",
+                "開根號"
+              ]
+            },
+            "Col_2": {
+              "samples": [
+                "數值",
+                "5500",
+                "3200",
+                "620"
+              ]
+            },
+            "Col_3": {
+              "samples": [
+                "驗證",
+                "3",
+                "10",
+                "21",
+                "15"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "Damage": {
+      "filename": "Damage.xlsm",
+      "sheets": {
+        "Damage": {
+          "headers": [
+            "#流水號",
+            "角色",
+            "招式",
+            "傷害",
+            "傷害(對建築)",
+            "攻擊屬性\n(For音效判斷)",
+            "攻擊屬性\n(For音效判斷)",
+            "驗證用1",
+            "驗證用2",
+            "驗證用3",
+            "AttackType對照表",
+            "Col_11"
+          ],
+          "row_count": 68,
+          "columns": {
+            "#流水號": {
+              "samples": [
+                "uint",
+                "id",
+                "#Solo Kaiju Melee",
+                "1101",
+                "1102"
+              ]
+            },
+            "角色": {
+              "samples": [
+                "#string",
+                "Shooter_Syu",
+                "Shooter_Syu",
+                "Stainer_Fu",
+                "Stainer_Fu"
+              ]
+            },
+            "招式": {
+              "samples": [
+                "#string",
+                "Melee Combo - 1",
+                "Melee Combo - 2",
+                "Melee Combo - 1",
+                "Melee Combo - 2"
+              ]
+            },
+            "傷害": {
+              "samples": [
+                "uint",
+                "Damage",
+                "13",
+                "13",
+                "13"
+              ]
+            },
+            "傷害(對建築)": {
+              "samples": [
+                "uint",
+                "DamageToBuilding",
+                "14",
+                "14",
+                "13"
+              ]
+            },
+            "攻擊屬性\n(For音效判斷)": {
+              "samples": [
+                "uint",
+                "AttackType",
+                "3",
+                "3",
+                "3"
+              ]
+            },
+            "驗證用1": {
+              "samples": [
+                "#uint",
+                "完整Combo傷害",
+                "26",
+                "28",
+                "42"
+              ]
+            },
+            "驗證用2": {
+              "samples": [
+                "#uint",
+                "完整Combo時間",
+                "0.935",
+                "0.935",
+                "1.453"
+              ]
+            },
+            "驗證用3": {
+              "samples": [
+                "#uint",
+                "每秒DPS",
+                "27.80748663101604",
+                "29.946524064171122",
+                "28.905712319339298"
+              ]
+            },
+            "AttackType對照表": {
+              "samples": [
+                "#uint",
+                "Default",
+                "Impact_Light",
+                "Impact_Heavy",
+                "Slash"
+              ]
+            },
+            "Col_11": {
+              "samples": [
+                "#uint",
+                "0",
+                "1",
+                "2",
+                "3"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "DropObject": {
+      "filename": "DropObject.xlsm",
+      "sheets": {
+        "DropObject": {
+          "headers": [
+            "#流水號",
+            "說明",
+            "Parameter",
+            "Parameter",
+            "Value",
+            "存在時間(秒)"
+          ],
+          "row_count": 30,
+          "columns": {
+            "#流水號": {
+              "samples": [
+                "uint",
+                "id",
+                "#能量",
+                "1001",
+                "1002"
+              ]
+            },
+            "說明": {
+              "samples": [
+                "#string",
+                "name",
+                "共鳴能量球",
+                "超共鳴能量球",
+                "補血"
+              ]
+            },
+            "Parameter": {
+              "samples": [
+                "uint",
+                "dropObjectParameter",
+                "1",
+                "1",
+                "3"
+              ]
+            },
+            "Value": {
+              "samples": [
+                "uint",
+                "Value",
+                "1",
+                "1",
+                "101"
+              ]
+            },
+            "存在時間(秒)": {
+              "samples": [
+                "uint",
+                "Lifetime",
+                "22",
+                "99999",
+                "22"
+              ]
+            }
+          }
+        },
+        "#Enum": {
+          "headers": [
+            "Col_0",
+            "Col_1",
+            "Col_2",
+            "Col_3"
+          ],
+          "row_count": 7,
+          "columns": {
+            "Col_0": {
+              "samples": []
+            },
+            "Col_1": {
+              "samples": [
+                "Null",
+                "數值",
+                "道具",
+                "人類"
+              ]
+            },
+            "Col_2": {
+              "samples": [
+                "dropObjectType",
+                "Null",
+                "Amount",
+                "ItemUsage_Id",
+                "NeutralUnits_Id"
+              ]
+            },
+            "Col_3": {
+              "samples": [
+                "Value",
+                "0",
+                "1",
+                "3",
+                "4"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "Effect": {
+      "filename": "Effect.xlsm",
+      "sheets": {
+        "Effect": {
+          "headers": [
+            "#流水號",
+            "Effect ID",
+            "Type",
+            "Type",
+            "Parameter",
+            "Parameter",
+            "Value",
+            "說明"
+          ],
+          "row_count": 203,
+          "columns": {
+            "#流水號": {
+              "samples": [
+                "uint",
+                "id",
+                "#特殊效果",
+                "#毒液",
+                "10101"
+              ]
+            },
+            "Effect ID": {
+              "samples": [
+                "uint",
+                "Effect_ID",
+                "101",
+                "101",
+                "101"
+              ]
+            },
+            "Type": {
+              "samples": [
+                "uint",
+                "EffectType",
+                "100",
+                "100",
+                "100"
+              ]
+            },
+            "Parameter": {
+              "samples": [
+                "uint",
+                "EffectParameter",
+                "10",
+                "11",
+                "12"
+              ]
+            },
+            "Value": {
+              "samples": [
+                "uint",
+                "Value",
+                "12002",
+                "700",
+                "2200"
+              ]
+            },
+            "說明": {
+              "samples": [
+                "#string",
+                "Note",
+                "中毒傷害(Damage_ID)",
+                "中毒受傷頻率(豪秒)",
+                "中毒狀態持續時間(豪秒)"
+              ]
+            }
+          }
+        },
+        "#編號規則": {
+          "headers": [
+            "Col_0",
+            "Col_1",
+            "Col_2"
+          ],
+          "row_count": 47,
+          "columns": {
+            "Col_0": {
+              "samples": []
+            },
+            "Col_1": {
+              "samples": [
+                "特殊效果 (3碼，前綴10~99)",
+                "前綴",
+                "10x",
+                "20x",
+                "負面效果 (4碼，前綴10~39)"
+              ]
+            },
+            "Col_2": {
+              "samples": [
+                "類別",
+                "中毒",
+                "解體後耗竭狀態",
+                "類別",
+                "硬直"
+              ]
+            }
+          }
+        },
+        "#飽足度驗證": {
+          "headers": [
+            "Col_0",
+            "Col_1",
+            "Col_2",
+            "Col_3",
+            "Col_4",
+            "Col_5",
+            "Col_6",
+            "Col_7",
+            "Col_8",
+            "Col_9",
+            "Col_10",
+            "Col_11",
+            "Col_12",
+            "Col_13",
+            "Col_14",
+            "Col_15",
+            "Col_16",
+            "Col_17",
+            "Col_18",
+            "Col_19"
+          ],
+          "row_count": 997,
+          "columns": {
+            "Col_0": {
+              "samples": [
+                "備註：黃色格子可更改數字以測試計算結果",
+                "吃飽所需吃人數",
+                "額外最大血量",
+                "額外Melee傷害加成(%)",
+                "額外精力值加成(%)"
+              ]
+            },
+            "Col_1": {
+              "samples": [
+                "Lv 1",
+                "0",
+                "0",
+                "0",
+                "0"
+              ]
+            },
+            "Col_2": {
+              "samples": [
+                "100",
+                "Lv 2",
+                "20",
+                "0.08",
+                "0"
+              ]
+            },
+            "Col_3": {
+              "samples": [
+                "Lv 3",
+                "20",
+                "0.08",
+                "0",
+                "0.1"
+              ]
+            },
+            "Col_4": {
+              "samples": [
+                "Lv 4(Max)",
+                "30",
+                "0.08",
+                "0",
+                "0.15"
+              ]
+            },
+            "Col_5": {
+              "samples": []
+            },
+            "Col_6": {
+              "samples": []
+            },
+            "Col_7": {
+              "samples": []
+            },
+            "Col_8": {
+              "samples": []
+            },
+            "Col_9": {
+              "samples": []
+            },
+            "Col_10": {
+              "samples": []
+            },
+            "Col_11": {
+              "samples": []
+            },
+            "Col_12": {
+              "samples": []
+            },
+            "Col_13": {
+              "samples": []
+            },
+            "Col_14": {
+              "samples": []
+            },
+            "Col_15": {
+              "samples": []
+            },
+            "Col_16": {
+              "samples": []
+            },
+            "Col_17": {
+              "samples": []
+            },
+            "Col_18": {
+              "samples": []
+            },
+            "Col_19": {
+              "samples": []
+            }
+          }
+        },
+        "#飽足度驗證(舊)": {
+          "headers": [
+            "Col_0",
+            "Col_1",
+            "Col_2",
+            "Col_3",
+            "Col_4",
+            "Col_5",
+            "Col_6",
+            "Col_7",
+            "Col_8",
+            "Col_9",
+            "Col_10",
+            "Col_11",
+            "Col_12",
+            "Col_13",
+            "Col_14",
+            "Col_15",
+            "Col_16",
+            "Col_17",
+            "Col_18",
+            "Col_19",
+            "Col_20",
+            "Col_21",
+            "Col_22",
+            "Col_23",
+            "Col_24",
+            "Col_25",
+            "Col_26",
+            "Col_27",
+            "Col_28"
+          ],
+          "row_count": 999,
+          "columns": {
+            "Col_0": {
+              "samples": [
+                "備註：黃色格子可更改數字以測試計算結果",
+                "吃飽所需吃人數",
+                "額外最大血量",
+                "額外Melee傷害加成(%)",
+                "額外精力值加成(%)"
+              ]
+            },
+            "Col_1": {
+              "samples": [
+                "100",
+                "強化係數",
+                "25",
+                "0.1",
+                "0.15"
+              ]
+            },
+            "Col_2": {
+              "samples": [
+                "額外強化值",
+                "30",
+                "0.12",
+                "0.18",
+                "0.24"
+              ]
+            },
+            "Col_3": {
+              "samples": [
+                "兩者倍數",
+                "1.2",
+                "1.2",
+                "1.2",
+                "1.2"
+              ]
+            },
+            "Col_4": {
+              "samples": []
+            },
+            "Col_5": {
+              "samples": []
+            },
+            "Col_6": {
+              "samples": []
+            },
+            "Col_7": {
+              "samples": []
+            },
+            "Col_8": {
+              "samples": []
+            },
+            "Col_9": {
+              "samples": []
+            },
+            "Col_10": {
+              "samples": []
+            },
+            "Col_11": {
+              "samples": []
+            },
+            "Col_12": {
+              "samples": []
+            },
+            "Col_13": {
+              "samples": []
+            },
+            "Col_14": {
+              "samples": []
+            },
+            "Col_15": {
+              "samples": []
+            },
+            "Col_16": {
+              "samples": []
+            },
+            "Col_17": {
+              "samples": []
+            },
+            "Col_18": {
+              "samples": []
+            },
+            "Col_19": {
+              "samples": []
+            },
+            "Col_20": {
+              "samples": []
+            },
+            "Col_21": {
+              "samples": []
+            },
+            "Col_22": {
+              "samples": []
+            },
+            "Col_23": {
+              "samples": []
+            },
+            "Col_24": {
+              "samples": []
+            },
+            "Col_25": {
+              "samples": []
+            },
+            "Col_26": {
+              "samples": []
+            },
+            "Col_27": {
+              "samples": []
+            },
+            "Col_28": {
+              "samples": []
+            }
+          }
+        }
+      }
+    },
+    "Entity": {
+      "filename": "Entity.xlsm",
+      "sheets": {
+        "Entity": {
+          "headers": [
+            "#流水號",
+            "說明",
+            "名字",
+            "說明",
+            "Col_4"
+          ],
+          "row_count": 10,
+          "columns": {
+            "#流水號": {
+              "samples": [
+                "uint",
+                "id",
+                "1",
+                "2",
+                "3"
+              ]
+            },
+            "說明": {
+              "samples": [
+                "#string",
+                "表單",
+                "Kaiju_Solo",
+                "Kaiju_Fused",
+                "Building"
+              ]
+            },
+            "名字": {
+              "samples": [
+                "#enum",
+                "EntityType",
+                "SoloKaiju",
+                "FusedKaiju",
+                "Building"
+              ]
+            },
+            "Col_4": {
+              "samples": []
+            }
+          }
+        },
+        "#@EntityType": {
+          "headers": [
+            "#名字",
+            "#流水號",
+            "說明"
+          ],
+          "row_count": 11,
+          "columns": {
+            "#名字": {
+              "samples": [
+                "enum",
+                "#Type",
+                "Unknow",
+                "SoloKaiju",
+                "FusedKaiju"
+              ]
+            },
+            "#流水號": {
+              "samples": [
+                "uint",
+                "#id",
+                "0",
+                "1",
+                "2"
+              ]
+            },
+            "說明": {
+              "samples": [
+                "#string",
+                "職業",
+                "未知",
+                "單人獸",
+                "合成獸"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "EventTracking": {
+      "filename": "EventTracking.xlsm",
+      "sheets": {
+        "EventTracking": {
+          "headers": [
+            "#事件ID",
+            "啟用(1/0)",
+            "說明",
+            "事件類型",
+            "Game Analytics-Feature",
+            "Game Analytics-EventKey",
+            "Col_6",
+            "Col_7",
+            "Col_8",
+            "Col_9",
+            "Col_10",
+            "Col_11",
+            "Col_12",
+            "Col_13"
+          ],
+          "row_count": 44,
+          "columns": {
+            "#事件ID": {
+              "samples": [
+                "uint",
+                "id",
+                "100001",
+                "100002",
+                "100003"
+              ]
+            },
+            "啟用(1/0)": {
+              "samples": [
+                "uint",
+                "isEnable",
+                "1",
+                "1",
+                "1"
+              ]
+            },
+            "說明": {
+              "samples": [
+                "#string",
+                "content",
+                "有效場次計數器(1)",
+                "無效場次計數器(1)",
+                "該場時間"
+              ]
+            },
+            "事件類型": {
+              "samples": [
+                "uint",
+                "eventType",
+                "1",
+                "1",
+                "1"
+              ]
+            },
+            "Game Analytics-Feature": {
+              "samples": [
+                "string",
+                "gaEventFeature",
+                "moba_general",
+                "moba_general",
+                "moba_general"
+              ]
+            },
+            "Game Analytics-EventKey": {
+              "samples": [
+                "string",
+                "gaEventKey",
+                "00_game_count",
+                "01_voided_game_count",
+                "02_duration"
+              ]
+            },
+            "Col_6": {
+              "samples": []
+            },
+            "Col_7": {
+              "samples": []
+            },
+            "Col_8": {
+              "samples": []
+            },
+            "Col_9": {
+              "samples": []
+            },
+            "Col_10": {
+              "samples": []
+            },
+            "Col_11": {
+              "samples": []
+            },
+            "Col_12": {
+              "samples": []
+            },
+            "Col_13": {
+              "samples": []
+            }
+          }
+        },
+        "#EventType(Readonly)": {
+          "headers": [
+            "type_id",
+            "type_name",
+            "核心關注點",
+            "後台自動生成的指標",
+            "推薦使用情境",
+            "Display",
+            "Firebase (GA4)",
+            "PlayFab (Standard)"
+          ],
+          "row_count": 5,
+          "columns": {
+            "type_id": {
+              "samples": [
+                "1",
+                "2",
+                "3",
+                "4",
+                "5"
+              ]
+            },
+            "type_name": {
+              "samples": [
+                "Design",
+                "Progression",
+                "Resource",
+                "Business",
+                "Error"
+              ]
+            },
+            "核心關注點": {
+              "samples": [
+                "行為頻率",
+                "遊戲難度",
+                "經濟平衡",
+                "營利能力",
+                "穩定性"
+              ]
+            },
+            "後台自動生成的指標": {
+              "samples": [
+                "自定義計數",
+                "關卡勝率、平均通關時間",
+                "資源產出 vs 消耗 (Sink/Source)",
+                "ARPU, LTV, 付費轉換率",
+                "錯誤發生率 (Error Rate)"
+              ]
+            },
+            "推薦使用情境": {
+              "samples": [
+                "功能偏好、新手教學流失",
+                "關卡、章節、任務進度",
+                "金幣、鑽石、體力管理",
+                "真錢購買、內購項目",
+                "Bug 追蹤、伺服器異常"
+              ]
+            },
+            "Display": {
+              "samples": [
+                "1 - Design",
+                "2 - Progression",
+                "3 - Resource",
+                "4 - Business",
+                "5 - Error"
+              ]
+            },
+            "Firebase (GA4)": {
+              "samples": [
+                "custom_event",
+                "level_start / up",
+                "earn / spend_vc",
+                "purchase",
+                "exception"
+              ]
+            },
+            "PlayFab (Standard)": {
+              "samples": [
+                "Custom",
+                "player_level_up",
+                "vc_item_purchased",
+                "real_money_purchase",
+                "error_log"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "Item": {
+      "filename": "Item.xlsm",
+      "sheets": {
+        "Item_Usage": {
+          "headers": [
+            "#流水號",
+            "Item_ID",
+            "道具名稱",
+            "說明",
+            "Parameter",
+            "Parameter",
+            "Value"
+          ],
+          "row_count": 33,
+          "columns": {
+            "#流水號": {
+              "samples": [
+                "uint",
+                "id",
+                "#稀有度：1星",
+                "10101",
+                "10201"
+              ]
+            },
+            "Item_ID": {
+              "samples": [
+                "uint",
+                "Item_ID",
+                "101",
+                "102",
+                "103"
+              ]
+            },
+            "道具名稱": {
+              "samples": [
+                "#string",
+                "itme_Name",
+                "補血",
+                "追蹤飛彈",
+                "炸彈"
+              ]
+            },
+            "說明": {
+              "samples": [
+                "#uint",
+                "depiction",
+                "立即回血量",
+                "Skill_Item_HomingMissile",
+                "Skill_Item_Bomb"
+              ]
+            },
+            "Parameter": {
+              "samples": [
+                "uint",
+                "ItemParameter",
+                "12",
+                "2",
+                "2"
+              ]
+            },
+            "Value": {
+              "samples": [
+                "string",
+                "Value",
+                "100",
+                "1001",
+                "1001"
+              ]
+            }
+          }
+        },
+        "#Enum": {
+          "headers": [
+            "Col_0",
+            "Col_1",
+            "Col_2"
+          ],
+          "row_count": 14,
+          "columns": {
+            "Col_0": {
+              "samples": []
+            },
+            "Col_1": {
+              "samples": [
+                "ItemParameter",
+                "enum",
+                "None",
+                "Amount",
+                "Skill_ID"
+              ]
+            },
+            "Col_2": {
+              "samples": [
+                "uint",
+                "0",
+                "1",
+                "2",
+                "3"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "Kaiju": {
+      "filename": "Kaiju.xlsm",
+      "sheets": {
+        "Kaiju_Solo": {
+          "headers": [
+            "#流水號",
+            "說明",
+            "職業",
+            "速度(千分之一)",
+            "轉向速度(角度/每秒)",
+            "血量",
+            "Dash CD(毫秒)",
+            "Dash速度(千分之一)",
+            "Dash時間(毫秒)",
+            "Dash轉向速度(角度/每秒)",
+            "精力值",
+            "技能消耗閾值",
+            "精力恢復頻率(頻率，毫秒)",
+            "精力恢復量",
+            "吃人範圍扇形半徑(千分之一公尺)",
+            "吃人範圍扇形角度",
+            "自身被動效果",
+            "掉落表Id",
+            "掉落表Id_Duo限定取得"
+          ],
+          "row_count": 8,
+          "columns": {
+            "#流水號": {
+              "samples": [
+                "uint",
+                "id",
+                "1011",
+                "1012",
+                "1013"
+              ]
+            },
+            "說明": {
+              "samples": [
+                "#string",
+                "角色",
+                "Shooter_Syu",
+                "Stainer_Fu",
+                "Defender_Tan"
+              ]
+            },
+            "職業": {
+              "samples": [
+                "uint",
+                "Role",
+                "1001",
+                "1002",
+                "1003"
+              ]
+            },
+            "速度(千分之一)": {
+              "samples": [
+                "uint",
+                "Speed",
+                "11400",
+                "11400",
+                "11400"
+              ]
+            },
+            "轉向速度(角度/每秒)": {
+              "samples": [
+                "uint",
+                "TurnSpeed",
+                "900",
+                "900",
+                "900"
+              ]
+            },
+            "血量": {
+              "samples": [
+                "uint",
+                "Health",
+                "114",
+                "120",
+                "130"
+              ]
+            },
+            "Dash CD(毫秒)": {
+              "samples": [
+                "uint",
+                "DashCD",
+                "2750",
+                "2750",
+                "2750"
+              ]
+            },
+            "Dash速度(千分之一)": {
+              "samples": [
+                "uint",
+                "DashSpeed",
+                "44000",
+                "44000",
+                "44000"
+              ]
+            },
+            "Dash時間(毫秒)": {
+              "samples": [
+                "uint",
+                "DashDuration",
+                "235",
+                "235",
+                "235"
+              ]
+            },
+            "Dash轉向速度(角度/每秒)": {
+              "samples": [
+                "uint",
+                "DashTurnSpeed",
+                "200",
+                "200",
+                "200"
+              ]
+            },
+            "精力值": {
+              "samples": [
+                "uint",
+                "Stamina",
+                "1000",
+                "1000",
+                "1000"
+              ]
+            },
+            "技能消耗閾值": {
+              "samples": [
+                "uint",
+                "StaminaThreshold",
+                "0",
+                "200",
+                "150"
+              ]
+            },
+            "精力恢復頻率(頻率，毫秒)": {
+              "samples": [
+                "uint",
+                "StaminaRecoveryRate",
+                "100",
+                "100",
+                "100"
+              ]
+            },
+            "精力恢復量": {
+              "samples": [
+                "uint",
+                "StaminaRecoveryAmount",
+                "15",
+                "18",
+                "12"
+              ]
+            },
+            "吃人範圍扇形半徑(千分之一公尺)": {
+              "samples": [
+                "uint",
+                "EatHumanoidRadius",
+                "1900",
+                "1900",
+                "1900"
+              ]
+            },
+            "吃人範圍扇形角度": {
+              "samples": [
+                "uint",
+                "EatHumanoidAngle",
+                "120",
+                "120",
+                "120"
+              ]
+            },
+            "自身被動效果": {
+              "samples": [
+                "string",
+                "Self_Effect_ID",
+                "4901",
+                "4901",
+                "4901"
+              ]
+            },
+            "掉落表Id": {
+              "samples": [
+                "uint",
+                "Loot_Id",
+                "201",
+                "201",
+                "201"
+              ]
+            },
+            "掉落表Id_Duo限定取得": {
+              "samples": [
+                "uint",
+                "Loot_Id_Duo",
+                "10008",
+                "10008",
+                "10008"
+              ]
+            }
+          }
+        },
+        "Kaiju_Solo_c": {
+          "headers": [
+            "#流水號",
+            "說明",
+            "名字字串id",
+            "技能提示字串id"
+          ],
+          "row_count": 8,
+          "columns": {
+            "#流水號": {
+              "samples": [
+                "uint",
+                "id",
+                "1011",
+                "1012",
+                "1013"
+              ]
+            },
+            "說明": {
+              "samples": [
+                "#string",
+                "角色",
+                "Shooter_Syu",
+                "Stainer_Fu",
+                "Defender_Tan"
+              ]
+            },
+            "名字字串id": {
+              "samples": [
+                "uint",
+                "NameStringId",
+                "2001",
+                "2002",
+                "2003"
+              ]
+            },
+            "技能提示字串id": {
+              "samples": [
+                "uint",
+                "SkillHintStringId",
+                "3001",
+                "3002",
+                "3003"
+              ]
+            }
+          }
+        },
+        "Kaiju_Fused": {
+          "headers": [
+            "#流水號",
+            "說明",
+            "怪獸能源",
+            "怪獸能源消耗頻率(毫秒)",
+            "怪獸能源消耗量",
+            "移動速度(千分之一)",
+            "轉向速度(角度/每秒)",
+            "起步加速度",
+            "慣性減速度",
+            "產生速度加成之輸入夾角度\n(所有成員朝相同方向角度內移動，產生速度加成)",
+            "脈衝最大值",
+            "共鳴值偵測變化頻率(毫秒)",
+            "1人集氣 脈衝值增加量",
+            "2人集氣 脈衝值增加量",
+            "3人集氣 脈衝值增加量",
+            "4人集氣 脈衝值增加量",
+            "無人集氣 脈衝值倒扣量",
+            "自身被動效果",
+            "Col_18"
+          ],
+          "row_count": 4,
+          "columns": {
+            "#流水號": {
+              "samples": [
+                "uint",
+                "id",
+                "2",
+                "4"
+              ]
+            },
+            "說明": {
+              "samples": [
+                "#string",
+                "職業",
+                "雙人獸",
+                "Gidora"
+              ]
+            },
+            "怪獸能源": {
+              "samples": [
+                "uint",
+                "KaijuPower",
+                "330",
+                "660"
+              ]
+            },
+            "怪獸能源消耗頻率(毫秒)": {
+              "samples": [
+                "uint",
+                "KaijuPowerConsumptionRate",
+                "1000",
+                "1000"
+              ]
+            },
+            "怪獸能源消耗量": {
+              "samples": [
+                "uint",
+                "KaijuPowerConsumptionCost",
+                "10",
+                "10"
+              ]
+            },
+            "移動速度(千分之一)": {
+              "samples": [
+                "uint",
+                "MoveSpeed",
+                "7600",
+                "8800"
+              ]
+            },
+            "轉向速度(角度/每秒)": {
+              "samples": [
+                "uint",
+                "TurnSpeed",
+                "190",
+                "170"
+              ]
+            },
+            "起步加速度": {
+              "samples": [
+                "uint",
+                "Acceleration",
+                "29",
+                "18"
+              ]
+            },
+            "慣性減速度": {
+              "samples": [
+                "uint",
+                "Deceleration",
+                "60",
+                "25"
+              ]
+            },
+            "產生速度加成之輸入夾角度\n(所有成員朝相同方向角度內移動，產生速度加成)": {
+              "samples": [
+                "uint",
+                "BoostAngle",
+                "40",
+                "55"
+              ]
+            },
+            "脈衝最大值": {
+              "samples": [
+                "uint",
+                "PulseMax",
+                "150",
+                "400"
+              ]
+            },
+            "共鳴值偵測變化頻率(毫秒)": {
+              "samples": [
+                "uint",
+                "PulseCheckTickInterval",
+                "100",
+                "100"
+              ]
+            },
+            "1人集氣 脈衝值增加量": {
+              "samples": [
+                "uint",
+                "PulseGain1P",
+                "6",
+                "7"
+              ]
+            },
+            "2人集氣 脈衝值增加量": {
+              "samples": [
+                "uint",
+                "PulseGain2P",
+                "14",
+                "16"
+              ]
+            },
+            "3人集氣 脈衝值增加量": {
+              "samples": [
+                "uint",
+                "PulseGain3P",
+                "23",
+                "30"
+              ]
+            },
+            "4人集氣 脈衝值增加量": {
+              "samples": [
+                "uint",
+                "PulseGain4P",
+                "74",
+                "74"
+              ]
+            },
+            "無人集氣 脈衝值倒扣量": {
+              "samples": [
+                "uint",
+                "PulseDecayNoInput",
+                "8",
+                "12"
+              ]
+            },
+            "自身被動效果": {
+              "samples": [
+                "string",
+                "Self_Effect_ID",
+                "7101 | 4002 | 7202 | 4301 | 4401 | 4102 | 4103 | 4104 | 4902 | 5002 | 8201 | 8301",
+                "7102 | 4003 | 7203 | 4301 | 4401 | 4105 | 4106 | 4107 | 4903 | 5003 | 8201 | 8301"
+              ]
+            },
+            "Col_18": {
+              "samples": []
+            }
+          }
+        },
+        "Kaiju_Fullness": {
+          "headers": [
+            "#流水號",
+            "飽足等級",
+            "疊加Effect(每級額外疊加)",
+            "體型放大倍率(%)"
+          ],
+          "row_count": 6,
+          "columns": {
+            "#流水號": {
+              "samples": [
+                "uint",
+                "id",
+                "101",
+                "102",
+                "103"
+              ]
+            },
+            "飽足等級": {
+              "samples": [
+                "uint",
+                "Level",
+                "1",
+                "2",
+                "3"
+              ]
+            },
+            "疊加Effect(每級額外疊加)": {
+              "samples": [
+                "string",
+                "Self_Effect_ID",
+                "0",
+                "7402 | 7602 | 7802 | 8003",
+                "7403 | 7603 | 7803 | 8004"
+              ]
+            },
+            "體型放大倍率(%)": {
+              "samples": [
+                "uint",
+                "ScaleRatio",
+                "100",
+                "110",
+                "120"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "Language": {
+      "filename": "Language.xlsm",
+      "sheets": {
+        "Language_c": {
+          "headers": [
+            "#編號",
+            "用途說明",
+            "參數總數(不需手動填寫)",
+            "參數定義",
+            "英文",
+            "繁中",
+            "簡中",
+            "日文",
+            "韓文"
+          ],
+          "row_count": 183,
+          "columns": {
+            "#編號": {
+              "samples": [
+                "uint",
+                "id",
+                "#Test",
+                "101",
+                "102"
+              ]
+            },
+            "用途說明": {
+              "samples": [
+                "#string",
+                "Original"
+              ]
+            },
+            "參數總數(不需手動填寫)": {
+              "samples": [
+                "uint",
+                "IndexCount",
+                "0",
+                "0",
+                "0"
+              ]
+            },
+            "參數定義": {
+              "samples": [
+                "#string",
+                "IndexInfo",
+                "{0} = 測試文字"
+              ]
+            },
+            "英文": {
+              "samples": [
+                "string",
+                "En",
+                "Gidora {0} Startup",
+                "Enter Game",
+                "FIRST CRACK!"
+              ]
+            },
+            "繁中": {
+              "samples": [
+                "#string",
+                "Cht"
+              ]
+            },
+            "簡中": {
+              "samples": [
+                "#string",
+                "Chs"
+              ]
+            },
+            "日文": {
+              "samples": [
+                "#string",
+                "Jp"
+              ]
+            },
+            "韓文": {
+              "samples": [
+                "#string",
+                "Kr"
+              ]
+            }
+          }
+        },
+        "#填值規範": {
+          "headers": [
+            "1.大括號合法性\n\n-  {{0}}  → 合法，最外層以外的括弧分別代表字面上的  {  與  } 。\n-  {...}  必須成對，孤立的  }  或缺少  }  → **非法**。\n\n2. 索引格式\n\n-  {...}  內部僅允許 **純數字**（ 0–9 ）。\n- 不允許：\n    - 空白（如  { 0} 、 {0 } ）\n    - 字母（如  {A} ）\n    - 符號  + - , : . （如  {+1} 、 {-1} 、 {1,10} 、 {0:N2} ）\n    - 非 ASCII 數字（全形數字等）\n    - 空字串  {} \n    - 超出  int  範圍的大數字\n- **禁止前導零**：長度 > 1 且第一位為  0  視為非法。\n    -  {0}  ✅\n    -  {01}  ❌\n    -  {002}  ❌\n\n3. 索引集合完整性\n\n- 索引必須從 **0 開始**。\n- 若最大索引為  maxIndex ，則必須包含 **0~maxIndex** 全部索引，不能缺失索引。\n- 可以不依順序出現在字串中。\n- 索引允許重複",
+            "Col_1",
+            "Col_2",
+            "Col_3",
+            "Col_4",
+            "Col_5",
+            "Col_6",
+            "Col_7",
+            "Col_8",
+            "Col_9",
+            "Col_10",
+            "Col_11",
+            "Col_12"
+          ],
+          "row_count": 28,
+          "columns": {
+            "1.大括號合法性\n\n-  {{0}}  → 合法，最外層以外的括弧分別代表字面上的  {  與  } 。\n-  {...}  必須成對，孤立的  }  或缺少  }  → **非法**。\n\n2. 索引格式\n\n-  {...}  內部僅允許 **純數字**（ 0–9 ）。\n- 不允許：\n    - 空白（如  { 0} 、 {0 } ）\n    - 字母（如  {A} ）\n    - 符號  + - , : . （如  {+1} 、 {-1} 、 {1,10} 、 {0:N2} ）\n    - 非 ASCII 數字（全形數字等）\n    - 空字串  {} \n    - 超出  int  範圍的大數字\n- **禁止前導零**：長度 > 1 且第一位為  0  視為非法。\n    -  {0}  ✅\n    -  {01}  ❌\n    -  {002}  ❌\n\n3. 索引集合完整性\n\n- 索引必須從 **0 開始**。\n- 若最大索引為  maxIndex ，則必須包含 **0~maxIndex** 全部索引，不能缺失索引。\n- 可以不依順序出現在字串中。\n- 索引允許重複": {
+              "samples": []
+            },
+            "Col_1": {
+              "samples": []
+            },
+            "Col_2": {
+              "samples": []
+            },
+            "Col_3": {
+              "samples": []
+            },
+            "Col_4": {
+              "samples": []
+            },
+            "Col_5": {
+              "samples": []
+            },
+            "Col_6": {
+              "samples": []
+            },
+            "Col_7": {
+              "samples": []
+            },
+            "Col_8": {
+              "samples": []
+            },
+            "Col_9": {
+              "samples": []
+            },
+            "Col_10": {
+              "samples": []
+            },
+            "Col_11": {
+              "samples": [
+                "合法範例",
+                "格式字串",
+                "{0}",
+                "{0}{1}{2}",
+                "{2}{0}{1}{1}"
+              ]
+            },
+            "Col_12": {
+              "samples": [
+                "說明",
+                "單一索引 0",
+                "最大索引 2 → 有 0,1,2",
+                "有 0,1,2，允許重複",
+                "{{0}} → 字面 {0}，實際索引 {0}"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "Loot": {
+      "filename": "Loot.xlsm",
+      "sheets": {
+        "Loot": {
+          "headers": [
+            "#編號",
+            "掉落者",
+            "掉落表Id",
+            "資源Id",
+            "資源名稱",
+            "掉落類型",
+            "機率(千分之一%)",
+            "數量",
+            "機率權重",
+            "Col_9",
+            "Col_10"
+          ],
+          "row_count": 89,
+          "columns": {
+            "#編號": {
+              "samples": [
+                "uint",
+                "id",
+                "#隨機道具",
+                "#Lv1 - 6 item",
+                "1011"
+              ]
+            },
+            "掉落者": {
+              "samples": [
+                "#string",
+                "source",
+                "隨機掉落物 Lv1",
+                "隨機掉落物 Lv1",
+                "隨機掉落物 Lv1"
+              ]
+            },
+            "掉落表Id": {
+              "samples": [
+                "uint",
+                "loot_Id",
+                "101",
+                "101",
+                "101"
+              ]
+            },
+            "資源Id": {
+              "samples": [
+                "uint",
+                "resource_Id",
+                "1101",
+                "1106",
+                "1201"
+              ]
+            },
+            "資源名稱": {
+              "samples": [
+                "#string",
+                "resource_Name",
+                "補血",
+                "能量飲料",
+                "大補血"
+              ]
+            },
+            "掉落類型": {
+              "samples": [
+                "uint",
+                "loot_Type",
+                "3",
+                "3",
+                "3"
+              ]
+            },
+            "機率(千分之一%)": {
+              "samples": [
+                "uint",
+                "rate",
+                "500",
+                "500",
+                "0"
+              ]
+            },
+            "數量": {
+              "samples": [
+                "uint",
+                "count",
+                "1",
+                "1",
+                "1"
+              ]
+            },
+            "機率權重": {
+              "samples": [
+                "#uint",
+                "6",
+                "6",
+                "0",
+                "0"
+              ]
+            },
+            "Col_9": {
+              "samples": [
+                "#機率Check",
+                "1000"
+              ]
+            },
+            "Col_10": {
+              "samples": []
+            }
+          }
+        },
+        "#Enum": {
+          "headers": [],
+          "row_count": 0,
+          "columns": {}
+        },
+        "#Info": {
+          "headers": [
+            "Col_0",
+            "Col_1"
+          ],
+          "row_count": 11,
+          "columns": {
+            "Col_0": {
+              "samples": []
+            },
+            "Col_1": {
+              "samples": [
+                "Loot_Type",
+                "獨立機率掉落 = 1",
+                "必定掉落 = 2",
+                "加總機率掉落 = 3",
+                "Rate"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "Melee": {
+      "filename": "Melee.xlsm",
+      "sheets": {
+        "Melee_Solo": {
+          "headers": [
+            "#流水號",
+            "說明",
+            "#角色ID",
+            "Damage ID",
+            "Combo第幾下",
+            "必定位移(1為True)",
+            "初速度倍率(千分之一)",
+            "最終速度倍率(千分之一)",
+            "Frame",
+            "前搖持續時間(毫秒)",
+            "Frame",
+            "攻擊狀態持續時間(毫秒)",
+            "Frame",
+            "後搖持續時間(毫秒)",
+            "連段可輸入時間(毫秒)",
+            "移動過程曲線",
+            "Frame",
+            "延遲位移時間(毫秒)",
+            "Frame",
+            "位移時間(毫秒)",
+            "被動效果集合",
+            "接段所需時間",
+            "硬直時間 Effect",
+            "硬直時間 ",
+            "擊退力 Effect",
+            "擊退力"
+          ],
+          "row_count": 23,
+          "columns": {
+            "#流水號": {
+              "samples": [
+                "uint",
+                "id",
+                "1001",
+                "1002",
+                "2001"
+              ]
+            },
+            "說明": {
+              "samples": [
+                "#string",
+                "角色",
+                "Shooter_Syu",
+                "Shooter_Syu",
+                "Stainer_Fu"
+              ]
+            },
+            "#角色ID": {
+              "samples": [
+                "uint",
+                "Kaiju_Solo_ID",
+                "1011",
+                "1011",
+                "1012"
+              ]
+            },
+            "Damage ID": {
+              "samples": [
+                "uint",
+                "Damage_ID",
+                "1101",
+                "1102",
+                "1201"
+              ]
+            },
+            "Combo第幾下": {
+              "samples": [
+                "uint",
+                "ComboNum",
+                "1",
+                "2",
+                "1"
+              ]
+            },
+            "必定位移(1為True)": {
+              "samples": [
+                "uint",
+                "AlwaysMove",
+                "0",
+                "0",
+                "0"
+              ]
+            },
+            "初速度倍率(千分之一)": {
+              "samples": [
+                "uint",
+                "InitialSpeedMultiplier",
+                "900",
+                "900",
+                "800"
+              ]
+            },
+            "最終速度倍率(千分之一)": {
+              "samples": [
+                "uint",
+                "EndSpeedMultiplier",
+                "200",
+                "300",
+                "200"
+              ]
+            },
+            "Frame": {
+              "samples": [
+                "#uint",
+                "10",
+                "12",
+                "13",
+                "13"
+              ]
+            },
+            "前搖持續時間(毫秒)": {
+              "samples": [
+                "uint",
+                "StartupDuration",
+                "150",
+                "150",
+                "134"
+              ]
+            },
+            "攻擊狀態持續時間(毫秒)": {
+              "samples": [
+                "uint",
+                "ActiveDuration",
+                "134",
+                "134",
+                "150"
+              ]
+            },
+            "後搖持續時間(毫秒)": {
+              "samples": [
+                "uint",
+                "RecoveryDuration",
+                "217",
+                "317",
+                "284"
+              ]
+            },
+            "連段可輸入時間(毫秒)": {
+              "samples": [
+                "uint",
+                "ComboInputWindowDuration",
+                "317",
+                "0",
+                "384"
+              ]
+            },
+            "移動過程曲線": {
+              "samples": [
+                "string",
+                "MovementCurve",
+                "Linear",
+                "OutSine",
+                "Linear"
+              ]
+            },
+            "延遲位移時間(毫秒)": {
+              "samples": [
+                "uint",
+                "delayMovementTime ",
+                "0",
+                "100",
+                "0"
+              ]
+            },
+            "位移時間(毫秒)": {
+              "samples": [
+                "uint",
+                "MoveDuration",
+                "167",
+                "200",
+                "217"
+              ]
+            },
+            "被動效果集合": {
+              "samples": [
+                "string",
+                "Hit_Effect_ID",
+                "1203",
+                "1203",
+                "1203"
+              ]
+            },
+            "接段所需時間": {
+              "samples": [
+                "#uint",
+                "284",
+                "501",
+                "284",
+                "384"
+              ]
+            },
+            "硬直時間 Effect": {
+              "samples": [
+                "#uint",
+                "1009",
+                "1010"
+              ]
+            },
+            "硬直時間 ": {
+              "samples": [
+                "#uint",
+                "?",
+                "?"
+              ]
+            },
+            "擊退力 Effect": {
+              "samples": [
+                "#uint",
+                "1203",
+                "1203",
+                "1203",
+                "1203"
+              ]
+            },
+            "擊退力": {
+              "samples": [
+                "#uint",
+                "?",
+                "?",
+                "?",
+                "?"
+              ]
+            }
+          }
+        },
+        "Melee_Fused": {
+          "headers": [
+            "#流水號",
+            "說明",
+            "Damage ID",
+            "融合獸頭 ID",
+            "融合獸 ID",
+            "Combo第幾下",
+            "後座力速度(千分之一)",
+            "後座力時間(毫秒)",
+            "Frame",
+            "前搖持續時間(毫秒)",
+            "Frame",
+            "攻擊狀態持續時間(毫秒)",
+            "Frame",
+            "後搖持續時間(毫秒)",
+            "硬直時間ID",
+            "毫秒",
+            "擊退力ID",
+            "擊退力",
+            "被動效果集合"
+          ],
+          "row_count": 11,
+          "columns": {
+            "#流水號": {
+              "samples": [
+                "uint",
+                "id",
+                "#流水號 = 幾人獸 + 合成獸編號 + 成員編號 + Combo第幾下",
+                "#一般型態Duo Kaiju",
+                "20111"
+              ]
+            },
+            "說明": {
+              "samples": [
+                "#string",
+                "招式",
+                "Head - Left",
+                "Head - Right",
+                "Head - Left"
+              ]
+            },
+            "Damage ID": {
+              "samples": [
+                "uint",
+                "Damage_ID",
+                "20111",
+                "20121",
+                "40111"
+              ]
+            },
+            "融合獸頭 ID": {
+              "samples": [
+                "uint",
+                "Kaiju_Fused_Head_ID",
+                "2011",
+                "2012",
+                "4011"
+              ]
+            },
+            "融合獸 ID": {
+              "samples": [
+                "uint",
+                "Kaiju_Fused_ID",
+                "2",
+                "2",
+                "4"
+              ]
+            },
+            "Combo第幾下": {
+              "samples": [
+                "uint",
+                "ComboNum",
+                "1",
+                "1",
+                "1"
+              ]
+            },
+            "後座力速度(千分之一)": {
+              "samples": [
+                "uint",
+                "RecoilSpeed",
+                "1200",
+                "1200",
+                "1000"
+              ]
+            },
+            "後座力時間(毫秒)": {
+              "samples": [
+                "uint",
+                "RecoilDuration",
+                "150",
+                "150",
+                "120"
+              ]
+            },
+            "Frame": {
+              "samples": [
+                "#uint",
+                "30",
+                "30",
+                "24",
+                "30"
+              ]
+            },
+            "前搖持續時間(毫秒)": {
+              "samples": [
+                "uint",
+                "StartupDuration",
+                "401",
+                "401",
+                "334"
+              ]
+            },
+            "攻擊狀態持續時間(毫秒)": {
+              "samples": [
+                "uint",
+                "ActiveDuration",
+                "301",
+                "301",
+                "267"
+              ]
+            },
+            "後搖持續時間(毫秒)": {
+              "samples": [
+                "uint",
+                "RecoveryDuration",
+                "501",
+                "501",
+                "401"
+              ]
+            },
+            "硬直時間ID": {
+              "samples": [
+                "#uint",
+                "1002",
+                "1002",
+                "1003",
+                "1003"
+              ]
+            },
+            "毫秒": {
+              "samples": [
+                "#uint",
+                "?",
+                "?",
+                "?",
+                "?"
+              ]
+            },
+            "擊退力ID": {
+              "samples": [
+                "#uint",
+                "1206",
+                "1206",
+                "1207",
+                "1207"
+              ]
+            },
+            "擊退力": {
+              "samples": [
+                "#uint",
+                "?",
+                "?",
+                "?",
+                "?"
+              ]
+            },
+            "被動效果集合": {
+              "samples": [
+                "string",
+                "Hit_Effect_ID",
+                "1002 | 1206",
+                "1002 | 1206",
+                "1003 | 1207"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "NeutralUnits": {
+      "filename": "NeutralUnits.xlsm",
+      "sheets": {
+        "NeutralUnits": {
+          "headers": [
+            "#流水號",
+            "說明",
+            "類型",
+            "血量",
+            "掉落表Id"
+          ],
+          "row_count": 11,
+          "columns": {
+            "#流水號": {
+              "samples": [
+                "uint",
+                "id",
+                "#路人",
+                "4001",
+                "4002"
+              ]
+            },
+            "說明": {
+              "samples": [
+                "#string",
+                "單位",
+                "一般路人 男",
+                "一般路人 女",
+                "網紅"
+              ]
+            },
+            "類型": {
+              "samples": [
+                "uint",
+                "Type",
+                "1",
+                "1",
+                "1"
+              ]
+            },
+            "血量": {
+              "samples": [
+                "uint",
+                "Health",
+                "1",
+                "1",
+                "1"
+              ]
+            },
+            "掉落表Id": {
+              "samples": [
+                "uint",
+                "Loot_Id",
+                "0",
+                "0",
+                "0"
+              ]
+            }
+          }
+        },
+        "NeutralUnits_Tank": {
+          "headers": [
+            "#流水號",
+            "說明",
+            "Damage_ID",
+            "跟隨範圍(半徑，公分)",
+            "攻擊範圍(半徑，公分)",
+            "巡邏移動速度(千分之一)",
+            "追擊移動速度(千分之一)",
+            "轉向速度(角度/每秒)",
+            "預備攻擊時間(毫秒)",
+            "停止跟隨時間(毫秒)"
+          ],
+          "row_count": 3,
+          "columns": {
+            "#流水號": {
+              "samples": [
+                "uint",
+                "id",
+                "9001"
+              ]
+            },
+            "說明": {
+              "samples": [
+                "#string",
+                "單位",
+                "坦克"
+              ]
+            },
+            "Damage_ID": {
+              "samples": [
+                "uint",
+                "Damage_ID",
+                "9001"
+              ]
+            },
+            "跟隨範圍(半徑，公分)": {
+              "samples": [
+                "uint",
+                "FollowRange",
+                "2200"
+              ]
+            },
+            "攻擊範圍(半徑，公分)": {
+              "samples": [
+                "uint",
+                "AttackRange",
+                "1200"
+              ]
+            },
+            "巡邏移動速度(千分之一)": {
+              "samples": [
+                "uint",
+                "PatrolMoveSpeed",
+                "3000"
+              ]
+            },
+            "追擊移動速度(千分之一)": {
+              "samples": [
+                "uint",
+                "ChaseMoveSpeed",
+                "4000"
+              ]
+            },
+            "轉向速度(角度/每秒)": {
+              "samples": [
+                "uint",
+                "TurnSpeed",
+                "100"
+              ]
+            },
+            "預備攻擊時間(毫秒)": {
+              "samples": [
+                "uint",
+                "StartupTime",
+                "1000"
+              ]
+            },
+            "停止跟隨時間(毫秒)": {
+              "samples": [
+                "uint",
+                "StopFollowDuration",
+                "3000"
+              ]
+            }
+          }
+        },
+        "NeutralUnits_Human_AI": {
+          "headers": [
+            "#流水號",
+            "說明",
+            "生成機率權重",
+            "觸發恐懼扇形半徑\n(半徑，千分之一公尺)",
+            "觸發恐懼扇形角度",
+            "逃跑目標距離\n(半徑，千分之一公尺)",
+            "巡邏移動速度(千分之一)",
+            "逃跑移動速度(千分之一)",
+            "轉向速度(角度/每秒)",
+            "特殊恐懼行為持續時間(毫秒)",
+            "特殊恐懼行為觸發機率(千分之一)",
+            "恐懼行為 ID"
+          ],
+          "row_count": 8,
+          "columns": {
+            "#流水號": {
+              "samples": [
+                "uint",
+                "id",
+                "4001",
+                "4002",
+                "4003"
+              ]
+            },
+            "說明": {
+              "samples": [
+                "#string",
+                "單位",
+                "一般路人 男",
+                "一般路人 女",
+                "網紅"
+              ]
+            },
+            "生成機率權重": {
+              "samples": [
+                "uint",
+                "SpawnWeight",
+                "10",
+                "10",
+                "1"
+              ]
+            },
+            "觸發恐懼扇形半徑\n(半徑，千分之一公尺)": {
+              "samples": [
+                "uint",
+                "FearTriggerRange",
+                "14000",
+                "14000",
+                "14000"
+              ]
+            },
+            "觸發恐懼扇形角度": {
+              "samples": [
+                "uint",
+                "FearTriggerAngle",
+                "160",
+                "160",
+                "160"
+              ]
+            },
+            "逃跑目標距離\n(半徑，千分之一公尺)": {
+              "samples": [
+                "uint",
+                "FleeTargetDistance",
+                "30000",
+                "30000",
+                "30000"
+              ]
+            },
+            "巡邏移動速度(千分之一)": {
+              "samples": [
+                "uint",
+                "PatrolMoveSpeed",
+                "2200",
+                "2000",
+                "2200"
+              ]
+            },
+            "逃跑移動速度(千分之一)": {
+              "samples": [
+                "uint",
+                "FleeMoveSpeed",
+                "3600",
+                "3200",
+                "3600"
+              ]
+            },
+            "轉向速度(角度/每秒)": {
+              "samples": [
+                "uint",
+                "TurnSpeed",
+                "600",
+                "600",
+                "600"
+              ]
+            },
+            "特殊恐懼行為持續時間(毫秒)": {
+              "samples": [
+                "uint",
+                "SpecialFearBehaviorDuration",
+                "10000",
+                "10000",
+                "10000"
+              ]
+            },
+            "特殊恐懼行為觸發機率(千分之一)": {
+              "samples": [
+                "uint",
+                "SpecialFearBehaviorChance",
+                "180",
+                "180",
+                "400"
+              ]
+            },
+            "恐懼行為 ID": {
+              "samples": [
+                "string",
+                "NeutralUnits_Human_FearBehavior_ID",
+                "5001 | 5002 | 5003",
+                "5001 | 5002 | 5003",
+                "5005"
+              ]
+            }
+          }
+        },
+        "NeutralUnits_Human_FearBehavior": {
+          "headers": [
+            "#流水號",
+            "特殊恐懼行為",
+            "觸發機率權重"
+          ],
+          "row_count": 7,
+          "columns": {
+            "#流水號": {
+              "samples": [
+                "uint",
+                "id",
+                "5001",
+                "5002",
+                "5003"
+              ]
+            },
+            "特殊恐懼行為": {
+              "samples": [
+                "#string",
+                "跑到房子門口一直敲門",
+                "腿軟跌倒在地上",
+                "跪地祈禱",
+                "就地擺出攻擊架勢(轉向最近怪獸)"
+              ]
+            },
+            "觸發機率權重": {
+              "samples": [
+                "uint",
+                "TriggerWeight",
+                "1",
+                "3",
+                "2"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "Resource": {
+      "filename": "Resource.xlsm",
+      "sheets": {
+        "Resource": {
+          "headers": [
+            "#編號",
+            "資源名稱",
+            "稀有度",
+            "Parameter",
+            "Parameter",
+            "Value"
+          ],
+          "row_count": 38,
+          "columns": {
+            "#編號": {
+              "samples": [
+                "uint",
+                "id",
+                "#個人資源",
+                "#101",
+                "#102"
+              ]
+            },
+            "資源名稱": {
+              "samples": [
+                "#string",
+                "name",
+                "金幣",
+                "經驗值",
+                "鑽石"
+              ]
+            },
+            "稀有度": {
+              "samples": [
+                "uint",
+                "rare",
+                "0",
+                "0",
+                "0"
+              ]
+            },
+            "Parameter": {
+              "samples": [
+                "uint",
+                "resourceParameter",
+                "1",
+                "1",
+                "1"
+              ]
+            },
+            "Value": {
+              "samples": [
+                "uint",
+                "value",
+                "1",
+                "1",
+                "1"
+              ]
+            }
+          }
+        },
+        "#Resource_c": {
+          "headers": [
+            "#編號",
+            "資源名稱",
+            "字串Id"
+          ],
+          "row_count": 32,
+          "columns": {
+            "#編號": {
+              "samples": [
+                "uint",
+                "id",
+                "#個人資源",
+                "#101",
+                "#102"
+              ]
+            },
+            "資源名稱": {
+              "samples": [
+                "#string",
+                "name",
+                "金幣",
+                "經驗值",
+                "鑽石"
+              ]
+            },
+            "字串Id": {
+              "samples": [
+                "uint",
+                "string_Id"
+              ]
+            }
+          }
+        },
+        "#Resource_s": {
+          "headers": [],
+          "row_count": 0,
+          "columns": {}
+        },
+        "#Enum": {
+          "headers": [
+            "#",
+            "Col_1",
+            "Col_2",
+            "Col_3"
+          ],
+          "row_count": 6,
+          "columns": {
+            "#": {
+              "samples": []
+            },
+            "Col_1": {
+              "samples": [
+                "數值",
+                "掉落物",
+                "掉落表"
+              ]
+            },
+            "Col_2": {
+              "samples": [
+                "Resource_Used",
+                "Amount",
+                "DropObject_Id",
+                "Loot_Id"
+              ]
+            },
+            "Col_3": {
+              "samples": [
+                "Value",
+                "1",
+                "2",
+                "3"
+              ]
+            }
+          }
+        }
+      }
+    },
     "Skill": {
       "filename": "Skill.xlsm",
       "sheets": {
@@ -1937,7 +5119,6 @@
             "傷害頻率(毫秒)",
             "光束最遠距離(千分之一)",
             "自身效果_ID",
-            "組合技CD(毫秒)",
             "前搖時間(毫秒)",
             "技能作用時間(毫秒)",
             "收尾時間(毫秒)",
@@ -2018,14 +5199,6 @@
                 "Self_Effect_ID",
                 "\"\"",
                 "\"\""
-              ]
-            },
-            "組合技CD(毫秒)": {
-              "samples": [
-                "uint",
-                "SkillCD",
-                "30000",
-                "30000"
               ]
             },
             "前搖時間(毫秒)": {
@@ -2718,1173 +5891,6 @@
         }
       }
     },
-    "Stage": {
-      "filename": "Stage.xlsm",
-      "sheets": {
-        "Stage": {
-          "headers": [
-            "#UUID",
-            "Json File Name",
-            "Airdrop_Pattern_id"
-          ],
-          "row_count": 5,
-          "columns": {
-            "#UUID": {
-              "samples": [
-                "uint",
-                "id",
-                "10001",
-                "10002",
-                "10003"
-              ]
-            },
-            "Json File Name": {
-              "samples": [
-                "string",
-                "StageName",
-                "Stage001",
-                "Stage002",
-                "Stage003"
-              ]
-            },
-            "Airdrop_Pattern_id": {
-              "samples": [
-                "uint",
-                "Airdrop_Pattern_id",
-                "101",
-                "101",
-                "101"
-              ]
-            }
-          }
-        },
-        "Stage_Stage002_Rule": {
-          "headers": [
-            "#流水號",
-            "說明",
-            "數值"
-          ],
-          "row_count": 4,
-          "columns": {
-            "#流水號": {
-              "samples": [
-                "uint",
-                "id",
-                "1101",
-                "1102"
-              ]
-            },
-            "說明": {
-              "samples": [
-                "#string",
-                "橋開啟條件1：場景內房屋破壞率達標(%)",
-                "橋開啟條件2：遊戲時間超過多久(秒)"
-              ]
-            },
-            "數值": {
-              "samples": [
-                "uint",
-                "Value_1",
-                "25",
-                "180"
-              ]
-            }
-          }
-        }
-      }
-    },
-    "Kaiju": {
-      "filename": "Kaiju.xlsm",
-      "sheets": {
-        "Kaiju_Solo": {
-          "headers": [
-            "#流水號",
-            "說明",
-            "職業",
-            "速度(千分之一)",
-            "轉向速度(角度/每秒)",
-            "血量",
-            "Dash CD(毫秒)",
-            "Dash速度(千分之一)",
-            "Dash時間(毫秒)",
-            "Dash轉向速度(角度/每秒)",
-            "精力值",
-            "技能消耗閾值",
-            "精力恢復頻率(頻率，毫秒)",
-            "精力恢復量",
-            "吃人範圍扇形半徑(千分之一公尺)",
-            "吃人範圍扇形角度",
-            "自身被動效果",
-            "掉落表Id",
-            "掉落表Id_Duo限定取得"
-          ],
-          "row_count": 8,
-          "columns": {
-            "#流水號": {
-              "samples": [
-                "uint",
-                "id",
-                "1011",
-                "1012",
-                "1013"
-              ]
-            },
-            "說明": {
-              "samples": [
-                "#string",
-                "角色",
-                "Shooter_Syu",
-                "Stainer_Fu",
-                "Defender_Tan"
-              ]
-            },
-            "職業": {
-              "samples": [
-                "uint",
-                "Role",
-                "1001",
-                "1002",
-                "1003"
-              ]
-            },
-            "速度(千分之一)": {
-              "samples": [
-                "uint",
-                "Speed",
-                "11400",
-                "11400",
-                "11400"
-              ]
-            },
-            "轉向速度(角度/每秒)": {
-              "samples": [
-                "uint",
-                "TurnSpeed",
-                "900",
-                "900",
-                "900"
-              ]
-            },
-            "血量": {
-              "samples": [
-                "uint",
-                "Health",
-                "114",
-                "120",
-                "130"
-              ]
-            },
-            "Dash CD(毫秒)": {
-              "samples": [
-                "uint",
-                "DashCD",
-                "2750",
-                "2750",
-                "2750"
-              ]
-            },
-            "Dash速度(千分之一)": {
-              "samples": [
-                "uint",
-                "DashSpeed",
-                "41500",
-                "41500",
-                "41500"
-              ]
-            },
-            "Dash時間(毫秒)": {
-              "samples": [
-                "uint",
-                "DashDuration",
-                "200",
-                "200",
-                "200"
-              ]
-            },
-            "Dash轉向速度(角度/每秒)": {
-              "samples": [
-                "uint",
-                "DashTurnSpeed",
-                "200",
-                "200",
-                "200"
-              ]
-            },
-            "精力值": {
-              "samples": [
-                "uint",
-                "Stamina",
-                "1000",
-                "1000",
-                "1000"
-              ]
-            },
-            "技能消耗閾值": {
-              "samples": [
-                "uint",
-                "StaminaThreshold",
-                "0",
-                "200",
-                "150"
-              ]
-            },
-            "精力恢復頻率(頻率，毫秒)": {
-              "samples": [
-                "uint",
-                "StaminaRecoveryRate",
-                "100",
-                "100",
-                "100"
-              ]
-            },
-            "精力恢復量": {
-              "samples": [
-                "uint",
-                "StaminaRecoveryAmount",
-                "15",
-                "18",
-                "12"
-              ]
-            },
-            "吃人範圍扇形半徑(千分之一公尺)": {
-              "samples": [
-                "uint",
-                "EatHumanoidRadius",
-                "1900",
-                "1900",
-                "1900"
-              ]
-            },
-            "吃人範圍扇形角度": {
-              "samples": [
-                "uint",
-                "EatHumanoidAngle",
-                "120",
-                "120",
-                "120"
-              ]
-            },
-            "自身被動效果": {
-              "samples": [
-                "string",
-                "Self_Effect_ID",
-                "4901",
-                "4901",
-                "4901"
-              ]
-            },
-            "掉落表Id": {
-              "samples": [
-                "uint",
-                "Loot_Id",
-                "201",
-                "201",
-                "201"
-              ]
-            },
-            "掉落表Id_Duo限定取得": {
-              "samples": [
-                "uint",
-                "Loot_Id_Duo",
-                "10008",
-                "10008",
-                "10008"
-              ]
-            }
-          }
-        },
-        "Kaiju_Solo_c": {
-          "headers": [
-            "#流水號",
-            "說明",
-            "名字字串id",
-            "技能提示字串id"
-          ],
-          "row_count": 8,
-          "columns": {
-            "#流水號": {
-              "samples": [
-                "uint",
-                "id",
-                "1011",
-                "1012",
-                "1013"
-              ]
-            },
-            "說明": {
-              "samples": [
-                "#string",
-                "角色",
-                "Shooter_Syu",
-                "Stainer_Fu",
-                "Defender_Tan"
-              ]
-            },
-            "名字字串id": {
-              "samples": [
-                "uint",
-                "NameStringId",
-                "2001",
-                "2002",
-                "2003"
-              ]
-            },
-            "技能提示字串id": {
-              "samples": [
-                "uint",
-                "SkillHintStringId",
-                "3001",
-                "3002",
-                "3003"
-              ]
-            }
-          }
-        },
-        "Kaiju_Fused": {
-          "headers": [
-            "#流水號",
-            "說明",
-            "怪獸能源",
-            "怪獸能源消耗頻率(毫秒)",
-            "怪獸能源消耗量",
-            "移動速度(千分之一)",
-            "轉向速度(角度/每秒)",
-            "起步加速度",
-            "慣性減速度",
-            "產生速度加成之輸入夾角度\n(所有成員朝相同方向角度內移動，產生速度加成)",
-            "失衡條滿值",
-            "失衡值延遲衰退時間(毫秒)",
-            "失衡衰退頻率(毫秒)",
-            "失衡衰退量",
-            "失衡持續時間(毫秒)",
-            "脈衝最大值",
-            "共鳴值偵測變化頻率(毫秒)",
-            "1人集氣 脈衝值增加量",
-            "2人集氣 脈衝值增加量",
-            "3人集氣 脈衝值增加量",
-            "4人集氣 脈衝值增加量",
-            "無人集氣 脈衝值倒扣量",
-            "進食範圍(千分之一公尺)",
-            "掉落表Id",
-            "自身被動效果",
-            "Col_25"
-          ],
-          "row_count": 4,
-          "columns": {
-            "#流水號": {
-              "samples": [
-                "uint",
-                "id",
-                "2",
-                "4"
-              ]
-            },
-            "說明": {
-              "samples": [
-                "#string",
-                "職業",
-                "Duo",
-                "Ultra 原始龍型態"
-              ]
-            },
-            "怪獸能源": {
-              "samples": [
-                "uint",
-                "KaijuPower",
-                "330",
-                "660"
-              ]
-            },
-            "怪獸能源消耗頻率(毫秒)": {
-              "samples": [
-                "uint",
-                "KaijuPowerConsumptionRate",
-                "0",
-                "0"
-              ]
-            },
-            "怪獸能源消耗量": {
-              "samples": [
-                "uint",
-                "KaijuPowerConsumptionCost",
-                "0",
-                "0"
-              ]
-            },
-            "移動速度(千分之一)": {
-              "samples": [
-                "uint",
-                "MoveSpeed",
-                "7600",
-                "8800"
-              ]
-            },
-            "轉向速度(角度/每秒)": {
-              "samples": [
-                "uint",
-                "TurnSpeed",
-                "190",
-                "170"
-              ]
-            },
-            "起步加速度": {
-              "samples": [
-                "uint",
-                "Acceleration",
-                "29",
-                "18"
-              ]
-            },
-            "慣性減速度": {
-              "samples": [
-                "uint",
-                "Deceleration",
-                "60",
-                "25"
-              ]
-            },
-            "產生速度加成之輸入夾角度\n(所有成員朝相同方向角度內移動，產生速度加成)": {
-              "samples": [
-                "uint",
-                "BoostAngle",
-                "40",
-                "55"
-              ]
-            },
-            "失衡條滿值": {
-              "samples": [
-                "uint",
-                "StaggerMax",
-                "180",
-                "750"
-              ]
-            },
-            "失衡值延遲衰退時間(毫秒)": {
-              "samples": [
-                "uint",
-                "StaggerDecayDelay",
-                "2000",
-                "2000"
-              ]
-            },
-            "失衡衰退頻率(毫秒)": {
-              "samples": [
-                "uint",
-                "StaggerDecayInterval",
-                "100",
-                "100"
-              ]
-            },
-            "失衡衰退量": {
-              "samples": [
-                "uint",
-                "StaggerDecayAmount",
-                "4",
-                "9"
-              ]
-            },
-            "失衡持續時間(毫秒)": {
-              "samples": [
-                "uint",
-                "StaggerDuration",
-                "3000",
-                "6000"
-              ]
-            },
-            "脈衝最大值": {
-              "samples": [
-                "uint",
-                "PulseMax",
-                "150",
-                "400"
-              ]
-            },
-            "共鳴值偵測變化頻率(毫秒)": {
-              "samples": [
-                "uint",
-                "PulseCheckTickInterval",
-                "100",
-                "100"
-              ]
-            },
-            "1人集氣 脈衝值增加量": {
-              "samples": [
-                "uint",
-                "PulseGain1P",
-                "6",
-                "7"
-              ]
-            },
-            "2人集氣 脈衝值增加量": {
-              "samples": [
-                "uint",
-                "PulseGain2P",
-                "14",
-                "16"
-              ]
-            },
-            "3人集氣 脈衝值增加量": {
-              "samples": [
-                "uint",
-                "PulseGain3P",
-                "23",
-                "30"
-              ]
-            },
-            "4人集氣 脈衝值增加量": {
-              "samples": [
-                "uint",
-                "PulseGain4P",
-                "74",
-                "74"
-              ]
-            },
-            "無人集氣 脈衝值倒扣量": {
-              "samples": [
-                "uint",
-                "PulseDecayNoInput",
-                "8",
-                "12"
-              ]
-            },
-            "進食範圍(千分之一公尺)": {
-              "samples": [
-                "uint",
-                "EatingRadius",
-                "16000",
-                "24000"
-              ]
-            },
-            "掉落表Id": {
-              "samples": [
-                "uint",
-                "Loot_Id",
-                "0",
-                "0"
-              ]
-            },
-            "自身被動效果": {
-              "samples": [
-                "string",
-                "Self_Effect_ID",
-                "7101 | 4002 | 7202 | 4301 | 4401 | 4102 | 4103 | 4104 | 4902 | 5002 | 8201 | 8301",
-                "7102 | 4003 | 7203 | 4301 | 4401 | 4105 | 4106 | 4107 | 4903 | 5003 | 8201 | 8301"
-              ]
-            },
-            "Col_25": {
-              "samples": []
-            }
-          }
-        },
-        "Kaiju_Fullness": {
-          "headers": [
-            "#流水號",
-            "飽足等級",
-            "疊加Effect(每級額外疊加)",
-            "體型放大倍率(%)"
-          ],
-          "row_count": 6,
-          "columns": {
-            "#流水號": {
-              "samples": [
-                "uint",
-                "id",
-                "101",
-                "102",
-                "103"
-              ]
-            },
-            "飽足等級": {
-              "samples": [
-                "uint",
-                "Level",
-                "1",
-                "2",
-                "3"
-              ]
-            },
-            "疊加Effect(每級額外疊加)": {
-              "samples": [
-                "string",
-                "Self_Effect_ID",
-                "0",
-                "7402 | 7602 | 7802 | 8003",
-                "7403 | 7603 | 7803 | 8004"
-              ]
-            },
-            "體型放大倍率(%)": {
-              "samples": [
-                "uint",
-                "ScaleRatio",
-                "100",
-                "110",
-                "120"
-              ]
-            }
-          }
-        }
-      }
-    },
-    "EventTracking": {
-      "filename": "EventTracking.xlsm",
-      "sheets": {
-        "EventTracking": {
-          "headers": [
-            "#事件ID",
-            "啟用(1/0)",
-            "說明",
-            "事件類型",
-            "Game Analytics-Feature",
-            "Game Analytics-EventKey",
-            "Col_6",
-            "Col_7",
-            "Col_8",
-            "Col_9",
-            "Col_10",
-            "Col_11",
-            "Col_12",
-            "Col_13"
-          ],
-          "row_count": 44,
-          "columns": {
-            "#事件ID": {
-              "samples": [
-                "uint",
-                "id",
-                "100001",
-                "100002",
-                "100003"
-              ]
-            },
-            "啟用(1/0)": {
-              "samples": [
-                "uint",
-                "isEnable",
-                "1",
-                "1",
-                "1"
-              ]
-            },
-            "說明": {
-              "samples": [
-                "#string",
-                "content",
-                "有效場次計數器(1)",
-                "無效場次計數器(1)",
-                "該場時間"
-              ]
-            },
-            "事件類型": {
-              "samples": [
-                "uint",
-                "eventType",
-                "1",
-                "1",
-                "1"
-              ]
-            },
-            "Game Analytics-Feature": {
-              "samples": [
-                "string",
-                "gaEventFeature",
-                "moba_general",
-                "moba_general",
-                "moba_general"
-              ]
-            },
-            "Game Analytics-EventKey": {
-              "samples": [
-                "string",
-                "gaEventKey",
-                "00_game_count",
-                "01_voided_game_count",
-                "02_duration"
-              ]
-            },
-            "Col_6": {
-              "samples": []
-            },
-            "Col_7": {
-              "samples": []
-            },
-            "Col_8": {
-              "samples": []
-            },
-            "Col_9": {
-              "samples": []
-            },
-            "Col_10": {
-              "samples": []
-            },
-            "Col_11": {
-              "samples": []
-            },
-            "Col_12": {
-              "samples": []
-            },
-            "Col_13": {
-              "samples": []
-            }
-          }
-        },
-        "#EventType(Readonly)": {
-          "headers": [
-            "type_id",
-            "type_name",
-            "核心關注點",
-            "後台自動生成的指標",
-            "推薦使用情境",
-            "Display",
-            "Firebase (GA4)",
-            "PlayFab (Standard)"
-          ],
-          "row_count": 5,
-          "columns": {
-            "type_id": {
-              "samples": [
-                "1",
-                "2",
-                "3",
-                "4",
-                "5"
-              ]
-            },
-            "type_name": {
-              "samples": [
-                "Design",
-                "Progression",
-                "Resource",
-                "Business",
-                "Error"
-              ]
-            },
-            "核心關注點": {
-              "samples": [
-                "行為頻率",
-                "遊戲難度",
-                "經濟平衡",
-                "營利能力",
-                "穩定性"
-              ]
-            },
-            "後台自動生成的指標": {
-              "samples": [
-                "自定義計數",
-                "關卡勝率、平均通關時間",
-                "資源產出 vs 消耗 (Sink/Source)",
-                "ARPU, LTV, 付費轉換率",
-                "錯誤發生率 (Error Rate)"
-              ]
-            },
-            "推薦使用情境": {
-              "samples": [
-                "功能偏好、新手教學流失",
-                "關卡、章節、任務進度",
-                "金幣、鑽石、體力管理",
-                "真錢購買、內購項目",
-                "Bug 追蹤、伺服器異常"
-              ]
-            },
-            "Display": {
-              "samples": [
-                "1 - Design",
-                "2 - Progression",
-                "3 - Resource",
-                "4 - Business",
-                "5 - Error"
-              ]
-            },
-            "Firebase (GA4)": {
-              "samples": [
-                "custom_event",
-                "level_start / up",
-                "earn / spend_vc",
-                "purchase",
-                "exception"
-              ]
-            },
-            "PlayFab (Standard)": {
-              "samples": [
-                "Custom",
-                "player_level_up",
-                "vc_item_purchased",
-                "real_money_purchase",
-                "error_log"
-              ]
-            }
-          }
-        }
-      }
-    },
-    "Effect": {
-      "filename": "Effect.xlsm",
-      "sheets": {
-        "Effect": {
-          "headers": [
-            "#流水號",
-            "Effect ID",
-            "Type",
-            "Type",
-            "Parameter",
-            "Parameter",
-            "Value",
-            "說明"
-          ],
-          "row_count": 213,
-          "columns": {
-            "#流水號": {
-              "samples": [
-                "uint",
-                "id",
-                "#特殊效果",
-                "#毒液",
-                "10101"
-              ]
-            },
-            "Effect ID": {
-              "samples": [
-                "uint",
-                "Effect_ID",
-                "101",
-                "101",
-                "101"
-              ]
-            },
-            "Type": {
-              "samples": [
-                "uint",
-                "EffectType",
-                "100",
-                "100",
-                "100"
-              ]
-            },
-            "Parameter": {
-              "samples": [
-                "uint",
-                "EffectParameter",
-                "10",
-                "11",
-                "12"
-              ]
-            },
-            "Value": {
-              "samples": [
-                "uint",
-                "Value",
-                "12002",
-                "700",
-                "2200"
-              ]
-            },
-            "說明": {
-              "samples": [
-                "#string",
-                "Note",
-                "中毒傷害(Damage_ID)",
-                "中毒受傷頻率(豪秒)",
-                "中毒狀態持續時間(豪秒)"
-              ]
-            }
-          }
-        },
-        "#編號規則": {
-          "headers": [
-            "Col_0",
-            "Col_1",
-            "Col_2"
-          ],
-          "row_count": 49,
-          "columns": {
-            "Col_0": {
-              "samples": []
-            },
-            "Col_1": {
-              "samples": [
-                "特殊效果 (3碼，前綴10~99)",
-                "前綴",
-                "10x",
-                "20x",
-                "負面效果 (4碼，前綴10~39)"
-              ]
-            },
-            "Col_2": {
-              "samples": [
-                "類別",
-                "中毒",
-                "解體後耗竭狀態",
-                "類別",
-                "硬直"
-              ]
-            }
-          }
-        },
-        "#飽足度驗證": {
-          "headers": [
-            "Col_0",
-            "Col_1",
-            "Col_2",
-            "Col_3",
-            "Col_4",
-            "Col_5",
-            "Col_6",
-            "Col_7",
-            "Col_8",
-            "Col_9",
-            "Col_10",
-            "Col_11",
-            "Col_12",
-            "Col_13",
-            "Col_14",
-            "Col_15",
-            "Col_16",
-            "Col_17",
-            "Col_18",
-            "Col_19"
-          ],
-          "row_count": 997,
-          "columns": {
-            "Col_0": {
-              "samples": [
-                "備註：黃色格子可更改數字以測試計算結果",
-                "吃飽所需吃人數",
-                "額外最大血量",
-                "額外Melee傷害加成(%)",
-                "額外精力值加成(%)"
-              ]
-            },
-            "Col_1": {
-              "samples": [
-                "Lv 1",
-                "0",
-                "0",
-                "0",
-                "0"
-              ]
-            },
-            "Col_2": {
-              "samples": [
-                "100",
-                "Lv 2",
-                "20",
-                "0.08",
-                "0"
-              ]
-            },
-            "Col_3": {
-              "samples": [
-                "Lv 3",
-                "20",
-                "0.08",
-                "0",
-                "0.1"
-              ]
-            },
-            "Col_4": {
-              "samples": [
-                "Lv 4(Max)",
-                "30",
-                "0.08",
-                "0",
-                "0.15"
-              ]
-            },
-            "Col_5": {
-              "samples": []
-            },
-            "Col_6": {
-              "samples": []
-            },
-            "Col_7": {
-              "samples": []
-            },
-            "Col_8": {
-              "samples": []
-            },
-            "Col_9": {
-              "samples": []
-            },
-            "Col_10": {
-              "samples": []
-            },
-            "Col_11": {
-              "samples": []
-            },
-            "Col_12": {
-              "samples": []
-            },
-            "Col_13": {
-              "samples": []
-            },
-            "Col_14": {
-              "samples": []
-            },
-            "Col_15": {
-              "samples": []
-            },
-            "Col_16": {
-              "samples": []
-            },
-            "Col_17": {
-              "samples": []
-            },
-            "Col_18": {
-              "samples": []
-            },
-            "Col_19": {
-              "samples": []
-            }
-          }
-        },
-        "#飽足度驗證(舊)": {
-          "headers": [
-            "Col_0",
-            "Col_1",
-            "Col_2",
-            "Col_3",
-            "Col_4",
-            "Col_5",
-            "Col_6",
-            "Col_7",
-            "Col_8",
-            "Col_9",
-            "Col_10",
-            "Col_11",
-            "Col_12",
-            "Col_13",
-            "Col_14",
-            "Col_15",
-            "Col_16",
-            "Col_17",
-            "Col_18",
-            "Col_19",
-            "Col_20",
-            "Col_21",
-            "Col_22",
-            "Col_23",
-            "Col_24",
-            "Col_25",
-            "Col_26",
-            "Col_27",
-            "Col_28"
-          ],
-          "row_count": 999,
-          "columns": {
-            "Col_0": {
-              "samples": [
-                "備註：黃色格子可更改數字以測試計算結果",
-                "吃飽所需吃人數",
-                "額外最大血量",
-                "額外Melee傷害加成(%)",
-                "額外精力值加成(%)"
-              ]
-            },
-            "Col_1": {
-              "samples": [
-                "100",
-                "強化係數",
-                "25",
-                "0.1",
-                "0.15"
-              ]
-            },
-            "Col_2": {
-              "samples": [
-                "額外強化值",
-                "30",
-                "0.12",
-                "0.18",
-                "0.24"
-              ]
-            },
-            "Col_3": {
-              "samples": [
-                "兩者倍數",
-                "1.2",
-                "1.2",
-                "1.2",
-                "1.2"
-              ]
-            },
-            "Col_4": {
-              "samples": []
-            },
-            "Col_5": {
-              "samples": []
-            },
-            "Col_6": {
-              "samples": []
-            },
-            "Col_7": {
-              "samples": []
-            },
-            "Col_8": {
-              "samples": []
-            },
-            "Col_9": {
-              "samples": []
-            },
-            "Col_10": {
-              "samples": []
-            },
-            "Col_11": {
-              "samples": []
-            },
-            "Col_12": {
-              "samples": []
-            },
-            "Col_13": {
-              "samples": []
-            },
-            "Col_14": {
-              "samples": []
-            },
-            "Col_15": {
-              "samples": []
-            },
-            "Col_16": {
-              "samples": []
-            },
-            "Col_17": {
-              "samples": []
-            },
-            "Col_18": {
-              "samples": []
-            },
-            "Col_19": {
-              "samples": []
-            },
-            "Col_20": {
-              "samples": []
-            },
-            "Col_21": {
-              "samples": []
-            },
-            "Col_22": {
-              "samples": []
-            },
-            "Col_23": {
-              "samples": []
-            },
-            "Col_24": {
-              "samples": []
-            },
-            "Col_25": {
-              "samples": []
-            },
-            "Col_26": {
-              "samples": []
-            },
-            "Col_27": {
-              "samples": []
-            },
-            "Col_28": {
-              "samples": []
-            }
-          }
-        }
-      }
-    },
     "SpawnedObject": {
       "filename": "SpawnedObject.xlsm",
       "sheets": {
@@ -4148,8 +6154,6 @@
             "#流水號",
             "說明",
             "範圍內的Solo-Gido治療量",
-            "範圍內的Duo治療量",
-            "範圍內的Ultra治療量",
             "範圍內的Turret, 主堡治療量",
             "治療範圍(半徑，千分之一公尺)",
             "延遲治療時間(毫秒)"
@@ -4174,20 +6178,6 @@
               "samples": [
                 "uint",
                 "SoloHealAmount",
-                "80"
-              ]
-            },
-            "範圍內的Duo治療量": {
-              "samples": [
-                "uint",
-                "DuoHealAmount",
-                "80"
-              ]
-            },
-            "範圍內的Ultra治療量": {
-              "samples": [
-                "uint",
-                "UltraHealAmount",
                 "80"
               ]
             },
@@ -4310,7 +6300,7 @@
               "samples": [
                 "uint",
                 "ExplosionRadius",
-                "5500"
+                "6000"
               ]
             },
             "炸彈隱形所需時間(毫秒)": {
@@ -4345,7 +6335,7 @@
               "samples": [
                 "uint",
                 "RevealDuration",
-                "370"
+                "250"
               ]
             },
             "受擊時飛行距離(千分之一公尺)": {
@@ -4418,2536 +6408,6 @@
         }
       }
     },
-    "NeutralUnits": {
-      "filename": "NeutralUnits.xlsm",
-      "sheets": {
-        "NeutralUnits": {
-          "headers": [
-            "#流水號",
-            "說明",
-            "類型",
-            "血量",
-            "掉落表Id_Solo吃掉取得",
-            "掉落表Id_融合獸吃掉取得"
-          ],
-          "row_count": 11,
-          "columns": {
-            "#流水號": {
-              "samples": [
-                "uint",
-                "id",
-                "#路人",
-                "4001",
-                "4002"
-              ]
-            },
-            "說明": {
-              "samples": [
-                "#string",
-                "單位",
-                "一般路人 男",
-                "一般路人 女",
-                "網紅"
-              ]
-            },
-            "類型": {
-              "samples": [
-                "uint",
-                "Type",
-                "1",
-                "1",
-                "1"
-              ]
-            },
-            "血量": {
-              "samples": [
-                "uint",
-                "Health",
-                "1",
-                "1",
-                "1"
-              ]
-            },
-            "掉落表Id_Solo吃掉取得": {
-              "samples": [
-                "uint",
-                "Loot_Id_Solo",
-                "304",
-                "304",
-                "304"
-              ]
-            },
-            "掉落表Id_融合獸吃掉取得": {
-              "samples": [
-                "uint",
-                "Loot_Id_Fused",
-                "305",
-                "305",
-                "305"
-              ]
-            }
-          }
-        },
-        "NeutralUnits_Tank": {
-          "headers": [
-            "#流水號",
-            "說明",
-            "Damage_ID",
-            "跟隨範圍(半徑，公分)",
-            "攻擊範圍(半徑，公分)",
-            "巡邏移動速度(千分之一)",
-            "追擊移動速度(千分之一)",
-            "轉向速度(角度/每秒)",
-            "預備攻擊時間(毫秒)",
-            "停止跟隨時間(毫秒)"
-          ],
-          "row_count": 3,
-          "columns": {
-            "#流水號": {
-              "samples": [
-                "uint",
-                "id",
-                "9001"
-              ]
-            },
-            "說明": {
-              "samples": [
-                "#string",
-                "單位",
-                "坦克"
-              ]
-            },
-            "Damage_ID": {
-              "samples": [
-                "uint",
-                "Damage_ID",
-                "9001"
-              ]
-            },
-            "跟隨範圍(半徑，公分)": {
-              "samples": [
-                "uint",
-                "FollowRange",
-                "2200"
-              ]
-            },
-            "攻擊範圍(半徑，公分)": {
-              "samples": [
-                "uint",
-                "AttackRange",
-                "1200"
-              ]
-            },
-            "巡邏移動速度(千分之一)": {
-              "samples": [
-                "uint",
-                "PatrolMoveSpeed",
-                "3000"
-              ]
-            },
-            "追擊移動速度(千分之一)": {
-              "samples": [
-                "uint",
-                "ChaseMoveSpeed",
-                "4000"
-              ]
-            },
-            "轉向速度(角度/每秒)": {
-              "samples": [
-                "uint",
-                "TurnSpeed",
-                "100"
-              ]
-            },
-            "預備攻擊時間(毫秒)": {
-              "samples": [
-                "uint",
-                "StartupTime",
-                "1000"
-              ]
-            },
-            "停止跟隨時間(毫秒)": {
-              "samples": [
-                "uint",
-                "StopFollowDuration",
-                "3000"
-              ]
-            }
-          }
-        },
-        "NeutralUnits_Human_AI": {
-          "headers": [
-            "#流水號",
-            "說明",
-            "生成機率權重",
-            "觸發恐懼扇形半徑\n(半徑，千分之一公尺)",
-            "觸發恐懼扇形角度",
-            "逃跑目標距離\n(半徑，千分之一公尺)",
-            "巡邏移動速度(千分之一)",
-            "逃跑移動速度(千分之一)",
-            "轉向速度(角度/每秒)",
-            "特殊恐懼行為持續時間(毫秒)",
-            "特殊恐懼行為觸發機率(千分之一)",
-            "恐懼行為 ID"
-          ],
-          "row_count": 8,
-          "columns": {
-            "#流水號": {
-              "samples": [
-                "uint",
-                "id",
-                "4001",
-                "4002",
-                "4003"
-              ]
-            },
-            "說明": {
-              "samples": [
-                "#string",
-                "單位",
-                "一般路人 男",
-                "一般路人 女",
-                "網紅"
-              ]
-            },
-            "生成機率權重": {
-              "samples": [
-                "uint",
-                "SpawnWeight",
-                "10",
-                "10",
-                "1"
-              ]
-            },
-            "觸發恐懼扇形半徑\n(半徑，千分之一公尺)": {
-              "samples": [
-                "uint",
-                "FearTriggerRange",
-                "14000",
-                "14000",
-                "14000"
-              ]
-            },
-            "觸發恐懼扇形角度": {
-              "samples": [
-                "uint",
-                "FearTriggerAngle",
-                "160",
-                "160",
-                "160"
-              ]
-            },
-            "逃跑目標距離\n(半徑，千分之一公尺)": {
-              "samples": [
-                "uint",
-                "FleeTargetDistance",
-                "30000",
-                "30000",
-                "30000"
-              ]
-            },
-            "巡邏移動速度(千分之一)": {
-              "samples": [
-                "uint",
-                "PatrolMoveSpeed",
-                "2200",
-                "2000",
-                "2200"
-              ]
-            },
-            "逃跑移動速度(千分之一)": {
-              "samples": [
-                "uint",
-                "FleeMoveSpeed",
-                "3600",
-                "3200",
-                "3600"
-              ]
-            },
-            "轉向速度(角度/每秒)": {
-              "samples": [
-                "uint",
-                "TurnSpeed",
-                "600",
-                "600",
-                "600"
-              ]
-            },
-            "特殊恐懼行為持續時間(毫秒)": {
-              "samples": [
-                "uint",
-                "SpecialFearBehaviorDuration",
-                "10000",
-                "10000",
-                "10000"
-              ]
-            },
-            "特殊恐懼行為觸發機率(千分之一)": {
-              "samples": [
-                "uint",
-                "SpecialFearBehaviorChance",
-                "180",
-                "180",
-                "400"
-              ]
-            },
-            "恐懼行為 ID": {
-              "samples": [
-                "string",
-                "NeutralUnits_Human_FearBehavior_ID",
-                "5001 | 5002 | 5003",
-                "5001 | 5002 | 5003",
-                "5005"
-              ]
-            }
-          }
-        },
-        "NeutralUnits_Human_FearBehavior": {
-          "headers": [
-            "#流水號",
-            "特殊恐懼行為",
-            "觸發機率權重"
-          ],
-          "row_count": 7,
-          "columns": {
-            "#流水號": {
-              "samples": [
-                "uint",
-                "id",
-                "5001",
-                "5002",
-                "5003"
-              ]
-            },
-            "特殊恐懼行為": {
-              "samples": [
-                "#string",
-                "跑到房子門口一直敲門",
-                "腿軟跌倒在地上",
-                "跪地祈禱",
-                "就地擺出攻擊架勢(轉向最近怪獸)"
-              ]
-            },
-            "觸發機率權重": {
-              "samples": [
-                "uint",
-                "TriggerWeight",
-                "1",
-                "3",
-                "2"
-              ]
-            }
-          }
-        }
-      }
-    },
-    "Resource": {
-      "filename": "Resource.xlsm",
-      "sheets": {
-        "Resource": {
-          "headers": [
-            "#編號",
-            "資源名稱",
-            "稀有度",
-            "Parameter",
-            "Parameter",
-            "Value",
-            "Mode",
-            "Col_7",
-            "Col_8"
-          ],
-          "row_count": 36,
-          "columns": {
-            "#編號": {
-              "samples": [
-                "uint",
-                "id",
-                "#掉落物",
-                "1001",
-                "1002"
-              ]
-            },
-            "資源名稱": {
-              "samples": [
-                "#string",
-                "name",
-                "共鳴能量球",
-                "超共鳴能量球",
-                "補血"
-              ]
-            },
-            "稀有度": {
-              "samples": [
-                "uint",
-                "rare",
-                "0",
-                "0",
-                "1"
-              ]
-            },
-            "Parameter": {
-              "samples": [
-                "uint",
-                "resourceParameter",
-                "2",
-                "2",
-                "2"
-              ]
-            },
-            "Value": {
-              "samples": [
-                "uint",
-                "value",
-                "1001",
-                "1002",
-                "1101"
-              ]
-            },
-            "Mode": {
-              "samples": [
-                "string",
-                "mode",
-                "1",
-                "1",
-                "0"
-              ]
-            },
-            "Col_7": {
-              "samples": [
-                "#Mode代號",
-                "0",
-                "1",
-                "2"
-              ]
-            },
-            "Col_8": {
-              "samples": [
-                "#Mode對應",
-                "通用所有模式",
-                "限定Moba",
-                "限定Showdown"
-              ]
-            }
-          }
-        },
-        "#Resource_c": {
-          "headers": [
-            "#編號",
-            "資源名稱",
-            "字串Id"
-          ],
-          "row_count": 28,
-          "columns": {
-            "#編號": {
-              "samples": [
-                "uint",
-                "id",
-                "#掉落物",
-                "1001",
-                "1002"
-              ]
-            },
-            "資源名稱": {
-              "samples": [
-                "#string",
-                "name",
-                "共鳴能量球",
-                "超共鳴能量球",
-                "補血"
-              ]
-            },
-            "字串Id": {
-              "samples": [
-                "uint",
-                "string_Id"
-              ]
-            }
-          }
-        },
-        "#Resource_s": {
-          "headers": [],
-          "row_count": 0,
-          "columns": {}
-        },
-        "#Enum": {
-          "headers": [
-            "#",
-            "Col_1",
-            "Col_2",
-            "Col_3"
-          ],
-          "row_count": 8,
-          "columns": {
-            "#": {
-              "samples": []
-            },
-            "Col_1": {
-              "samples": [
-                "數值",
-                "掉落物",
-                "掉落表",
-                "積分",
-                "飽足度"
-              ]
-            },
-            "Col_2": {
-              "samples": [
-                "Resource_Used",
-                "Amount",
-                "DropObject_Id",
-                "Loot_Id",
-                "AddUltraEnergy"
-              ]
-            },
-            "Col_3": {
-              "samples": [
-                "Value",
-                "1",
-                "2",
-                "3",
-                "4"
-              ]
-            }
-          }
-        }
-      }
-    },
-    "Loot": {
-      "filename": "Loot.xlsm",
-      "sheets": {
-        "Loot": {
-          "headers": [
-            "#編號",
-            "掉落者",
-            "掉落表Id",
-            "資源Id",
-            "資源名稱",
-            "掉落類型",
-            "機率(千分之一%)",
-            "數量",
-            "機率權重",
-            "Col_9",
-            "Col_10"
-          ],
-          "row_count": 127,
-          "columns": {
-            "#編號": {
-              "samples": [
-                "uint",
-                "id",
-                "#隨機道具",
-                "#Lv1 - 7 item",
-                "1011"
-              ]
-            },
-            "掉落者": {
-              "samples": [
-                "#string",
-                "source",
-                "隨機掉落物 Lv1",
-                "隨機掉落物 Lv1",
-                "隨機掉落物 Lv1"
-              ]
-            },
-            "掉落表Id": {
-              "samples": [
-                "uint",
-                "loot_Id",
-                "101",
-                "101",
-                "101"
-              ]
-            },
-            "資源Id": {
-              "samples": [
-                "uint",
-                "resource_Id",
-                "1101",
-                "1106",
-                "1201"
-              ]
-            },
-            "資源名稱": {
-              "samples": [
-                "#string",
-                "resource_Name",
-                "補血",
-                "能量飲料",
-                "大補血"
-              ]
-            },
-            "掉落類型": {
-              "samples": [
-                "uint",
-                "loot_Type",
-                "3",
-                "3",
-                "3"
-              ]
-            },
-            "機率(千分之一%)": {
-              "samples": [
-                "uint",
-                "rate",
-                "316",
-                "316",
-                "0"
-              ]
-            },
-            "數量": {
-              "samples": [
-                "uint",
-                "count",
-                "1",
-                "1",
-                "1"
-              ]
-            },
-            "機率權重": {
-              "samples": [
-                "#uint",
-                "6",
-                "6",
-                "0",
-                "0"
-              ]
-            },
-            "Col_9": {
-              "samples": [
-                "#機率Check",
-                "1000"
-              ]
-            },
-            "Col_10": {
-              "samples": []
-            }
-          }
-        },
-        "#Enum": {
-          "headers": [],
-          "row_count": 0,
-          "columns": {}
-        },
-        "#Info": {
-          "headers": [
-            "Col_0",
-            "Col_1"
-          ],
-          "row_count": 11,
-          "columns": {
-            "Col_0": {
-              "samples": []
-            },
-            "Col_1": {
-              "samples": [
-                "Loot_Type",
-                "獨立機率掉落 = 1",
-                "必定掉落 = 2",
-                "加總機率掉落 = 3",
-                "Rate"
-              ]
-            }
-          }
-        }
-      }
-    },
-    "Melee": {
-      "filename": "Melee.xlsm",
-      "sheets": {
-        "Melee_Solo": {
-          "headers": [
-            "#流水號",
-            "說明",
-            "#角色ID",
-            "Damage ID",
-            "Combo第幾下",
-            "必定位移(1為True)",
-            "初速度倍率(千分之一)",
-            "最終速度倍率(千分之一)",
-            "Frame",
-            "前搖持續時間(毫秒)",
-            "Frame",
-            "攻擊狀態持續時間(毫秒)",
-            "Frame",
-            "後搖持續時間(毫秒)",
-            "連段可輸入時間(毫秒)",
-            "移動過程曲線",
-            "Frame",
-            "延遲位移時間(毫秒)",
-            "Frame",
-            "位移時間(毫秒)",
-            "被動效果集合",
-            "接段所需時間",
-            "硬直時間 Effect",
-            "硬直時間 ",
-            "擊退力 Effect",
-            "擊退力"
-          ],
-          "row_count": 23,
-          "columns": {
-            "#流水號": {
-              "samples": [
-                "uint",
-                "id",
-                "1001",
-                "1002",
-                "2001"
-              ]
-            },
-            "說明": {
-              "samples": [
-                "#string",
-                "角色",
-                "Shooter_Syu",
-                "Shooter_Syu",
-                "Stainer_Fu"
-              ]
-            },
-            "#角色ID": {
-              "samples": [
-                "uint",
-                "Kaiju_Solo_ID",
-                "1011",
-                "1011",
-                "1012"
-              ]
-            },
-            "Damage ID": {
-              "samples": [
-                "uint",
-                "Damage_ID",
-                "1101",
-                "1102",
-                "1201"
-              ]
-            },
-            "Combo第幾下": {
-              "samples": [
-                "uint",
-                "ComboNum",
-                "1",
-                "2",
-                "1"
-              ]
-            },
-            "必定位移(1為True)": {
-              "samples": [
-                "uint",
-                "AlwaysMove",
-                "0",
-                "0",
-                "0"
-              ]
-            },
-            "初速度倍率(千分之一)": {
-              "samples": [
-                "uint",
-                "InitialSpeedMultiplier",
-                "900",
-                "900",
-                "800"
-              ]
-            },
-            "最終速度倍率(千分之一)": {
-              "samples": [
-                "uint",
-                "EndSpeedMultiplier",
-                "200",
-                "300",
-                "200"
-              ]
-            },
-            "Frame": {
-              "samples": [
-                "#uint",
-                "10",
-                "12",
-                "13",
-                "13"
-              ]
-            },
-            "前搖持續時間(毫秒)": {
-              "samples": [
-                "uint",
-                "StartupDuration",
-                "150",
-                "150",
-                "134"
-              ]
-            },
-            "攻擊狀態持續時間(毫秒)": {
-              "samples": [
-                "uint",
-                "ActiveDuration",
-                "134",
-                "134",
-                "150"
-              ]
-            },
-            "後搖持續時間(毫秒)": {
-              "samples": [
-                "uint",
-                "RecoveryDuration",
-                "217",
-                "317",
-                "284"
-              ]
-            },
-            "連段可輸入時間(毫秒)": {
-              "samples": [
-                "uint",
-                "ComboInputWindowDuration",
-                "317",
-                "0",
-                "384"
-              ]
-            },
-            "移動過程曲線": {
-              "samples": [
-                "string",
-                "MovementCurve",
-                "Linear",
-                "OutSine",
-                "Linear"
-              ]
-            },
-            "延遲位移時間(毫秒)": {
-              "samples": [
-                "uint",
-                "delayMovementTime ",
-                "0",
-                "100",
-                "0"
-              ]
-            },
-            "位移時間(毫秒)": {
-              "samples": [
-                "uint",
-                "MoveDuration",
-                "167",
-                "200",
-                "217"
-              ]
-            },
-            "被動效果集合": {
-              "samples": [
-                "string",
-                "Hit_Effect_ID",
-                "1203",
-                "1203",
-                "1203"
-              ]
-            },
-            "接段所需時間": {
-              "samples": [
-                "#uint",
-                "284",
-                "501",
-                "284",
-                "384"
-              ]
-            },
-            "硬直時間 Effect": {
-              "samples": [
-                "#uint",
-                "1009",
-                "1010"
-              ]
-            },
-            "硬直時間 ": {
-              "samples": [
-                "#uint",
-                "?",
-                "?"
-              ]
-            },
-            "擊退力 Effect": {
-              "samples": [
-                "#uint",
-                "1203",
-                "1203",
-                "1203",
-                "1203"
-              ]
-            },
-            "擊退力": {
-              "samples": [
-                "#uint",
-                "?",
-                "?",
-                "?",
-                "?"
-              ]
-            }
-          }
-        },
-        "Melee_Fused": {
-          "headers": [
-            "#流水號",
-            "說明",
-            "Damage ID",
-            "融合獸頭 ID",
-            "融合獸 ID",
-            "Combo第幾下",
-            "可瞄準角度",
-            "後座力速度(千分之一)",
-            "後座力時間(毫秒)",
-            "Frame",
-            "前搖持續時間(毫秒)",
-            "Frame",
-            "攻擊狀態持續時間(毫秒)",
-            "Frame",
-            "後搖持續時間(毫秒)",
-            "硬直時間ID",
-            "毫秒",
-            "擊退力ID",
-            "擊退力",
-            "被動效果集合"
-          ],
-          "row_count": 11,
-          "columns": {
-            "#流水號": {
-              "samples": [
-                "uint",
-                "id",
-                "#流水號 = 幾人獸 + 合成獸編號 + 成員編號 + Combo第幾下",
-                "#一般型態Duo Kaiju",
-                "20111"
-              ]
-            },
-            "說明": {
-              "samples": [
-                "#string",
-                "招式",
-                "Head - Left",
-                "Head - Right",
-                "Head - Left"
-              ]
-            },
-            "Damage ID": {
-              "samples": [
-                "uint",
-                "Damage_ID",
-                "20111",
-                "20121",
-                "40111"
-              ]
-            },
-            "融合獸頭 ID": {
-              "samples": [
-                "uint",
-                "Kaiju_Fused_Head_ID",
-                "2011",
-                "2012",
-                "4011"
-              ]
-            },
-            "融合獸 ID": {
-              "samples": [
-                "uint",
-                "Kaiju_Fused_ID",
-                "2",
-                "2",
-                "4"
-              ]
-            },
-            "Combo第幾下": {
-              "samples": [
-                "uint",
-                "ComboNum",
-                "1",
-                "1",
-                "1"
-              ]
-            },
-            "可瞄準角度": {
-              "samples": [
-                "uint",
-                "AimAngle",
-                "60",
-                "60",
-                "60"
-              ]
-            },
-            "後座力速度(千分之一)": {
-              "samples": [
-                "uint",
-                "RecoilSpeed",
-                "1200",
-                "1200",
-                "1000"
-              ]
-            },
-            "後座力時間(毫秒)": {
-              "samples": [
-                "uint",
-                "RecoilDuration",
-                "150",
-                "150",
-                "120"
-              ]
-            },
-            "Frame": {
-              "samples": [
-                "#uint",
-                "25",
-                "25",
-                "30",
-                "30"
-              ]
-            },
-            "前搖持續時間(毫秒)": {
-              "samples": [
-                "uint",
-                "StartupDuration",
-                "401",
-                "401",
-                "451"
-              ]
-            },
-            "攻擊狀態持續時間(毫秒)": {
-              "samples": [
-                "uint",
-                "ActiveDuration",
-                "134",
-                "134",
-                "200"
-              ]
-            },
-            "後搖持續時間(毫秒)": {
-              "samples": [
-                "uint",
-                "RecoveryDuration",
-                "418",
-                "418",
-                "501"
-              ]
-            },
-            "硬直時間ID": {
-              "samples": [
-                "#uint",
-                "1002",
-                "1002",
-                "1003",
-                "1003"
-              ]
-            },
-            "毫秒": {
-              "samples": [
-                "#uint",
-                "?",
-                "?",
-                "?",
-                "?"
-              ]
-            },
-            "擊退力ID": {
-              "samples": [
-                "#uint",
-                "1206",
-                "1206",
-                "1207",
-                "1207"
-              ]
-            },
-            "擊退力": {
-              "samples": [
-                "#uint",
-                "?",
-                "?",
-                "?",
-                "?"
-              ]
-            },
-            "被動效果集合": {
-              "samples": [
-                "string",
-                "Hit_Effect_ID",
-                "1002 | 1206",
-                "1002 | 1206",
-                "1003 | 1207"
-              ]
-            }
-          }
-        }
-      }
-    },
-    "Airdrop": {
-      "filename": "Airdrop.xlsm",
-      "sheets": {
-        "Airdrop_Pattern": {
-          "headers": [
-            "#流水號",
-            "生成時間",
-            "Airdrop",
-            "生成時間(秒)",
-            "生成道具箱數量",
-            "生成在落後陣營機率(%)",
-            "生成在領先陣營機率(%)"
-          ],
-          "row_count": 58,
-          "columns": {
-            "#流水號": {
-              "samples": [
-                "uint",
-                "id",
-                "#Pattern1",
-                "1001",
-                "1002"
-              ]
-            },
-            "生成時間": {
-              "samples": [
-                "#string",
-                "0:48",
-                "0:48",
-                "1:12",
-                "1:36"
-              ]
-            },
-            "Airdrop": {
-              "samples": [
-                "uint",
-                "Airdrop_Pattern_id",
-                "101",
-                "101",
-                "101"
-              ]
-            },
-            "生成時間(秒)": {
-              "samples": [
-                "uint",
-                "SpawnTime",
-                "48",
-                "48",
-                "72"
-              ]
-            },
-            "生成道具箱數量": {
-              "samples": [
-                "uint",
-                "SpawnCount",
-                "1",
-                "1",
-                "1"
-              ]
-            },
-            "生成在落後陣營機率(%)": {
-              "samples": [
-                "uint",
-                "LosingSideSpawnProbability",
-                "100",
-                "0",
-                "25"
-              ]
-            },
-            "生成在領先陣營機率(%)": {
-              "samples": [
-                "uint",
-                "LeadingSideSpawnProbability",
-                "0",
-                "100",
-                "0"
-              ]
-            }
-          }
-        },
-        "Airdrop_Thereafter": {
-          "headers": [
-            "#流水號",
-            "Airdrop_Pattern_id",
-            "後續道具箱生成頻率(秒)",
-            "生成道具箱數量",
-            "生成在落後陣營機率(%)",
-            "生成在領先陣營機率(%)"
-          ],
-          "row_count": 6,
-          "columns": {
-            "#流水號": {
-              "samples": [
-                "uint",
-                "id",
-                "#Pattern1",
-                "1001",
-                "#Pattern2"
-              ]
-            },
-            "Airdrop_Pattern_id": {
-              "samples": [
-                "uint",
-                "Airdrop_Pattern_id",
-                "101",
-                "102"
-              ]
-            },
-            "後續道具箱生成頻率(秒)": {
-              "samples": [
-                "uint",
-                "ThereafterSpawnInterval",
-                "15",
-                "15"
-              ]
-            },
-            "生成道具箱數量": {
-              "samples": [
-                "uint",
-                "SpawnCount",
-                "1",
-                "1"
-              ]
-            },
-            "生成在落後陣營機率(%)": {
-              "samples": [
-                "uint",
-                "LosingSideSpawnProbability",
-                "15",
-                "15"
-              ]
-            },
-            "生成在領先陣營機率(%)": {
-              "samples": [
-                "uint",
-                "LeadingSideSpawnProbability",
-                "0",
-                "0"
-              ]
-            }
-          }
-        }
-      }
-    },
-    "UltraMutation": {
-      "filename": "UltraMutation.xlsm",
-      "sheets": {
-        "UltraMutation": {
-          "headers": [
-            "#流水號",
-            "說明",
-            "說明",
-            "說明",
-            "說明"
-          ],
-          "row_count": 8,
-          "columns": {
-            "#流水號": {
-              "samples": [
-                "uint",
-                "id",
-                "1100",
-                "1200",
-                "1300"
-              ]
-            },
-            "說明": {
-              "samples": [
-                "#string",
-                "英文效果描述",
-                "Leaves venom behind while moving.",
-                "Creates leaves that orbit around you.",
-                "Resonance movement creates electric shocks."
-              ]
-            }
-          }
-        },
-        "UltraMutation_VenomTrail": {
-          "headers": [
-            "#流水號",
-            "說明",
-            "地面毒水ID"
-          ],
-          "row_count": 3,
-          "columns": {
-            "#流水號": {
-              "samples": [
-                "uint",
-                "id",
-                "1100"
-              ]
-            },
-            "說明": {
-              "samples": [
-                "#string",
-                "基因名",
-                "毒毒毒"
-              ]
-            },
-            "地面毒水ID": {
-              "samples": [
-                "uint",
-                "SpawnedObject_VenomPuddle_ID",
-                "3001"
-              ]
-            }
-          }
-        },
-        "UltraMutation_LeafShield": {
-          "headers": [
-            "#流水號",
-            "說明",
-            "環繞盾牌數量",
-            "盾牌旋轉速度(角度/每秒)",
-            "盾牌距離(半徑，千分之一)"
-          ],
-          "row_count": 4,
-          "columns": {
-            "#流水號": {
-              "samples": [
-                "uint",
-                "id",
-                "1200",
-                "1201"
-              ]
-            },
-            "說明": {
-              "samples": [
-                "#string",
-                "基因名",
-                "葉子護盾",
-                "葉子護盾 組合技期間"
-              ]
-            },
-            "環繞盾牌數量": {
-              "samples": [
-                "uint",
-                "ShieldCount",
-                "1",
-                "8"
-              ]
-            },
-            "盾牌旋轉速度(角度/每秒)": {
-              "samples": [
-                "uint",
-                "ShieldRotationSpeed",
-                "60",
-                "90"
-              ]
-            },
-            "盾牌距離(半徑，千分之一)": {
-              "samples": [
-                "uint",
-                "ShieldRadius",
-                "1400",
-                "1100"
-              ]
-            }
-          }
-        },
-        "UltraMutation_ZoomZap": {
-          "headers": [
-            "#流水號",
-            "說明",
-            "Damage_ID",
-            "電擊間隔時間(毫秒)",
-            "電擊對象數量上限",
-            "產生電圈速度門檻\n(千分之一)",
-            "電擊影響範圍(半徑，千分之一)",
-            "HIT效果集合",
-            "硬直時間ID",
-            "毫秒",
-            "擊退力ID",
-            "擊退力",
-            "被動效果"
-          ],
-          "row_count": 3,
-          "columns": {
-            "#流水號": {
-              "samples": [
-                "uint",
-                "id",
-                "1300"
-              ]
-            },
-            "說明": {
-              "samples": [
-                "#string",
-                "基因名",
-                "同心協力放電"
-              ]
-            },
-            "Damage_ID": {
-              "samples": [
-                "uint",
-                "Damage_ID",
-                "60105"
-              ]
-            },
-            "電擊間隔時間(毫秒)": {
-              "samples": [
-                "uint",
-                "DamageInterval",
-                "850"
-              ]
-            },
-            "電擊對象數量上限": {
-              "samples": [
-                "uint",
-                "TargetCountMax",
-                "3"
-              ]
-            },
-            "產生電圈速度門檻\n(千分之一)": {
-              "samples": [
-                "uint",
-                "DamageSpeedThreshold",
-                "9000"
-              ]
-            },
-            "電擊影響範圍(半徑，千分之一)": {
-              "samples": [
-                "uint",
-                "ZapRadius",
-                "32000"
-              ]
-            },
-            "HIT效果集合": {
-              "samples": [
-                "string",
-                "Hit_Effect_ID",
-                "1201"
-              ]
-            },
-            "硬直時間ID": {
-              "samples": [
-                "#uint"
-              ]
-            },
-            "毫秒": {
-              "samples": [
-                "#uint"
-              ]
-            },
-            "擊退力ID": {
-              "samples": [
-                "#uint",
-                "1201"
-              ]
-            },
-            "擊退力": {
-              "samples": [
-                "#uint",
-                "?"
-              ]
-            },
-            "被動效果": {
-              "samples": [
-                "#string"
-              ]
-            }
-          }
-        },
-        "UltraMutation_RapidCast": {
-          "headers": [
-            "#流水號",
-            "說明",
-            "Self_Effect_ID"
-          ],
-          "row_count": 3,
-          "columns": {
-            "#流水號": {
-              "samples": [
-                "uint",
-                "id",
-                "1400"
-              ]
-            },
-            "說明": {
-              "samples": [
-                "#string",
-                "基因名",
-                "快速施放"
-              ]
-            },
-            "Self_Effect_ID": {
-              "samples": [
-                "string",
-                "Self_Effect_ID",
-                "5401"
-              ]
-            }
-          }
-        },
-        "UltraMutation_ToughSkin": {
-          "headers": [
-            "#流水號",
-            "說明",
-            "Self_Effect_ID"
-          ],
-          "row_count": 3,
-          "columns": {
-            "#流水號": {
-              "samples": [
-                "uint",
-                "id",
-                "1500"
-              ]
-            },
-            "說明": {
-              "samples": [
-                "#string",
-                "基因名",
-                "防禦+"
-              ]
-            },
-            "Self_Effect_ID": {
-              "samples": [
-                "string",
-                "Self_Effect_ID",
-                "4206"
-              ]
-            }
-          }
-        },
-        "UltraMutation_AllInStrike": {
-          "headers": [
-            "#流水號",
-            "說明",
-            "Self_Effect_ID"
-          ],
-          "row_count": 3,
-          "columns": {
-            "#流水號": {
-              "samples": [
-                "uint",
-                "id",
-                "1600"
-              ]
-            },
-            "說明": {
-              "samples": [
-                "#string",
-                "基因名",
-                "終極一發"
-              ]
-            },
-            "Self_Effect_ID": {
-              "samples": [
-                "string",
-                "Self_Effect_ID",
-                "5501"
-              ]
-            }
-          }
-        }
-      }
-    },
-    "Damage": {
-      "filename": "Damage.xlsm",
-      "sheets": {
-        "Damage": {
-          "headers": [
-            "#流水號",
-            "角色",
-            "招式",
-            "傷害",
-            "傷害(對建築)",
-            "攻擊屬性\n(For音效判斷)",
-            "攻擊屬性\n(For音效判斷)",
-            "驗證用1",
-            "驗證用2",
-            "驗證用3",
-            "AttackType對照表",
-            "Col_11"
-          ],
-          "row_count": 69,
-          "columns": {
-            "#流水號": {
-              "samples": [
-                "uint",
-                "id",
-                "#Solo Kaiju Melee",
-                "1101",
-                "1102"
-              ]
-            },
-            "角色": {
-              "samples": [
-                "#string",
-                "Shooter_Syu",
-                "Shooter_Syu",
-                "Stainer_Fu",
-                "Stainer_Fu"
-              ]
-            },
-            "招式": {
-              "samples": [
-                "#string",
-                "Melee Combo - 1",
-                "Melee Combo - 2",
-                "Melee Combo - 1",
-                "Melee Combo - 2"
-              ]
-            },
-            "傷害": {
-              "samples": [
-                "uint",
-                "Damage",
-                "13",
-                "13",
-                "13"
-              ]
-            },
-            "傷害(對建築)": {
-              "samples": [
-                "uint",
-                "DamageToBuilding",
-                "14",
-                "14",
-                "13"
-              ]
-            },
-            "攻擊屬性\n(For音效判斷)": {
-              "samples": [
-                "uint",
-                "AttackType",
-                "3",
-                "3",
-                "3"
-              ]
-            },
-            "驗證用1": {
-              "samples": [
-                "#uint",
-                "完整Combo傷害",
-                "26",
-                "28",
-                "42"
-              ]
-            },
-            "驗證用2": {
-              "samples": [
-                "#uint",
-                "完整Combo時間",
-                "0.935",
-                "0.935",
-                "1.453"
-              ]
-            },
-            "驗證用3": {
-              "samples": [
-                "#uint",
-                "每秒DPS",
-                "27.80748663101604",
-                "29.946524064171122",
-                "28.905712319339298"
-              ]
-            },
-            "AttackType對照表": {
-              "samples": [
-                "#uint",
-                "Default",
-                "Impact_Light",
-                "Impact_Heavy",
-                "Slash"
-              ]
-            },
-            "Col_11": {
-              "samples": [
-                "#uint",
-                "0",
-                "1",
-                "2",
-                "3"
-              ]
-            }
-          }
-        }
-      }
-    },
-    "Common": {
-      "filename": "Common.xlsm",
-      "sheets": {
-        "Common": {
-          "headers": [
-            "#流水號",
-            "數值",
-            "說明",
-            "Col_3",
-            "Col_4"
-          ],
-          "row_count": 99,
-          "columns": {
-            "#流水號": {
-              "samples": [
-                "uint",
-                "id",
-                "#融合/解體",
-                "1001",
-                "1002"
-              ]
-            },
-            "數值": {
-              "samples": [
-                "uint",
-                "Value_1",
-                "5000",
-                "8000",
-                "21000"
-              ]
-            },
-            "說明": {
-              "samples": [
-                "#string",
-                "項目",
-                "共鳴狀態持續時間(毫秒)，若無與其他玩家連線，時間到停止共鳴",
-                "移至Effect表\n解體後虛弱時間(毫秒) (虛弱：精力鎖在0、無法使用共鳴)",
-                "融合連線距離(萬分之一)"
-              ]
-            },
-            "Col_3": {
-              "samples": []
-            },
-            "Col_4": {
-              "samples": []
-            }
-          }
-        },
-        "#數值驗證": {
-          "headers": [
-            "Col_0",
-            "Col_1",
-            "Col_2",
-            "Col_3"
-          ],
-          "row_count": 6,
-          "columns": {
-            "Col_0": {
-              "samples": []
-            },
-            "Col_1": {
-              "samples": [
-                "X (基數)",
-                "Y (被破壞塔數)",
-                "Z (時間)",
-                "總時間",
-                "開根號"
-              ]
-            },
-            "Col_2": {
-              "samples": [
-                "數值",
-                "5500",
-                "3200",
-                "620"
-              ]
-            },
-            "Col_3": {
-              "samples": [
-                "驗證",
-                "3",
-                "10",
-                "21",
-                "15"
-              ]
-            }
-          }
-        }
-      }
-    },
-    "Building": {
-      "filename": "Building.xlsm",
-      "sheets": {
-        "Building": {
-          "headers": [
-            "#流水號",
-            "說明",
-            "類型",
-            "血量",
-            "掉落表Id",
-            "掉落表Id_Duo限定取得"
-          ],
-          "row_count": 38,
-          "columns": {
-            "#流水號": {
-              "samples": [
-                "uint",
-                "id",
-                "#低資源",
-                "10001",
-                "10002"
-              ]
-            },
-            "說明": {
-              "samples": [
-                "#string",
-                "建築",
-                "無資源建築A",
-                "無資源建築B",
-                "無資源建築C"
-              ]
-            },
-            "類型": {
-              "samples": [
-                "string",
-                "Type",
-                "NoResource",
-                "NoResource",
-                "NoResource"
-              ]
-            },
-            "血量": {
-              "samples": [
-                "uint",
-                "Health",
-                "31",
-                "46",
-                "60"
-              ]
-            },
-            "掉落表Id": {
-              "samples": [
-                "uint",
-                "Loot_Id",
-                "0",
-                "0",
-                "0"
-              ]
-            },
-            "掉落表Id_Duo限定取得": {
-              "samples": [
-                "uint",
-                "Loot_Id_Duo",
-                "10001",
-                "10001",
-                "10001"
-              ]
-            }
-          }
-        },
-        "Building_Turret": {
-          "headers": [
-            "#流水號",
-            "說明",
-            "Skill_Turret_ID",
-            "警戒時間(毫秒)",
-            "攻擊CD(毫秒)",
-            "治療波CD(毫秒)",
-            "治療波治療血量",
-            "庇護圈範圍(半徑公分)",
-            "自身被動效果"
-          ],
-          "row_count": 4,
-          "columns": {
-            "#流水號": {
-              "samples": [
-                "uint",
-                "id",
-                "2001",
-                "2002"
-              ]
-            },
-            "說明": {
-              "samples": [
-                "#string",
-                "物件",
-                "Lv1砲塔",
-                "Lv2砲塔"
-              ]
-            },
-            "Skill_Turret_ID": {
-              "samples": [
-                "uint",
-                "Skill_Turret_ID",
-                "2001",
-                "2002"
-              ]
-            },
-            "警戒時間(毫秒)": {
-              "samples": [
-                "uint",
-                "AlertDuration",
-                "2000",
-                "700"
-              ]
-            },
-            "攻擊CD(毫秒)": {
-              "samples": [
-                "uint",
-                "AttackCD",
-                "1500",
-                "900"
-              ]
-            },
-            "治療波CD(毫秒)": {
-              "samples": [
-                "uint",
-                "HealWaveCD",
-                "90",
-                "90"
-              ]
-            },
-            "治療波治療血量": {
-              "samples": [
-                "uint",
-                "HealingAmount",
-                "1",
-                "1"
-              ]
-            },
-            "庇護圈範圍(半徑公分)": {
-              "samples": [
-                "uint",
-                "FOVRadius",
-                "2000",
-                "2000"
-              ]
-            },
-            "自身被動效果": {
-              "samples": [
-                "string",
-                "Self_Effect_ID",
-                "4902",
-                "4902"
-              ]
-            }
-          }
-        },
-        "Building_MainTurret": {
-          "headers": [
-            "#流水號",
-            "說明",
-            "Skill_Turret_ID",
-            "警戒時間(毫秒)",
-            "攻擊CD(毫秒)",
-            "攻擊前搖時間(毫秒)",
-            "偵測敵人範圍(半徑公分)"
-          ],
-          "row_count": 3,
-          "columns": {
-            "#流水號": {
-              "samples": [
-                "uint",
-                "id",
-                "3001"
-              ]
-            },
-            "說明": {
-              "samples": [
-                "#string",
-                "物件",
-                "主塔"
-              ]
-            },
-            "Skill_Turret_ID": {
-              "samples": [
-                "uint",
-                "Skill_MainTurret_ID",
-                "3001"
-              ]
-            },
-            "警戒時間(毫秒)": {
-              "samples": [
-                "uint",
-                "AlertDuration",
-                "700"
-              ]
-            },
-            "攻擊CD(毫秒)": {
-              "samples": [
-                "uint",
-                "AttackCD",
-                "750"
-              ]
-            },
-            "攻擊前搖時間(毫秒)": {
-              "samples": [
-                "uint",
-                "AttackSetupTime",
-                "600"
-              ]
-            },
-            "偵測敵人範圍(半徑公分)": {
-              "samples": [
-                "uint",
-                "FOVRadius",
-                "2500"
-              ]
-            }
-          }
-        },
-        "Building_UltraCocoon": {
-          "headers": [
-            "#流水號",
-            "說明",
-            "超合融合圈範圍(千分之一)",
-            "異變最大值",
-            "異變值偵測變化頻率(毫秒)",
-            "1人進圈 異變值增加量",
-            "2人進圈 異變值增加量",
-            "3人進圈 異變值增加量",
-            "4人進圈 異變值增加量",
-            "無人進圈 異變值倒扣量",
-            "自身被動效果"
-          ],
-          "row_count": 3,
-          "columns": {
-            "#流水號": {
-              "samples": [
-                "uint",
-                "id",
-                "5001"
-              ]
-            },
-            "說明": {
-              "samples": [
-                "#string",
-                "物件",
-                "超合獸繭"
-              ]
-            },
-            "超合融合圈範圍(千分之一)": {
-              "samples": [
-                "uint",
-                "UltraWaveRadius",
-                "19000"
-              ]
-            },
-            "異變最大值": {
-              "samples": [
-                "uint",
-                "MutationMax",
-                "1000"
-              ]
-            },
-            "異變值偵測變化頻率(毫秒)": {
-              "samples": [
-                "uint",
-                "MutationCheckTickInterval",
-                "100"
-              ]
-            },
-            "1人進圈 異變值增加量": {
-              "samples": [
-                "uint",
-                "MutationGain1P",
-                "5"
-              ]
-            },
-            "2人進圈 異變值增加量": {
-              "samples": [
-                "uint",
-                "MutationGain2P",
-                "11"
-              ]
-            },
-            "3人進圈 異變值增加量": {
-              "samples": [
-                "uint",
-                "MutationGain3P",
-                "28"
-              ]
-            },
-            "4人進圈 異變值增加量": {
-              "samples": [
-                "uint",
-                "MutationGain4P",
-                "60"
-              ]
-            },
-            "無人進圈 異變值倒扣量": {
-              "samples": [
-                "uint",
-                "MutationDecayNoInput",
-                "10"
-              ]
-            },
-            "自身被動效果": {
-              "samples": [
-                "string",
-                "Self_Effect_ID",
-                "4802"
-              ]
-            }
-          }
-        },
-        "Building_Fountain": {
-          "headers": [
-            "#流水號",
-            "說明",
-            "治療回血量",
-            "治療間隔時間(毫秒)",
-            "Damage_ID",
-            "傷害間隔時間(毫秒)"
-          ],
-          "row_count": 3,
-          "columns": {
-            "#流水號": {
-              "samples": [
-                "uint",
-                "id",
-                "4001"
-              ]
-            },
-            "說明": {
-              "samples": [
-                "#string",
-                "物件",
-                "溫泉"
-              ]
-            },
-            "治療回血量": {
-              "samples": [
-                "uint",
-                "HealAmount",
-                "7"
-              ]
-            },
-            "治療間隔時間(毫秒)": {
-              "samples": [
-                "uint",
-                "HealInterval",
-                "100"
-              ]
-            },
-            "Damage_ID": {
-              "samples": [
-                "uint",
-                "Damage_ID",
-                "50004"
-              ]
-            },
-            "傷害間隔時間(毫秒)": {
-              "samples": [
-                "uint",
-                "DamageInterval",
-                "100"
-              ]
-            }
-          }
-        }
-      }
-    },
-    "DropObject": {
-      "filename": "DropObject.xlsm",
-      "sheets": {
-        "DropObject": {
-          "headers": [
-            "#流水號",
-            "說明",
-            "Parameter",
-            "Parameter",
-            "Value",
-            "存在時間(秒)",
-            "掉落表Id_Solo吃掉取得",
-            "掉落表Id_融合獸吃掉取得"
-          ],
-          "row_count": 30,
-          "columns": {
-            "#流水號": {
-              "samples": [
-                "uint",
-                "id",
-                "#能量",
-                "1001",
-                "1002"
-              ]
-            },
-            "說明": {
-              "samples": [
-                "#string",
-                "name",
-                "共鳴能量球",
-                "超共鳴能量球",
-                "補血"
-              ]
-            },
-            "Parameter": {
-              "samples": [
-                "uint",
-                "dropObjectParameter",
-                "1",
-                "1",
-                "3"
-              ]
-            },
-            "Value": {
-              "samples": [
-                "uint",
-                "Value",
-                "1",
-                "1",
-                "101"
-              ]
-            },
-            "存在時間(秒)": {
-              "samples": [
-                "uint",
-                "Lifetime",
-                "22",
-                "3",
-                "22"
-              ]
-            },
-            "掉落表Id_Solo吃掉取得": {
-              "samples": [
-                "uint",
-                "Loot_Id_Solo",
-                "0",
-                "0",
-                "0"
-              ]
-            },
-            "掉落表Id_融合獸吃掉取得": {
-              "samples": [
-                "uint",
-                "Loot_Id_Fused",
-                "0",
-                "0",
-                "303"
-              ]
-            }
-          }
-        },
-        "#Enum": {
-          "headers": [
-            "Col_0",
-            "Col_1",
-            "Col_2",
-            "Col_3"
-          ],
-          "row_count": 7,
-          "columns": {
-            "Col_0": {
-              "samples": []
-            },
-            "Col_1": {
-              "samples": [
-                "Null",
-                "數值",
-                "道具",
-                "人類"
-              ]
-            },
-            "Col_2": {
-              "samples": [
-                "dropObjectType",
-                "Null",
-                "Amount",
-                "ItemUsage_Id",
-                "NeutralUnits_Id"
-              ]
-            },
-            "Col_3": {
-              "samples": [
-                "Value",
-                "0",
-                "1",
-                "3",
-                "4"
-              ]
-            }
-          }
-        }
-      }
-    },
-    "Language": {
-      "filename": "Language.xlsm",
-      "sheets": {
-        "Language_c": {
-          "headers": [
-            "#編號",
-            "用途說明",
-            "參數總數(不需手動填寫)",
-            "參數定義",
-            "英文",
-            "繁中",
-            "簡中",
-            "日文",
-            "韓文"
-          ],
-          "row_count": 188,
-          "columns": {
-            "#編號": {
-              "samples": [
-                "uint",
-                "id",
-                "#Test",
-                "101",
-                "102"
-              ]
-            },
-            "用途說明": {
-              "samples": [
-                "#string",
-                "Original"
-              ]
-            },
-            "參數總數(不需手動填寫)": {
-              "samples": [
-                "uint",
-                "IndexCount",
-                "0",
-                "0",
-                "0"
-              ]
-            },
-            "參數定義": {
-              "samples": [
-                "#string",
-                "IndexInfo",
-                "{0} = 測試文字"
-              ]
-            },
-            "英文": {
-              "samples": [
-                "string",
-                "En",
-                "Gidora {0} Startup",
-                "Enter Game",
-                "FIRST CRACK!"
-              ]
-            },
-            "繁中": {
-              "samples": [
-                "#string",
-                "Cht"
-              ]
-            },
-            "簡中": {
-              "samples": [
-                "#string",
-                "Chs"
-              ]
-            },
-            "日文": {
-              "samples": [
-                "#string",
-                "Jp"
-              ]
-            },
-            "韓文": {
-              "samples": [
-                "#string",
-                "Kr"
-              ]
-            }
-          }
-        },
-        "#填值規範": {
-          "headers": [
-            "1.大括號合法性\n\n-  {{0}}  → 合法，最外層以外的括弧分別代表字面上的  {  與  } 。\n-  {...}  必須成對，孤立的  }  或缺少  }  → **非法**。\n\n2. 索引格式\n\n-  {...}  內部僅允許 **純數字**（ 0–9 ）。\n- 不允許：\n    - 空白（如  { 0} 、 {0 } ）\n    - 字母（如  {A} ）\n    - 符號  + - , : . （如  {+1} 、 {-1} 、 {1,10} 、 {0:N2} ）\n    - 非 ASCII 數字（全形數字等）\n    - 空字串  {} \n    - 超出  int  範圍的大數字\n- **禁止前導零**：長度 > 1 且第一位為  0  視為非法。\n    -  {0}  ✅\n    -  {01}  ❌\n    -  {002}  ❌\n\n3. 索引集合完整性\n\n- 索引必須從 **0 開始**。\n- 若最大索引為  maxIndex ，則必須包含 **0~maxIndex** 全部索引，不能缺失索引。\n- 可以不依順序出現在字串中。\n- 索引允許重複",
-            "Col_1",
-            "Col_2",
-            "Col_3",
-            "Col_4",
-            "Col_5",
-            "Col_6",
-            "Col_7",
-            "Col_8",
-            "Col_9",
-            "Col_10",
-            "Col_11",
-            "Col_12"
-          ],
-          "row_count": 28,
-          "columns": {
-            "1.大括號合法性\n\n-  {{0}}  → 合法，最外層以外的括弧分別代表字面上的  {  與  } 。\n-  {...}  必須成對，孤立的  }  或缺少  }  → **非法**。\n\n2. 索引格式\n\n-  {...}  內部僅允許 **純數字**（ 0–9 ）。\n- 不允許：\n    - 空白（如  { 0} 、 {0 } ）\n    - 字母（如  {A} ）\n    - 符號  + - , : . （如  {+1} 、 {-1} 、 {1,10} 、 {0:N2} ）\n    - 非 ASCII 數字（全形數字等）\n    - 空字串  {} \n    - 超出  int  範圍的大數字\n- **禁止前導零**：長度 > 1 且第一位為  0  視為非法。\n    -  {0}  ✅\n    -  {01}  ❌\n    -  {002}  ❌\n\n3. 索引集合完整性\n\n- 索引必須從 **0 開始**。\n- 若最大索引為  maxIndex ，則必須包含 **0~maxIndex** 全部索引，不能缺失索引。\n- 可以不依順序出現在字串中。\n- 索引允許重複": {
-              "samples": []
-            },
-            "Col_1": {
-              "samples": []
-            },
-            "Col_2": {
-              "samples": []
-            },
-            "Col_3": {
-              "samples": []
-            },
-            "Col_4": {
-              "samples": []
-            },
-            "Col_5": {
-              "samples": []
-            },
-            "Col_6": {
-              "samples": []
-            },
-            "Col_7": {
-              "samples": []
-            },
-            "Col_8": {
-              "samples": []
-            },
-            "Col_9": {
-              "samples": []
-            },
-            "Col_10": {
-              "samples": []
-            },
-            "Col_11": {
-              "samples": [
-                "合法範例",
-                "格式字串",
-                "{0}",
-                "{0}{1}{2}",
-                "{2}{0}{1}{1}"
-              ]
-            },
-            "Col_12": {
-              "samples": [
-                "說明",
-                "單一索引 0",
-                "最大索引 2 → 有 0,1,2",
-                "有 0,1,2，允許重複",
-                "{{0}} → 字面 {0}，實際索引 {0}"
-              ]
-            }
-          }
-        }
-      }
-    },
-    "Entity": {
-      "filename": "Entity.xlsm",
-      "sheets": {
-        "Entity": {
-          "headers": [
-            "#流水號",
-            "說明",
-            "名字",
-            "說明",
-            "Col_4"
-          ],
-          "row_count": 10,
-          "columns": {
-            "#流水號": {
-              "samples": [
-                "uint",
-                "id",
-                "1",
-                "2",
-                "3"
-              ]
-            },
-            "說明": {
-              "samples": [
-                "#string",
-                "表單",
-                "Kaiju_Solo",
-                "Kaiju_Fused",
-                "Building"
-              ]
-            },
-            "名字": {
-              "samples": [
-                "#enum",
-                "EntityType",
-                "SoloKaiju",
-                "FusedKaiju",
-                "Building"
-              ]
-            },
-            "Col_4": {
-              "samples": []
-            }
-          }
-        },
-        "#@EntityType": {
-          "headers": [
-            "#名字",
-            "#流水號",
-            "說明"
-          ],
-          "row_count": 11,
-          "columns": {
-            "#名字": {
-              "samples": [
-                "enum",
-                "#Type",
-                "Unknow",
-                "SoloKaiju",
-                "FusedKaiju"
-              ]
-            },
-            "#流水號": {
-              "samples": [
-                "uint",
-                "#id",
-                "0",
-                "1",
-                "2"
-              ]
-            },
-            "說明": {
-              "samples": [
-                "#string",
-                "職業",
-                "未知",
-                "單人獸",
-                "合成獸"
-              ]
-            }
-          }
-        }
-      }
-    },
-    "Broadcast": {
-      "filename": "Broadcast.xlsm",
-      "sheets": {
-        "Broadcast": {
-          "headers": [
-            "#編號",
-            "道具名稱"
-          ],
-          "row_count": 15,
-          "columns": {
-            "#編號": {
-              "samples": [
-                "uint",
-                "id",
-                "# In-game ",
-                "1001",
-                "1002"
-              ]
-            },
-            "道具名稱": {
-              "samples": [
-                "#string",
-                "context",
-                "首殺 (不論是敵我任一方達成)",
-                "敵方全滅時",
-                "我方隊伍完成雙殺 (每一殺相隔10秒內"
-              ]
-            }
-          }
-        },
-        "Broadcast_c": {
-          "headers": [
-            "#編號",
-            "道具名稱",
-            "字串id"
-          ],
-          "row_count": 15,
-          "columns": {
-            "#編號": {
-              "samples": [
-                "uint",
-                "id",
-                "# In-game ",
-                "1001",
-                "1002"
-              ]
-            },
-            "道具名稱": {
-              "samples": [
-                "#string",
-                "context",
-                "首殺 (不論是敵我任一方達成)",
-                "敵方全滅時",
-                "我方隊伍完成雙殺 (每一殺相隔10秒內"
-              ]
-            },
-            "字串id": {
-              "samples": [
-                "string",
-                "StringId",
-                "1001",
-                "1002",
-                "1003"
-              ]
-            }
-          }
-        }
-      }
-    },
     "Spawner": {
       "filename": "Spawner.xlsm",
       "sheets": {
@@ -6957,7 +6417,6 @@
             "EntityType",
             "說明",
             "生產單位",
-            "Loot生產ID",
             "生產上限"
           ],
           "row_count": 24,
@@ -6998,15 +6457,6 @@
                 "4001 | 4002"
               ]
             },
-            "Loot生產ID": {
-              "samples": [
-                "uint",
-                "Loot_Id",
-                "11001",
-                "11002",
-                "11003"
-              ]
-            },
             "生產上限": {
               "samples": [
                 "uint",
@@ -7020,104 +6470,75 @@
         }
       }
     },
-    "Item": {
-      "filename": "Item.xlsm",
+    "Stage": {
+      "filename": "Stage.xlsm",
       "sheets": {
-        "Item_Usage": {
+        "Stage": {
+          "headers": [
+            "#UUID",
+            "Json File Name",
+            "Airdrop_Pattern_id"
+          ],
+          "row_count": 5,
+          "columns": {
+            "#UUID": {
+              "samples": [
+                "uint",
+                "id",
+                "10001",
+                "10002",
+                "10003"
+              ]
+            },
+            "Json File Name": {
+              "samples": [
+                "string",
+                "StageName",
+                "Stage001",
+                "Stage002",
+                "Stage003"
+              ]
+            },
+            "Airdrop_Pattern_id": {
+              "samples": [
+                "uint",
+                "Airdrop_Pattern_id",
+                "101",
+                "101",
+                "101"
+              ]
+            }
+          }
+        },
+        "Stage_Stage002_Rule": {
           "headers": [
             "#流水號",
-            "Item_ID",
-            "道具名稱",
             "說明",
-            "Parameter",
-            "Parameter",
-            "Value"
+            "數值"
           ],
-          "row_count": 33,
+          "row_count": 4,
           "columns": {
             "#流水號": {
               "samples": [
                 "uint",
                 "id",
-                "#稀有度：1星",
-                "10101",
-                "10201"
-              ]
-            },
-            "Item_ID": {
-              "samples": [
-                "uint",
-                "Item_ID",
-                "101",
-                "102",
-                "103"
-              ]
-            },
-            "道具名稱": {
-              "samples": [
-                "#string",
-                "itme_Name",
-                "補血",
-                "追蹤飛彈",
-                "炸彈"
+                "1101",
+                "1102"
               ]
             },
             "說明": {
               "samples": [
-                "#uint",
-                "depiction",
-                "立即回血量",
-                "Skill_Item_HomingMissile",
-                "Skill_Item_Bomb"
+                "#string",
+                "橋開啟條件1：場景內房屋破壞率達標(%)",
+                "橋開啟條件2：遊戲時間超過多久(秒)"
               ]
             },
-            "Parameter": {
+            "數值": {
               "samples": [
                 "uint",
-                "ItemParameter",
-                "12",
-                "2",
-                "2"
-              ]
-            },
-            "Value": {
-              "samples": [
-                "string",
-                "Value",
-                "100",
-                "1001",
-                "1001"
-              ]
-            }
-          }
-        },
-        "#Enum": {
-          "headers": [
-            "Col_0",
-            "Col_1",
-            "Col_2"
-          ],
-          "row_count": 14,
-          "columns": {
-            "Col_0": {
-              "samples": []
-            },
-            "Col_1": {
-              "samples": [
-                "ItemParameter",
-                "enum",
-                "None",
-                "Amount",
-                "Skill_ID"
-              ]
-            },
-            "Col_2": {
-              "samples": [
-                "uint",
-                "0",
-                "1",
-                "2",
-                "3"
+                "Value_1",
+                "25",
+                "180"
               ]
             }
           }
