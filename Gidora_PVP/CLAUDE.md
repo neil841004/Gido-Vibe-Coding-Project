@@ -154,6 +154,7 @@ PVE CPU 規範：
 | Dragon B | PVP debug 仍可用方向鍵；一般測試模式方向鍵優先給 Dragon A | 右側數字鍵 `1/2/3/4` (`Numpad1~4`) | 右側數字鍵 `5/6/7/8` (`Numpad5~8`) |
 
 Dragon A P1 仍保留滑鼠左鍵 Melee、滑鼠右鍵蓄力、滑鼠位置瞄準。
+滑鼠點擊若落在 UI 介面區（左側按鈕 / 測試條、右上 Buff 面板、PVP/PVE overlay、表單控制項等），不會觸發 Melee 或蓄力，只處理 UI 互動。
 
 ### PVP 指派後輸入
 

@@ -14,6 +14,13 @@ function setupInputs() {
 
     const keyboardDevice = { type: 'keyboard', id: 'keyboard', label: 'Keyboard / Mouse' };
 
+    const isPointerOnGameUI = (target) => {
+        if (!target || !target.closest) return false;
+        return !!target.closest(
+            '#info, #buff-panel, #pvp-setup-overlay, #pvp-result-overlay, #mystery-box-overlay, button, input, select, textarea, label'
+        );
+    };
+
     const setKey = (e, isDown) => {
         keys[e.code] = isDown;
         if (e.code && e.code.startsWith('Arrow')) e.preventDefault();
@@ -46,6 +53,11 @@ function setupInputs() {
     window.addEventListener('mousedown', (e) => {
         SoundSystem.init();
         mousePos.set(e.clientX, e.clientY);
+        if (isPointerOnGameUI(e.target)) {
+            if (e.button === 0) mouseAttack = false;
+            if (e.button === 2) mouseCharge = false;
+            return;
+        }
         const isPvpSetupClick = e.target && e.target.closest && e.target.closest('#pvp-setup-overlay');
         if (!isPvpSetupClick && state.pvp && state.pvp.configuring && typeof window.pvpSetPendingDevice === 'function') {
             window.pvpSetPendingDevice(keyboardDevice);
