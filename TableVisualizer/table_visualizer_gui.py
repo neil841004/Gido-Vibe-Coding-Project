@@ -1725,7 +1725,6 @@ class RelationGraphView(BaseGraphView):
         self.config_manager = config_manager
         self.excel_handler = excel_handler
         self.font_size = 10
-        self.edit_mode = False  # v3.13 編輯模式狀態
         self.center_node_data = None  # 保存中心節點數據
         self.all_nodes_map = {}  # 保存所有節點映射
         self.show_empty_state()
@@ -1884,8 +1883,6 @@ class RelationGraphView(BaseGraphView):
         
         if reset_view:
             self.fitInView(self.scene.sceneRect(), Qt.AspectRatioMode.KeepAspectRatio)
-        
-        self.update_edit_mode_ui()
 
     def on_node_clicked(self, item):
         self.details_requested.emit(item.node_data)
@@ -1904,84 +1901,10 @@ class RelationGraphView(BaseGraphView):
              self.fitInView(self.scene.sceneRect(), Qt.AspectRatioMode.KeepAspectRatio)
 
     def on_node_moved(self, item): pass
+
     def on_node_double_clicked(self, node_item):
-        """雙擊節點打開快速編輯窗口"""
-        mw = self.window()
-        if mw and hasattr(mw, 'excel_handler'):
-            dialog = QuickEditDialog(
-                mw,
-                node_item.node_data['filename'],
-                node_item.node_data['sheet'],
-                mw.excel_handler
-            )
-            dialog.exec()
-    
-    def toggle_edit_mode(self):
-        """切換編輯模式 (v3.13)"""
-        self.edit_mode = not self.edit_mode
-        self.update_edit_mode_ui()
-        return self.edit_mode
-    
-    def update_edit_mode_ui(self):
-        """更新編輯模式 UI (v3.13)"""
-        for item in self.scene.items():
-            if isinstance(item, GraphEdgeItem):
-                item.set_edit_mode(self.edit_mode)
-            elif isinstance(item, GraphNodeItem):
-                item.set_edit_mode(self.edit_mode)
-    
-    def remove_relation(self, from_id, to_id):
-        """移除關聯 (v3.13, v3.16 partial update)"""
-        mw = self.window()
-        if not mw or not hasattr(mw, 'user_rel_manager'):
-            return
-        
-        # 使用 UserRelationManager 移除關聯
-        mw.user_rel_manager.remove_relation(from_id, to_id)
-        
-        # Update local edges
-        self.all_edges = [e for e in self.all_edges if not (e['from'] == from_id and e['to'] == to_id)]
-        
-        # Partial refresh (no view reset)
-        self.show_relations(self.center_node_data, self.all_edges, self.all_nodes_map, self.font_size, reset_view=False)
-    
-    def show_add_relation_dialog(self, node_data):
-        """顯示添加關聯對話框 (v3.13, v3.16 partial update)"""
-        if not self.center_node_data:
-            return
-        
-        dialog = AddRelationDialog(
-            self.window(),
-            node_data,
-            self.center_node_data,
-            self.all_nodes_map,
-            self.window().user_rel_manager if hasattr(self.window(), 'user_rel_manager') else None
-        )
-        
-        if dialog.exec() == QDialog.DialogCode.Accepted:
-            # 獲取剛添加的關聯
-            mw = self.window()
-            if hasattr(mw, 'user_rel_manager') and mw.user_rel_manager.relations['added']:
-                last_added = mw.user_rel_manager.relations['added'][-1]
-                # Construct edge dict
-                new_edge = {
-                    'from': last_added['from'],
-                    'to': last_added['to'],
-                    'type': last_added['type'],
-                    'label': last_added['label'],
-                    'column': 'Manual'
-                }
-                # Check duplication
-                exists = False
-                for e in self.all_edges:
-                    if e['from'] == new_edge['from'] and e['to'] == new_edge['to']:
-                        exists = True
-                        break
-                if not exists:
-                    self.all_edges.append(new_edge)
-            
-            # Partial refresh (no view reset)
-            self.show_relations(self.center_node_data, self.all_edges, self.all_nodes_map, self.font_size, reset_view=False)
+        """雙擊節點：於右欄顯示該表格的 Quick Browse。"""
+        self.details_requested.emit(node_item.node_data)
 
 
 class DetailsPanel(QWidget):
@@ -2775,6 +2698,17 @@ class FlowLayout(QLayout):
         return y + line_height - rect.y()
 
 
+class ClickableLabel(QLabel):
+    """可點擊的標籤（用於分組標題：點擊改變該表格顏色）。"""
+
+    clicked = pyqtSignal()
+
+    def mouseReleaseEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton and self.rect().contains(event.pos()):
+            self.clicked.emit()
+        super().mouseReleaseEvent(event)
+
+
 class TableCard(QFrame):
     """單一工作表卡片，可點選 / 雙擊。"""
 
@@ -2906,6 +2840,7 @@ class TableBrowserView(QWidget):
     node_selected = pyqtSignal(dict)
     node_deselected = pyqtSignal()
     node_double_clicked = pyqtSignal(dict)
+    table_color_requested = pyqtSignal(str)  # 點擊分組標題 → 變更該表格顏色
 
     def __init__(self, parent, config_manager, excel_handler):
         super().__init__(parent)
@@ -2978,10 +2913,13 @@ class TableBrowserView(QWidget):
         h.setContentsMargins(0, 0, 0, 0)
         h.setSpacing(10)
 
-        header = QLabel()
+        header = ClickableLabel()
         header.setFixedWidth(GROUP_LABEL_WIDTH)
         header.setWordWrap(True)
         header.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignHCenter)
+        header.setCursor(Qt.CursorShape.PointingHandCursor)
+        header.setToolTip("點擊變更此表格顏色")
+        header.clicked.connect(lambda t=table: self.table_color_requested.emit(t))
         self._style_header(header, table, len(sheets), color)
         h.addWidget(header, 0)
 
@@ -3102,6 +3040,183 @@ class TableBrowserView(QWidget):
                 card.set_font_size(size)
 
 
+class QuickBrowsePanel(QWidget):
+    """右欄：選取 / 雙擊表格時即時顯示該工作表完整內容（含 Excel 顏色），可儲存與在 Excel 開啟。"""
+
+    def __init__(self, excel_handler, config_manager):
+        super().__init__()
+        self.excel_handler = excel_handler
+        self.config_manager = config_manager
+        self.current_node_data = None
+        self.filename = None
+        self.sheet = None
+        self.dirty_cells = {}  # (row, col) -> new_value
+        self.init_ui()
+
+    def init_ui(self):
+        layout = QVBoxLayout(self)
+
+        top = QHBoxLayout()
+        self.lbl_title = QLabel()
+        self.lbl_title.setWordWrap(True)
+        top.addWidget(self.lbl_title, 1)
+
+        self.save_btn = QPushButton("Save to Excel")
+        self.save_btn.clicked.connect(self.save)
+        top.addWidget(self.save_btn)
+
+        self.open_excel_btn = QPushButton("Open in Excel")
+        self.open_excel_btn.clicked.connect(self.open_in_excel)
+        top.addWidget(self.open_excel_btn)
+        layout.addLayout(top)
+
+        self.table = QTableWidget()
+        self.table.cellChanged.connect(self.on_cell_changed)
+        layout.addWidget(self.table)
+
+        self.lbl_status = QLabel()
+        layout.addWidget(self.lbl_status)
+
+        self.clear()
+
+    def clear(self):
+        self.current_node_data = None
+        self.filename = None
+        self.sheet = None
+        self.dirty_cells = {}
+        self.table.blockSignals(True)
+        self.table.clear()
+        self.table.setRowCount(0)
+        self.table.setColumnCount(0)
+        self.table.blockSignals(False)
+        self.lbl_title.setText("Select a table")
+        self.lbl_status.setText("")
+        self.save_btn.setEnabled(False)
+        self.open_excel_btn.setEnabled(False)
+
+    def show_node(self, node_data):
+        # 重複選取同一節點時不重載，避免覆蓋未儲存的編輯
+        if self.current_node_data and self.current_node_data.get('id') == node_data.get('id'):
+            return
+        self.current_node_data = node_data
+        self.filename = node_data['filename']
+        self.sheet = node_data['sheet']
+        self.lbl_title.setText(f"{node_data['table']} > {node_data['sheet']}")
+        self.save_btn.setEnabled(True)
+        self.open_excel_btn.setEnabled(True)
+        self.load_data()
+
+    def load_data(self):
+        if not self.current_node_data:
+            return
+        self.table.blockSignals(True)
+        try:
+            headers, data, header_colors, data_colors = \
+                self.excel_handler.get_all_sheet_data_with_colors(self.filename, self.sheet)
+        except Exception as e:
+            self.table.blockSignals(False)
+            QMessageBox.warning(self, "Read Error", str(e))
+            return
+
+        self.table.clear()
+        self.table.setColumnCount(len(headers))
+        self.table.setRowCount(len(data))
+        self.table.setHorizontalHeaderLabels(headers)
+
+        # 套用標題列顏色 (與 Excel 一致)
+        for c, hdr in enumerate(headers):
+            hex_color = header_colors[c] if c < len(header_colors) else None
+            if hex_color:
+                hitem = QTableWidgetItem(str(hdr))
+                hitem.setBackground(QColor(hex_color))
+                hitem.setForeground(QColor(self._contrast_text_color(hex_color)))
+                self.table.setHorizontalHeaderItem(c, hitem)
+
+        for r, row_data in enumerate(data):
+            row_colors = data_colors[r] if r < len(data_colors) else []
+            for c, val in enumerate(row_data):
+                if c < len(headers):
+                    item = QTableWidgetItem(str(val))
+                    hex_color = row_colors[c] if c < len(row_colors) else None
+                    if hex_color:
+                        item.setBackground(QColor(hex_color))
+                        item.setForeground(QColor(self._contrast_text_color(hex_color)))
+                    self.table.setItem(r, c, item)
+
+        self.table.setFont(QFont(FONT_FAMILY, self.config_manager.get_global_font_size()))
+
+        self.table.resizeColumnsToContents()
+        for c in range(self.table.columnCount()):
+            if self.table.columnWidth(c) > 300:
+                self.table.setColumnWidth(c, 300)
+
+        self.table.blockSignals(False)
+        self.dirty_cells.clear()
+        self.lbl_status.setText("Tips: 雙擊儲存格可編輯，按 Save to Excel 寫回。")
+
+    @staticmethod
+    def _contrast_text_color(hex_color):
+        """依背景亮度回傳黑或白文字色，確保可讀性。"""
+        try:
+            h = hex_color.lstrip('#')
+            r, g, b = int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
+            luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255.0
+            return "#000000" if luminance > 0.5 else "#FFFFFF"
+        except Exception:
+            return "#000000"
+
+    def on_cell_changed(self, row, col):
+        item = self.table.item(row, col)
+        if item is None:
+            return
+        self.dirty_cells[(row, col)] = item.text()
+        self.lbl_status.setText(f"Pending changes: {len(self.dirty_cells)}")
+
+    def open_in_excel(self):
+        if not self.current_node_data:
+            return
+        try:
+            self.excel_handler.open_sheet(self.filename, self.sheet)
+        except Exception as e:
+            QMessageBox.warning(self, "Error", f"無法開啟 Excel：{e}")
+
+    def save(self):
+        if not self.current_node_data:
+            return
+        if not self.dirty_cells:
+            QMessageBox.information(self, "Info", "No changes to save.")
+            return
+
+        self.table.setEnabled(False)
+        self.lbl_status.setText("Saving changes to Excel...")
+        QApplication.processEvents()
+
+        success_count = 0
+        errors = []
+        for (r, c), val in self.dirty_cells.items():
+            # header 為第 1 列，資料自第 2 列起；欄為 1-based
+            excel_row = r + 2
+            excel_col = c + 1
+            ok, msg = self.excel_handler.update_cell_value(
+                self.filename, self.sheet, excel_col, excel_row, val
+            )
+            if ok:
+                success_count += 1
+            else:
+                errors.append(f"({r},{c}): {msg}")
+
+        self.table.setEnabled(True)
+        self.dirty_cells.clear()
+
+        if errors:
+            QMessageBox.warning(self, "Partial Success",
+                                f"Saved {success_count} cells.\nErrors:\n" + "\n".join(errors[:5]))
+        else:
+            QMessageBox.information(self, "Success", f"{success_count} cells updated successfully.")
+        # 重新載入以反映最新內容
+        self.load_data()
+
+
 class MainWindow(QMainWindow):
     # ... init ...
     
@@ -3113,11 +3228,8 @@ class MainWindow(QMainWindow):
         self.load_and_init()
         
     def open_quick_edit_dialog(self, node_data):
-        dlg = QuickEditDialog(self, node_data['filename'], node_data['sheet'], self.excel_handler)
-        dlg.exec()
-        # Refresh details if currently showing same node
-        if self.details.current_node_data and self.details.current_node_data['id'] == node_data['id']:
-             self.details.load_data()
+        # 雙擊：直接於右欄顯示 Quick Browse
+        self.details.show_node(node_data)
 
     def __init__(self):
         super().__init__()
@@ -3349,6 +3461,7 @@ class MainWindow(QMainWindow):
         self.main_view.node_selected.connect(self.on_main_node_selected)
         self.main_view.node_deselected.connect(self.on_main_node_deselected)
         self.main_view.node_double_clicked.connect(self.open_quick_edit_dialog)
+        self.main_view.table_color_requested.connect(self.on_table_color_requested)
         
         self.relation_view = RelationGraphView(self, self.config_manager, self.excel_handler)
         self.relation_view.details_requested.connect(self.on_relation_details_requested)
@@ -3356,17 +3469,13 @@ class MainWindow(QMainWindow):
         # Relation container always visible now
         self.relation_view_container = QWidget()
         rv_layout = QVBoxLayout(self.relation_view_container)
-        
-        # Relation View 標題和編輯按鈕 (v3.13)
+
+        # Relation View 標題
         rv_header = QHBoxLayout()
         rv_header.addWidget(QLabel("Relation View"))
         rv_header.addStretch()
-        self.relation_edit_btn = QPushButton("編輯模式")
-        self.relation_edit_btn.setCheckable(True)
-        self.relation_edit_btn.clicked.connect(self.on_toggle_relation_edit_mode)
-        rv_header.addWidget(self.relation_edit_btn)
         rv_layout.addLayout(rv_header)
-        
+
         rv_layout.addWidget(self.relation_view)
         
         self.v_splitter.addWidget(self.main_view)
@@ -3374,9 +3483,8 @@ class MainWindow(QMainWindow):
         
         self.h_splitter.addWidget(self.v_splitter)
         
-        self.details = DetailsPanel(self.excel_handler, self.config_manager)
-        self.details.color_changed.connect(self.refresh_colors)
-        
+        self.details = QuickBrowsePanel(self.excel_handler, self.config_manager)
+
         self.h_splitter.addWidget(self.details)
         
         # Restore Splitter
@@ -3452,10 +3560,14 @@ class MainWindow(QMainWindow):
             
             QMessageBox.information(self, "成功", f"Excel 目錄已變更為：\n{new_dir}\n\n數據已重新載入。")
 
-    def on_toggle_relation_edit_mode(self):
-        """切換 Relation View 編輯模式 (v3.13)"""
-        is_edit_mode = self.relation_view.toggle_edit_mode()
-        self.relation_edit_btn.setText("退出編輯" if is_edit_mode else "編輯模式")
+    def on_table_color_requested(self, table):
+        """點擊主視窗分組標題：跳出顏色選擇視窗並套用至該表格。"""
+        curr = QColor(self.config_manager.get_table_color(table))
+        c = QColorDialog.getColor(curr, self, f"選擇 {table} 的顏色")
+        if c.isValid():
+            self.config_manager.set_table_color(table, c.name())
+            self.config_manager.save_config()
+            self.refresh_colors()
 
     def on_main_node_selected(self, data):
         self.relation_view.show_relations(data, self.graph_data['edges'], self.all_nodes_map, self.font_size)

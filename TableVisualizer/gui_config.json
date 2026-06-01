@@ -285,7 +285,9 @@
     "Skill": "#479e85",
     "SpawnedObject": "#9e946b",
     "Spawner": "#9e629e",
-    "Stage": "#9e5555"
+    "Stage": "#9e5555",
+    "UltraMutation": "#50ae37",
+    "EventTracking": "#aea04e"
   },
   "sheet_settings": {
     "Item.Item_Usage": {
@@ -384,18 +386,18 @@
   },
   "layout_settings": {
     "h_splitter": [
-      1126,
-      1403
+      809,
+      945
     ],
     "v_splitter": [
-      780,
-      525
+      629,
+      423
     ]
   },
   "window_state": {
-    "width": 2560,
-    "height": 1387,
-    "maximized": true
+    "width": 1785,
+    "height": 1134,
+    "maximized": false
   },
   "global_settings": {
     "font_size": 14
