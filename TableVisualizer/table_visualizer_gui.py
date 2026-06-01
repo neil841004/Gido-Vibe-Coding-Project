@@ -31,8 +31,8 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, QRect, QRectF, QPoint, QPointF, QLineF, pyqtSignal, QTimer, QSize, QEvent
 from PyQt6.QtGui import (
-    QPainter, QPen, QBrush, QColor, QPainterPath, QFont,
-    QTransform, QPolygonF, QIcon, QAction
+    QPainter, QPen, QBrush, QColor, QPainterPath, QFont, QFontMetrics,
+    QTransform, QPolygonF, QIcon, QAction, QShortcut, QKeySequence
 )
 
 from config_manager import ConfigManager
@@ -46,6 +46,8 @@ NODE_RADIUS = 5
 FONT_FAMILY = "Segoe UI"
 GRID_SIZE = 20
 GROUP_LABEL_WIDTH = 120  # 分組左側標題欄寬度 (v4.0)
+GROUP_CARDS_BOTTOM_GAP = 14  # 分組卡片區底部留白，避免相鄰表格卡片相撞
+PREVIEW_MAX_COL_WIDTH_DEFAULT = 900  # 右欄預覽欄寬上限預設值（可於 Settings 調整）
 
 COLOR_DEFAULT = "#9E9E9E"
 COLOR_SELECTED = "#FFD700"  # Gold
@@ -261,35 +263,54 @@ class AddRelationDialog(QDialog):
 # --- Settings Dialog ---
 class SettingsDialog(QDialog):
     font_changed = pyqtSignal(int)
-    
-    def __init__(self, parent, current_font_size):
+    preview_col_width_changed = pyqtSignal(int)
+
+    def __init__(self, parent, current_font_size, current_col_width=PREVIEW_MAX_COL_WIDTH_DEFAULT):
         super().__init__(parent)
         self.setWindowTitle("Settings")
-        self.resize(300, 100)
-        
+        self.resize(340, 160)
+
         layout = QVBoxLayout(self)
-        
+
         # Font Size
         layout.addWidget(QLabel("Global Font Size (Live Preview):"))
         font_layout = QHBoxLayout()
         self.font_curr_label = QLabel(str(current_font_size))
-        
+
         self.slider = QSlider(Qt.Orientation.Horizontal)
         self.slider.setRange(8, 24)
         self.slider.setValue(current_font_size)
         self.slider.valueChanged.connect(self.on_slider_change)
-        
+
         font_layout.addWidget(self.slider)
         font_layout.addWidget(self.font_curr_label)
         layout.addLayout(font_layout)
-        
+
+        # 右欄預覽欄寬上限（字數截斷門檻）
+        layout.addWidget(QLabel("Preview Max Column Width (字數截斷門檻):"))
+        col_layout = QHBoxLayout()
+        self.col_curr_label = QLabel(str(current_col_width))
+        self.col_slider = QSlider(Qt.Orientation.Horizontal)
+        self.col_slider.setRange(100, 2000)
+        self.col_slider.setSingleStep(50)
+        self.col_slider.setPageStep(100)
+        self.col_slider.setValue(int(current_col_width))
+        self.col_slider.valueChanged.connect(self.on_col_width_change)
+        col_layout.addWidget(self.col_slider)
+        col_layout.addWidget(self.col_curr_label)
+        layout.addLayout(col_layout)
+
         # Reset Layout button moved to Main Window
-        
+
         layout.addStretch()
-        
+
     def on_slider_change(self, val):
         self.font_curr_label.setText(str(val))
         self.font_changed.emit(val)
+
+    def on_col_width_change(self, val):
+        self.col_curr_label.setText(str(val))
+        self.preview_col_width_changed.emit(val)
 
 # --- Shared Graphics Items ---
 
@@ -2679,15 +2700,18 @@ class FlowLayout(QLayout):
         return size
 
     def _do_layout(self, rect, test_only):
-        x, y = rect.x(), rect.y()
+        # 將 contentsMargins 納入排版與高度計算（heightForWidth 依賴此回傳值）
+        m = self.contentsMargins()
+        eff = rect.adjusted(m.left(), m.top(), -m.right(), -m.bottom())
+        x, y = eff.x(), eff.y()
         line_height = 0
         spacing = self.spacing()
         for item in self._items:
             w = item.sizeHint().width()
             h = item.sizeHint().height()
             next_x = x + w + spacing
-            if next_x - spacing > rect.right() and line_height > 0:
-                x = rect.x()
+            if next_x - spacing > eff.right() and line_height > 0:
+                x = eff.x()
                 y = y + line_height + spacing
                 next_x = x + w + spacing
                 line_height = 0
@@ -2695,7 +2719,8 @@ class FlowLayout(QLayout):
                 item.setGeometry(QRect(QPoint(x, y), QSize(w, h)))
             x = next_x
             line_height = max(line_height, h)
-        return y + line_height - rect.y()
+        # 內容底部 + 下邊距，相對於原始 rect 頂端的總高度
+        return y + line_height - rect.y() + m.bottom()
 
 
 class ClickableLabel(QLabel):
@@ -2710,10 +2735,11 @@ class ClickableLabel(QLabel):
 
 
 class TableCard(QFrame):
-    """單一工作表卡片，可點選 / 雙擊。"""
+    """單一工作表卡片，可點選 / 雙擊 / 中鍵釘選。"""
 
     clicked = pyqtSignal(dict)
     double_clicked = pyqtSignal(dict)
+    pin_requested = pyqtSignal(dict)  # 滾輪中鍵 → 選中並釘選
 
     def __init__(self, node_data, color_hex, font_size, parent=None):
         super().__init__(parent)
@@ -2722,6 +2748,7 @@ class TableCard(QFrame):
         self.color_hex = color_hex
         self.font_size = font_size
         self.selected = False
+        self.pinned = False
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
 
@@ -2730,6 +2757,13 @@ class TableCard(QFrame):
         self._label = QLabel(node_data['sheet'])
         self._label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self._label)
+
+        # 釘選圖示（右上角）
+        self._pin = QLabel("📌", self)
+        self._pin.setStyleSheet("background: transparent;")
+        self._pin.adjustSize()
+        self._pin.setVisible(False)
+
         self._apply_style()
 
     def set_color(self, color_hex):
@@ -2744,6 +2778,21 @@ class TableCard(QFrame):
         if self.selected != selected:
             self.selected = selected
             self._apply_style()
+
+    def set_pinned(self, pinned):
+        if self.pinned != pinned:
+            self.pinned = pinned
+            self._pin.setVisible(pinned)
+            self._reposition_pin()
+
+    def _reposition_pin(self):
+        self._pin.adjustSize()
+        self._pin.move(self.width() - self._pin.width() - 1, 0)
+        self._pin.raise_()
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._reposition_pin()
 
     def _apply_style(self):
         border_color = '#FFD700' if self.selected else 'rgba(255,255,255,0.30)'
@@ -2764,6 +2813,10 @@ class TableCard(QFrame):
         ''')
 
     def mousePressEvent(self, event):
+        if event.button() == Qt.MouseButton.MiddleButton:
+            self.pin_requested.emit(self.node_data)
+            event.accept()
+            return
         event.accept()
 
     def mouseReleaseEvent(self, event):
@@ -2841,6 +2894,7 @@ class TableBrowserView(QWidget):
     node_deselected = pyqtSignal()
     node_double_clicked = pyqtSignal(dict)
     table_color_requested = pyqtSignal(str)  # 點擊分組標題 → 變更該表格顏色
+    node_pin_requested = pyqtSignal(dict)    # 中鍵卡片 → 選中並釘選
 
     def __init__(self, parent, config_manager, excel_handler):
         super().__init__(parent)
@@ -2864,7 +2918,8 @@ class TableBrowserView(QWidget):
         self.content = QWidget()
         self.vbox = QVBoxLayout(self.content)
         self.vbox.setContentsMargins(14, 14, 14, 14)
-        self.vbox.setSpacing(18)
+        # 分組間距為 0，讓左側標題色塊在垂直方向彼此相連、不留空隙
+        self.vbox.setSpacing(0)
         self.vbox.addStretch()
         self.scroll.setWidget(self.content)
 
@@ -2915,10 +2970,11 @@ class TableBrowserView(QWidget):
 
         header = ClickableLabel()
         header.setFixedWidth(GROUP_LABEL_WIDTH)
-        header.setWordWrap(True)
+        header.setWordWrap(False)  # 不換行，過長改以 "..." 省略
+        # 色塊在垂直方向填滿整個分組高度，使相鄰分組標題彼此相連、不留空隙
+        header.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Expanding)
         header.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignHCenter)
         header.setCursor(Qt.CursorShape.PointingHandCursor)
-        header.setToolTip("點擊變更此表格顏色")
         header.clicked.connect(lambda t=table: self.table_color_requested.emit(t))
         self._style_header(header, table, len(sheets), color)
         h.addWidget(header, 0)
@@ -2928,12 +2984,16 @@ class TableBrowserView(QWidget):
         sp.setHeightForWidth(True)
         holder.setSizePolicy(sp)
         flow = FlowLayout(holder, spacing=8)
+        # 底部留白：分組間距為 0 時，避免相鄰表格的卡片上下相撞；
+        # 左側標題色塊因垂直 Expanding 會填滿含此留白的整個高度，仍保持相連。
+        flow.setContentsMargins(0, 0, 0, GROUP_CARDS_BOTTOM_GAP)
 
         group_cards = []
         for n in sheets:
             card = TableCard(n, color, self.font_size)
             card.clicked.connect(lambda nd, c=card: self._select_card(c))
             card.double_clicked.connect(self.node_double_clicked.emit)
+            card.pin_requested.connect(self.node_pin_requested.emit)
             flow.addWidget(card)
             self.cards.append(card)
             group_cards.append(card)
@@ -2948,7 +3008,14 @@ class TableBrowserView(QWidget):
 
     def _style_header(self, header, table, count, color):
         text_color = _contrast_text_color(color)
-        header.setText(f"{table}\n· {count}")
+        # 過長的表格名以 "..." 省略，完整名稱保留在 tooltip
+        title_font = QFont(FONT_FAMILY, self.font_size + 1)
+        title_font.setBold(True)
+        avail = GROUP_LABEL_WIDTH - 20  # 扣除左右 padding 的可用寬度
+        elided = QFontMetrics(title_font).elidedText(
+            table, Qt.TextElideMode.ElideRight, avail)
+        header.setText(f"{elided}\n({count})")
+        header.setToolTip(f"{table}（點擊變更此表格顏色）")
         header.setStyleSheet(f'''
             QLabel {{
                 background-color: {color};
@@ -2957,7 +3024,7 @@ class TableBrowserView(QWidget):
                 font-size: {self.font_size + 1}pt;
                 font-weight: bold;
                 padding: 6px 8px;
-                border-radius: 5px;
+                border-radius: 0px;
             }}
         ''')
 
@@ -2967,6 +3034,56 @@ class TableBrowserView(QWidget):
         self.selected_card = card
         card.set_selected(True)
         self.node_selected.emit(card.node_data)
+
+    def scroll_to_card(self, card):
+        self.scroll.ensureWidgetVisible(card, 50, 50)
+
+    def select_card_by_id(self, node_id):
+        """以節點 id 選中對應卡片（會捲動至可見並發出 node_selected）。"""
+        for card in self.cards:
+            if card.node_data['id'] == node_id:
+                self.scroll_to_card(card)
+                self._select_card(card)
+                return card
+        return None
+
+    def scroll_to_id(self, node_id, center=True):
+        """捲動使指定卡片可見；center=True 時將卡片置於視窗垂直中央。"""
+        for card in self.cards:
+            if card.node_data['id'] == node_id:
+                if center:
+                    vp_h = self.scroll.viewport().height()
+                    y = card.mapTo(self.content, QPoint(0, 0)).y()
+                    target = y - vp_h // 2 + card.height() // 2
+                    self.scroll.verticalScrollBar().setValue(max(0, target))
+                else:
+                    self.scroll_to_card(card)
+                return
+
+    def find_card_by_name(self, name):
+        """依名稱找卡片：先精確比對子表格名稱，再比對表格群組名稱（回傳該組第一張）。"""
+        if not name:
+            return None
+        key = name.strip().lower()
+        for card in self.cards:
+            if card.node_data['sheet'].lower() == key:
+                return card
+        for card in self.cards:
+            if card.node_data['table'].lower() == key:
+                return card
+        return None
+
+    def first_visible_card(self):
+        """回傳目前可見（未被搜尋過濾）的第一張卡片。"""
+        for card in self.cards:
+            if card.isVisible():
+                return card
+        return None
+
+    def set_pinned_ids(self, ids):
+        """更新卡片的釘選標記。"""
+        for card in self.cards:
+            card.set_pinned(card.node_data['id'] in ids)
 
     # --- 側邊索引 ---
     def _refresh_index(self):
@@ -3040,8 +3157,76 @@ class TableBrowserView(QWidget):
                 card.set_font_size(size)
 
 
+class SheetChip(QFrame):
+    """右欄上方的子表格方塊：顯示子表格名稱（含表格顏色），可點擊切換預覽；釘選時右上角顯示圖釘。"""
+
+    clicked = pyqtSignal(dict)
+    unpin_requested = pyqtSignal(str)  # 滾輪中鍵 → 取消釘選（傳 node id）
+
+    def __init__(self, node_data, color_hex, font_size, pinned=False, active=False, parent=None):
+        super().__init__(parent)
+        self.node_data = node_data
+        self.color_hex = color_hex
+        self.font_size = font_size
+        self.pinned = pinned
+        self.active = active
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(12, 6, 12, 6)
+        self._label = QLabel(node_data['sheet'])
+        self._label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(self._label)
+
+        self._pin = QLabel("📌", self)
+        self._pin.setStyleSheet("background: transparent;")
+        self._pin.adjustSize()
+        self._pin.setVisible(pinned)
+
+        self._apply_style()
+
+    def _apply_style(self):
+        border_color = '#FFD700' if self.active else 'rgba(255,255,255,0.30)'
+        border_w = 3 if self.active else 1
+        text_color = _contrast_text_color(self.color_hex)
+        self.setStyleSheet(f'''
+            SheetChip {{
+                background-color: {self.color_hex};
+                border: {border_w}px solid {border_color};
+                border-radius: 6px;
+            }}
+            QLabel {{
+                color: {text_color};
+                background: transparent;
+                font-family: "{FONT_FAMILY}";
+                font-size: {self.font_size}pt;
+            }}
+        ''')
+
+    def _reposition_pin(self):
+        self._pin.adjustSize()
+        self._pin.move(self.width() - self._pin.width() - 1, 0)
+        self._pin.raise_()
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._reposition_pin()
+
+    def mouseReleaseEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton and self.rect().contains(event.pos()):
+            self.clicked.emit(self.node_data)
+        elif event.button() == Qt.MouseButton.MiddleButton:
+            # 中鍵：取消釘選（未釘選的目前預覽方塊則由 unpin_node 自動忽略）
+            self.unpin_requested.emit(self.node_data['id'])
+        super().mouseReleaseEvent(event)
+
+
 class QuickBrowsePanel(QWidget):
     """右欄：選取 / 雙擊表格時即時顯示該工作表完整內容（含 Excel 顏色），可儲存與在 Excel 開啟。"""
+
+    chip_selected = pyqtSignal(dict)  # 點擊上方子表格方塊 → 切換預覽
+    pins_changed = pyqtSignal()       # 釘選清單變動 → 通知主視窗更新卡片標記
 
     def __init__(self, excel_handler, config_manager):
         super().__init__()
@@ -3051,35 +3236,141 @@ class QuickBrowsePanel(QWidget):
         self.filename = None
         self.sheet = None
         self.dirty_cells = {}  # (row, col) -> new_value
+        self.pinned = []       # 釘選的 node_data（依序，僅存於記憶體，關閉 app 即解除）
         self.init_ui()
 
     def init_ui(self):
         layout = QVBoxLayout(self)
 
+        # 上方：子表格方塊（含釘選）+ 操作按鈕
         top = QHBoxLayout()
-        self.lbl_title = QLabel()
-        self.lbl_title.setWordWrap(True)
-        top.addWidget(self.lbl_title, 1)
+        self.chip_bar = QWidget()
+        self.chip_layout = FlowLayout(self.chip_bar, spacing=6)
+        top.addWidget(self.chip_bar, 1)
 
         self.save_btn = QPushButton("Save to Excel")
         self.save_btn.clicked.connect(self.save)
-        top.addWidget(self.save_btn)
+        top.addWidget(self.save_btn, 0, Qt.AlignmentFlag.AlignTop)
 
         self.open_excel_btn = QPushButton("Open in Excel")
         self.open_excel_btn.clicked.connect(self.open_in_excel)
-        top.addWidget(self.open_excel_btn)
+        top.addWidget(self.open_excel_btn, 0, Qt.AlignmentFlag.AlignTop)
         layout.addLayout(top)
 
         self.table = QTableWidget()
         self.table.cellChanged.connect(self.on_cell_changed)
+        # 滾動條常駐，不要自動隱藏。
+        # macOS 原生 overlay 滾動條即使設定 AlwaysOn 仍會淡出隱藏，
+        # 因此額外套用 QScrollBar 樣式，強制改用常駐的自繪滾動條。
+        self.table.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOn)
+        self.table.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOn)
+        self.table.setStyleSheet('''
+            QScrollBar:vertical { width: 14px; background: #2b2b2b; margin: 0; }
+            QScrollBar::handle:vertical { background: #6e6e6e; min-height: 28px; border-radius: 5px; }
+            QScrollBar::handle:vertical:hover { background: #8a8a8a; }
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0; }
+            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical { background: transparent; }
+            QScrollBar:horizontal { height: 14px; background: #2b2b2b; margin: 0; }
+            QScrollBar::handle:horizontal { background: #6e6e6e; min-width: 28px; border-radius: 5px; }
+            QScrollBar::handle:horizontal:hover { background: #8a8a8a; }
+            QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal { width: 0; }
+            QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal { background: transparent; }
+        ''')
         layout.addWidget(self.table)
+
+        # 凍結標題列下方的粗黑分隔線（疊在 viewport 頂端，不影響標題色）。
+        # 滾動時 viewport 會重繪而蓋住此線，故監聽捲動值變化重新定位並置頂。
+        self.header_line = QFrame(self.table.viewport())
+        self.header_line.setStyleSheet("background-color: #000000; border: none;")
+        self.header_line.setFixedHeight(3)
+        self.header_line.hide()
+        self.table.viewport().installEventFilter(self)
+        self.table.verticalScrollBar().valueChanged.connect(self._position_header_line)
+        self.table.horizontalScrollBar().valueChanged.connect(self._position_header_line)
 
         self.lbl_status = QLabel()
         layout.addWidget(self.lbl_status)
 
         self.clear()
 
+    def eventFilter(self, obj, event):
+        if obj is self.table.viewport() and event.type() == QEvent.Type.Resize:
+            self._position_header_line()
+        return super().eventFilter(obj, event)
+
+    def _position_header_line(self):
+        vp = self.table.viewport()
+        self.header_line.setGeometry(0, 0, vp.width(), 3)
+        self.header_line.setVisible(self.table.rowCount() > 0)
+        self.header_line.raise_()
+
+    # --- 釘選模型 ---
+    def pinned_ids(self):
+        return {n['id'] for n in self.pinned}
+
+    def is_pinned(self, node_id):
+        return node_id in self.pinned_ids()
+
+    def pin_node(self, node_data):
+        if not self.is_pinned(node_data['id']):
+            self.pinned.append(node_data)
+            self.rebuild_chips()
+            self.pins_changed.emit()
+
+    def unpin_node(self, node_id):
+        if self.is_pinned(node_id):
+            self.pinned = [n for n in self.pinned if n['id'] != node_id]
+            self.rebuild_chips()
+            self.pins_changed.emit()
+
+    def next_pinned(self, forward=True):
+        """回傳釘選清單中相對目前預覽的下一個 / 上一個 node_data；無釘選則回傳 None。"""
+        if not self.pinned:
+            return None
+        ids = [n['id'] for n in self.pinned]
+        cur_id = self.current_node_data['id'] if self.current_node_data else None
+        if cur_id in ids:
+            idx = ids.index(cur_id)
+            nxt = (idx + 1) % len(ids) if forward else (idx - 1) % len(ids)
+        else:
+            nxt = 0 if forward else len(ids) - 1
+        return self.pinned[nxt]
+
+    def rebuild_chips(self):
+        # 清空現有方塊
+        while self.chip_layout.count():
+            it = self.chip_layout.takeAt(0)
+            w = it.widget()
+            if w:
+                w.deleteLater()
+
+        font_size = self.config_manager.get_global_font_size()
+        cur_id = self.current_node_data['id'] if self.current_node_data else None
+
+        # 顯示集合：目前預覽（若未釘選）置前，其後接所有釘選方塊
+        display = []
+        seen = set()
+        if self.current_node_data and not self.is_pinned(cur_id):
+            display.append(self.current_node_data)
+            seen.add(cur_id)
+        for n in self.pinned:
+            if n['id'] not in seen:
+                display.append(n)
+                seen.add(n['id'])
+
+        for nd in display:
+            color = self.config_manager.get_table_color(nd['table'])
+            chip = SheetChip(nd, color, font_size,
+                             pinned=self.is_pinned(nd['id']),
+                             active=(nd['id'] == cur_id))
+            chip.clicked.connect(self.chip_selected.emit)
+            # 用 Queued 連線：取消釘選會在 rebuild_chips 中刪除此 chip，
+            # 必須等目前的滑鼠事件完全結束後再執行，否則會 use-after-free 閃退。
+            chip.unpin_requested.connect(self.unpin_node, Qt.ConnectionType.QueuedConnection)
+            self.chip_layout.addWidget(chip)
+
     def clear(self):
+        # 釘選保留（僅關閉 app 才解除），只清空目前預覽內容
         self.current_node_data = None
         self.filename = None
         self.sheet = None
@@ -3089,8 +3380,9 @@ class QuickBrowsePanel(QWidget):
         self.table.setRowCount(0)
         self.table.setColumnCount(0)
         self.table.blockSignals(False)
-        self.lbl_title.setText("Select a table")
-        self.lbl_status.setText("")
+        self.header_line.hide()
+        self.rebuild_chips()
+        self.lbl_status.setText("Select a table")
         self.save_btn.setEnabled(False)
         self.open_excel_btn.setEnabled(False)
 
@@ -3101,9 +3393,9 @@ class QuickBrowsePanel(QWidget):
         self.current_node_data = node_data
         self.filename = node_data['filename']
         self.sheet = node_data['sheet']
-        self.lbl_title.setText(f"{node_data['table']} > {node_data['sheet']}")
         self.save_btn.setEnabled(True)
         self.open_excel_btn.setEnabled(True)
+        self.rebuild_chips()
         self.load_data()
 
     def load_data(self):
@@ -3143,15 +3435,23 @@ class QuickBrowsePanel(QWidget):
                         item.setForeground(QColor(self._contrast_text_color(hex_color)))
                     self.table.setItem(r, c, item)
 
-        self.table.setFont(QFont(FONT_FAMILY, self.config_manager.get_global_font_size()))
+        # 儲存格與表頭使用相同字體大小：QHeaderView（凍結首列）有獨立字體，
+        # 不會跟著 table.setFont 變大，需另外設定，否則標題列字會偏小。
+        cell_font = QFont(FONT_FAMILY, self.config_manager.get_global_font_size())
+        self.table.setFont(cell_font)
+        self.table.horizontalHeader().setFont(cell_font)
+        self.table.verticalHeader().setFont(cell_font)
 
         self.table.resizeColumnsToContents()
+        # 欄寬上限（字數截斷門檻）：由 Settings 設定，預設 PREVIEW_MAX_COL_WIDTH_DEFAULT
+        max_col_width = self.config_manager.get_preview_max_col_width()
         for c in range(self.table.columnCount()):
-            if self.table.columnWidth(c) > 300:
-                self.table.setColumnWidth(c, 300)
+            if self.table.columnWidth(c) > max_col_width:
+                self.table.setColumnWidth(c, max_col_width)
 
         self.table.blockSignals(False)
         self.dirty_cells.clear()
+        self._position_header_line()
         self.lbl_status.setText("Tips: 雙擊儲存格可編輯，按 Save to Excel 寫回。")
 
     @staticmethod
@@ -3227,9 +3527,12 @@ class MainWindow(QMainWindow):
         # Reload after close
         self.load_and_init()
         
-    def open_quick_edit_dialog(self, node_data):
-        # 雙擊：直接於右欄顯示 Quick Browse
-        self.details.show_node(node_data)
+    def on_card_open_in_excel(self, node_data):
+        # 雙擊表格方框：直接以 Excel 開啟
+        try:
+            self.excel_handler.open_sheet(node_data['filename'], node_data['sheet'])
+        except Exception as e:
+            QMessageBox.warning(self, "Error", f"無法開啟 Excel：{e}")
 
     def __init__(self):
         super().__init__()
@@ -3437,6 +3740,10 @@ class MainWindow(QMainWindow):
         completer.setFilterMode(Qt.MatchFlag.MatchContains)
         completer.setCompletionMode(QCompleter.CompletionMode.PopupCompletion)
         self.search_in.setCompleter(completer)
+        # Enter：選中對應的表格方塊（選取會一併脫離並清空搜尋）
+        self.search_in.returnPressed.connect(self.on_search_enter)
+        # 從下拉選單挑選結果：直接以該名稱選中對應方塊，而非主視窗第一個
+        completer.activated.connect(self.on_completion_chosen)
         top.addWidget(self.search_in)
         
         self.settings_btn = QPushButton("Settings")
@@ -3460,8 +3767,9 @@ class MainWindow(QMainWindow):
         self.main_view = TableBrowserView(self, self.config_manager, self.excel_handler)
         self.main_view.node_selected.connect(self.on_main_node_selected)
         self.main_view.node_deselected.connect(self.on_main_node_deselected)
-        self.main_view.node_double_clicked.connect(self.open_quick_edit_dialog)
+        self.main_view.node_double_clicked.connect(self.on_card_open_in_excel)
         self.main_view.table_color_requested.connect(self.on_table_color_requested)
+        self.main_view.node_pin_requested.connect(self.on_node_pin_requested)
         
         self.relation_view = RelationGraphView(self, self.config_manager, self.excel_handler)
         self.relation_view.details_requested.connect(self.on_relation_details_requested)
@@ -3484,6 +3792,8 @@ class MainWindow(QMainWindow):
         self.h_splitter.addWidget(self.v_splitter)
         
         self.details = QuickBrowsePanel(self.excel_handler, self.config_manager)
+        self.details.chip_selected.connect(self.on_chip_selected)
+        self.details.pins_changed.connect(self._refresh_pin_markers)
 
         self.h_splitter.addWidget(self.details)
         
@@ -3509,6 +3819,33 @@ class MainWindow(QMainWindow):
         # 用 application event filter 讀取實體按鍵碼，無視輸入法 (含中文輸入法) (v3.17)
         QApplication.instance().installEventFilter(self)
 
+        # Ctrl/Ctrl+Shift + Tab 切換釘選預覽
+        self._install_pin_shortcuts()
+
+    def _install_pin_shortcuts(self):
+        """以 ApplicationShortcut 註冊切換釘選預覽的快捷鍵，無視焦點在哪都生效。
+
+        macOS 上 Qt 的快捷鍵字串 "Ctrl" 對應 Cmd、"Meta" 對應「實體 Control」；
+        使用者要的是與 Chrome 一致的實體 Ctrl+Tab，故 Mac 用 "Meta+..."，
+        Windows / Linux 用 "Ctrl+..."。
+        """
+        if sys.platform == 'darwin':
+            next_seq, prev_seq = "Meta+Tab", "Meta+Shift+Tab"
+        else:
+            next_seq, prev_seq = "Ctrl+Tab", "Ctrl+Shift+Tab"
+        self._sc_next_pin = QShortcut(QKeySequence(next_seq), self)
+        self._sc_next_pin.setContext(Qt.ShortcutContext.ApplicationShortcut)
+        self._sc_next_pin.activated.connect(lambda: self._cycle_pinned(True))
+        self._sc_prev_pin = QShortcut(QKeySequence(prev_seq), self)
+        self._sc_prev_pin.setContext(Qt.ShortcutContext.ApplicationShortcut)
+        self._sc_prev_pin.activated.connect(lambda: self._cycle_pinned(False))
+
+    def _cycle_pinned(self, forward=True):
+        """切換到下一個 / 上一個釘選的預覽表格。"""
+        node = self.details.next_pinned(forward=forward)
+        if node:
+            self.main_view.select_card_by_id(node['id'])
+
     # (closeEvent unchanged)
     def closeEvent(self, event):
         self.config_manager.save_window_state(self.width(), self.height(), self.isMaximized())
@@ -3521,14 +3858,23 @@ class MainWindow(QMainWindow):
         self.main_view.load_nodes(nodes)
 
     def open_settings(self):
-        dlg = SettingsDialog(self, self.font_size)
+        dlg = SettingsDialog(self, self.font_size,
+                             self.config_manager.get_preview_max_col_width())
         dlg.font_changed.connect(self.on_font_changed)
+        dlg.preview_col_width_changed.connect(self.on_preview_col_width_changed)
         dlg.exec()
-        
+
     def on_font_changed(self, size):
         self.font_size = size
         self.config_manager.set_global_font_size(size)
         self.main_view.set_font_size_live(size)
+
+    def on_preview_col_width_changed(self, width):
+        """調整右欄預覽欄寬上限：存檔並即時套用到目前預覽。"""
+        self.config_manager.set_preview_max_col_width(width)
+        self.config_manager.save_config()
+        if self.details.current_node_data:
+            self.details.load_data()
 
     def on_change_directory(self):
         """變更 Excel 目錄並重新載入數據 (v3.11)"""
@@ -3569,17 +3915,86 @@ class MainWindow(QMainWindow):
             self.config_manager.save_config()
             self.refresh_colors()
 
+    def _confirm_switch(self, new_data):
+        """切換預覽前確認：若右欄有未儲存編輯且要切到不同表格，跳出『保存 / 取消』。
+
+        回傳 True 表示可切換（已視需要儲存）；False 表示使用者取消切換。
+        """
+        cur = self.details.current_node_data
+        if cur and cur.get('id') != new_data.get('id') and self.details.dirty_cells:
+            box = QMessageBox(self)
+            box.setIcon(QMessageBox.Icon.Warning)
+            box.setWindowTitle("未儲存的變更")
+            box.setText(f"右欄『{cur['sheet']}』有未儲存的編輯。\n要先儲存再切換嗎？")
+            save_btn = box.addButton("保存", QMessageBox.ButtonRole.AcceptRole)
+            box.addButton("取消", QMessageBox.ButtonRole.RejectRole)
+            box.exec()
+            if box.clickedButton() is save_btn:
+                self.details.save()
+                return True
+            return False
+        return True
+
     def on_main_node_selected(self, data):
+        if not self._confirm_switch(data):
+            # 取消切換：還原選取回目前預覽的表格
+            cur = self.details.current_node_data
+            if cur:
+                self.main_view.select_card_by_id(cur['id'])
+            return
         self.relation_view.show_relations(data, self.graph_data['edges'], self.all_nodes_map, self.font_size)
         self.details.show_node(data)
-        
+        # 搜尋狀態中選中任意方塊 → 脫離搜尋並清空搜尋欄
+        was_searching = bool(self.search_in.text())
+        if was_searching:
+            self.search_in.clear()  # 觸發 on_search('') 還原全部卡片
+        self.exit_search()
+        if was_searching:
+            # 篩選解除、全部方塊重新顯示後，將選中方塊捲動置中（等版面重算後再捲動）
+            node_id = data['id']
+            QTimer.singleShot(0, lambda: self.main_view.scroll_to_id(node_id))
+
     def on_main_node_deselected(self):
         self.relation_view.show_empty_state() # Show empty
-        self.details.clear() 
-        
+        self.details.clear()
+
     def on_relation_details_requested(self, data):
+        if not self._confirm_switch(data):
+            return
         self.details.show_node(data)
-        
+
+    def on_node_pin_requested(self, node_data):
+        """中鍵卡片：未釘選則選中並釘選；已釘選則取消釘選（再次中鍵切換）。"""
+        if self.details.is_pinned(node_data['id']):
+            self.details.unpin_node(node_data['id'])
+        else:
+            self.details.pin_node(node_data)
+            self.main_view.select_card_by_id(node_data['id'])
+
+    def on_chip_selected(self, node_data):
+        """點擊右欄上方子表格方塊：切換預覽（透過卡片選取保持各視圖同步）。"""
+        self.main_view.select_card_by_id(node_data['id'])
+
+    def _refresh_pin_markers(self):
+        self.main_view.set_pinned_ids(self.details.pinned_ids())
+
+    def on_search_enter(self):
+        """搜尋狀態按 Enter：優先選中與搜尋字串完全相符的方塊，否則選第一個可見方塊。"""
+        text = self.search_in.text().strip()
+        card = self.main_view.find_card_by_name(text) if text else None
+        if card is None:
+            card = self.main_view.first_visible_card()
+        if card:
+            self.main_view.select_card_by_id(card.node_data['id'])
+
+    def on_completion_chosen(self, text):
+        """從搜尋下拉選單挑選結果：以該名稱精確選中對應方塊。"""
+        card = self.main_view.find_card_by_name(text)
+        if card is None:
+            card = self.main_view.first_visible_card()
+        if card:
+            self.main_view.select_card_by_id(card.node_data['id'])
+
     def focus_search(self):
         """進入搜尋狀態：聚焦搜尋框並清空當下字元 (v3.18)"""
         self.search_in.setFocus(Qt.FocusReason.ShortcutFocusReason)
@@ -3599,6 +4014,8 @@ class MainWindow(QMainWindow):
         if event.type() == QEvent.Type.KeyPress:
             key = event.key()
             fw = QApplication.focusWidget()
+            # 註：Ctrl/Meta + (Shift) + Tab 切換釘選預覽改用 QShortcut（見 _install_pin_shortcuts），
+            #     以 ApplicationShortcut 內容無視焦點皆可運作。
             if key in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
                 if QApplication.activeWindow() is not None and \
                         not isinstance(fw, (QLineEdit, QTextEdit, QAbstractItemView)):

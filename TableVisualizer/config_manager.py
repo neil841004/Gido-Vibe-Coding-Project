@@ -182,6 +182,14 @@ class ConfigManager:
         if 'global_settings' not in self.config: self.config['global_settings'] = {}
         self.config['global_settings']['font_size'] = size
 
+    def get_preview_max_col_width(self):
+        """右欄預覽欄寬上限（字數截斷門檻），預設 900。"""
+        return self.config.get('global_settings', {}).get('preview_max_col_width', 900)
+
+    def set_preview_max_col_width(self, width):
+        if 'global_settings' not in self.config: self.config['global_settings'] = {}
+        self.config['global_settings']['preview_max_col_width'] = int(width)
+
     def get_main_view_transform(self):
         return self.config.get('view_settings', {})
 

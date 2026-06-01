@@ -386,21 +386,21 @@
   },
   "layout_settings": {
     "h_splitter": [
-      809,
-      945
+      777,
+      1451
     ],
     "v_splitter": [
-      629,
-      423
+      625,
+      421
     ]
   },
   "window_state": {
-    "width": 1785,
+    "width": 2259,
     "height": 1134,
     "maximized": false
   },
   "global_settings": {
-    "font_size": 14
+    "font_size": 18
   },
   "view_settings": {
     "main_view_transform": [
