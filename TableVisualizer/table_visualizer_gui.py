@@ -27,7 +27,7 @@ from PyQt6.QtWidgets import (
     QScrollArea, QFrame, QTableWidget, QTableWidgetItem,
     QHeaderView, QSpinBox, QDockWidget, QDialog, QSlider,
     QMenu, QListWidget, QListWidgetItem, QComboBox, QFileDialog,
-    QCompleter, QAbstractItemView, QLayout, QSizePolicy
+    QCompleter, QAbstractItemView, QLayout, QSizePolicy, QProgressDialog
 )
 from PyQt6.QtCore import Qt, QRect, QRectF, QPoint, QPointF, QLineF, pyqtSignal, QTimer, QSize, QEvent
 from PyQt6.QtGui import (
@@ -356,6 +356,8 @@ class GraphNodeItem(QGraphicsItem):
         self.is_highlighted = False
         # v3.14 Focus 狀態（替代原本的 isSelected）
         self.is_focused = False
+        # 釘選狀態（僅 Relation View 顯示圖釘 icon）
+        self.is_pinned = False
         
         # Init missing UI
         if self.is_missing:
@@ -434,6 +436,13 @@ class GraphNodeItem(QGraphicsItem):
         painter.setFont(font)
         painter.drawText(self.boundingRect(), Qt.AlignmentFlag.AlignCenter, self.label)
 
+        # 釘選狀態：於右上角畫出圖釘 icon（僅 Relation View）
+        if self.is_pinned and not self.is_main_view:
+            pin_font = QFont(FONT_FAMILY, max(9, self.font_size))
+            painter.setFont(pin_font)
+            pin_rect = QRectF(self.width / 2 - 20, -self.height / 2 + 1, 18, 18)
+            painter.drawText(pin_rect, Qt.AlignmentFlag.AlignCenter, "📌")
+
     def itemChange(self, change, value):
         # v3.14 在拖曳過程中和位置改變後都更新箭頭
         if change == QGraphicsItem.GraphicsItemChange.ItemPositionChange:
@@ -452,6 +461,12 @@ class GraphNodeItem(QGraphicsItem):
             self.view_context.on_node_moved(self)
             
     def mousePressEvent(self, event):
+        # Relation View：滾輪中鍵 → 釘選 / 取消釘選（不切換預覽）
+        if not self.is_main_view and event.button() == Qt.MouseButton.MiddleButton:
+            if hasattr(self.view_context, "on_node_pin_toggle"):
+                self.view_context.on_node_pin_toggle(self)
+            event.accept()
+            return
         super().mousePressEvent(event)
         if not self.is_main_view:
              # Use callback for reliable interaction in Relation View
@@ -1748,7 +1763,8 @@ class UserRelationManager:
 
 class RelationGraphView(BaseGraphView):
     details_requested = pyqtSignal(dict)
-    
+    node_pin_requested = pyqtSignal(dict)  # 中鍵節點 → 釘選 / 取消釘選
+
     def __init__(self, parent, config_manager, excel_handler):
         super().__init__(parent)
         self.config_manager = config_manager
@@ -1756,7 +1772,20 @@ class RelationGraphView(BaseGraphView):
         self.font_size = 10
         self.center_node_data = None  # 保存中心節點數據
         self.all_nodes_map = {}  # 保存所有節點映射
+        self._pinned_ids = set()  # 目前釘選的 node id，供節點顯示圖釘
         self.show_empty_state()
+
+    def on_node_pin_toggle(self, item):
+        """節點被中鍵點擊：通知主視窗切換釘選狀態。"""
+        self.node_pin_requested.emit(item.node_data)
+
+    def set_pinned_ids(self, ids):
+        """更新釘選標記並重繪目前顯示的節點。"""
+        self._pinned_ids = set(ids)
+        for item in self.scene.items():
+            if isinstance(item, GraphNodeItem):
+                item.is_pinned = item.node_id in self._pinned_ids
+                item.update()
 
     def set_font_size_live(self, size):
         self.font_size = size
@@ -1862,10 +1891,12 @@ class RelationGraphView(BaseGraphView):
                     item.bg_color = QColor(color_hex)
                 
                 item.setPos(layer_idx * spacing_x, start_y + i * base_spacing_y)
-                
+
                 if nid == cid:
                     item.is_focused = True
-                
+
+                item.is_pinned = nid in self._pinned_ids
+
                 self.scene.addItem(item)
                 item_map[nid] = item
         
@@ -2842,7 +2873,7 @@ class TableCard(QFrame):
 
 
 class SideIndexBar(QWidget):
-    """右側 A–Z 字首索引：點擊或拖曳即可快速定位到對應分組。"""
+    """左側 A–Z 字首索引：點擊或拖曳即可快速定位到對應分組。"""
 
     letter_picked = pyqtSignal(str)
 
@@ -2936,11 +2967,12 @@ class TableBrowserView(QWidget):
 
         self.scroll.verticalScrollBar().valueChanged.connect(self._sync_index_to_scroll)
 
-        outer.addWidget(self.scroll, 1)
-
+        # A–Z 字首索引改放在左側（位於捲動區之前）
         self.index_bar = SideIndexBar()
         self.index_bar.letter_picked.connect(self.scroll_to_letter)
         outer.addWidget(self.index_bar, 0)
+
+        outer.addWidget(self.scroll, 1)
 
     @staticmethod
     def _initial(table):
@@ -2984,7 +3016,8 @@ class TableBrowserView(QWidget):
         header.setWordWrap(False)  # 不換行，過長改以 "..." 省略
         # 色塊在垂直方向填滿整個分組高度，使相鄰分組標題彼此相連、不留空隙
         header.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Expanding)
-        header.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignHCenter)
+        # 標題文字垂直置中，與右側卡片對齊
+        header.setAlignment(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignHCenter)
         header.setCursor(Qt.CursorShape.PointingHandCursor)
         header.clicked.connect(lambda t=table: self.table_color_requested.emit(t))
         self._style_header(header, table, len(sheets), color)
@@ -2995,9 +3028,10 @@ class TableBrowserView(QWidget):
         sp.setHeightForWidth(True)
         holder.setSizePolicy(sp)
         flow = FlowLayout(holder, spacing=8)
-        # 底部留白：分組間距為 0 時，避免相鄰表格的卡片上下相撞；
-        # 左側標題色塊因垂直 Expanding 會填滿含此留白的整個高度，仍保持相連。
-        flow.setContentsMargins(0, 0, 0, GROUP_CARDS_BOTTOM_GAP)
+        # 上下對稱留白：分組間距為 0 時避免相鄰表格的卡片上下相撞；
+        # 對稱可讓卡片在分組高度內垂直置中（與左側標題對齊）。
+        # 左側標題色塊因垂直 Expanding 會填滿整個高度，仍保持相連。
+        flow.setContentsMargins(0, GROUP_CARDS_BOTTOM_GAP // 2, 0, GROUP_CARDS_BOTTOM_GAP // 2)
 
         group_cards = []
         for n in sheets:
@@ -3009,7 +3043,7 @@ class TableBrowserView(QWidget):
             self.cards.append(card)
             group_cards.append(card)
 
-        h.addWidget(holder, 1)
+        h.addWidget(holder, 1, Qt.AlignmentFlag.AlignVCenter)
 
         box._table = table
         box._header = header
@@ -3168,6 +3202,59 @@ class TableBrowserView(QWidget):
                 card.set_font_size(size)
 
 
+class PanTableWidget(QTableWidget):
+    """支援按住滾輪中鍵拖曳瀏覽的表格（與 Relation View 的中鍵平移一致）。"""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._panning = False
+        self._pan_start = QPoint()
+        # 以「像素」為捲動單位，中鍵拖曳才能與 Relation View 一樣滑到哪就到哪，
+        # 否則 QTableWidget 預設以「整列 / 整欄」為單位，拖一格就跳一整欄。
+        self.setHorizontalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
+        self.setVerticalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
+
+    def wheelEvent(self, event):
+        # 按住 Shift 滾輪 → 水平橫移（而非加速垂直滾動）
+        if event.modifiers() & Qt.KeyboardModifier.ShiftModifier:
+            delta = event.angleDelta().y() or event.angleDelta().x()
+            h = self.horizontalScrollBar()
+            h.setValue(h.value() - delta)
+            event.accept()
+            return
+        super().wheelEvent(event)
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.MouseButton.MiddleButton:
+            self._panning = True
+            self._pan_start = event.position().toPoint()
+            self.setCursor(Qt.CursorShape.ClosedHandCursor)
+            event.accept()
+            return
+        super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event):
+        if self._panning:
+            pos = event.position().toPoint()
+            delta = pos - self._pan_start
+            self._pan_start = pos
+            h = self.horizontalScrollBar()
+            v = self.verticalScrollBar()
+            h.setValue(h.value() - delta.x())
+            v.setValue(v.value() - delta.y())
+            event.accept()
+            return
+        super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event):
+        if event.button() == Qt.MouseButton.MiddleButton and self._panning:
+            self._panning = False
+            self.setCursor(Qt.CursorShape.ArrowCursor)
+            event.accept()
+            return
+        super().mouseReleaseEvent(event)
+
+
 class SheetChip(QFrame):
     """右欄上方的子表格方塊：顯示子表格名稱（含表格顏色），可點擊切換預覽；釘選時右上角顯示圖釘。"""
 
@@ -3251,13 +3338,50 @@ class QuickBrowsePanel(QWidget):
         self.dirty_cells = {}  # (row, col) -> new_value
         self.pinned = []       # 釘選的 node_data（依序，僅存於記憶體，關閉 app 即解除）
         self.preview_zoom = config_manager.get_preview_zoom()  # 右欄預覽縮放百分比
+        # 釘選表格內容搜尋狀態
+        self._pin_search_query = None
+        self._pin_search_pins = ()          # 上次建立結果時的釘選順序簽章
+        self._pin_search_matches = []        # [(node_data, row, col), ...]
+        self._pin_search_idx = -1
         self.init_ui()
 
     def init_ui(self):
         layout = QVBoxLayout(self)
 
-        # 上方：子表格方塊（含釘選）+ 操作按鈕
+        # 上方：釘選表格內容搜尋框 + 子表格方塊（含釘選）+ 操作按鈕
         top = QHBoxLayout()
+
+        search_box = QVBoxLayout()
+        search_box.setSpacing(2)
+        self.pin_search_in = QLineEdit()
+        self.pin_search_in.setPlaceholderText("搜尋釘選表格內容…")
+        self.pin_search_in.setMaximumWidth(180)
+        self.pin_search_in.setToolTip("Enter：依釘選順序定位下一筆；Shift+Enter：上一筆")
+        self.pin_search_in.installEventFilter(self)  # 攔截 Enter / Shift+Enter
+        search_box.addWidget(self.pin_search_in)
+
+        # 搜尋框下方：結果計數 + 上一筆 / 下一筆箭頭
+        nav = QHBoxLayout()
+        nav.setSpacing(2)
+        self.pin_prev_btn = QPushButton("◀")
+        self.pin_prev_btn.setFixedWidth(28)
+        self.pin_prev_btn.setToolTip("上一筆結果 (Shift+Enter)")
+        self.pin_prev_btn.clicked.connect(lambda: self._run_pin_search(forward=False))
+        nav.addWidget(self.pin_prev_btn, 0)
+
+        self.pin_result_label = QLabel("")
+        self.pin_result_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        nav.addWidget(self.pin_result_label, 1)
+
+        self.pin_next_btn = QPushButton("▶")
+        self.pin_next_btn.setFixedWidth(28)
+        self.pin_next_btn.setToolTip("下一筆結果 (Enter)")
+        self.pin_next_btn.clicked.connect(lambda: self._run_pin_search(forward=True))
+        nav.addWidget(self.pin_next_btn, 0)
+        search_box.addLayout(nav)
+
+        top.addLayout(search_box, 0)
+
         self.chip_bar = QWidget()
         self.chip_layout = FlowLayout(self.chip_bar, spacing=6)
         top.addWidget(self.chip_bar, 1)
@@ -3271,14 +3395,22 @@ class QuickBrowsePanel(QWidget):
         top.addWidget(self.open_excel_btn, 0, Qt.AlignmentFlag.AlignTop)
         layout.addLayout(top)
 
-        self.table = QTableWidget()
+        self.table = PanTableWidget()
         self.table.cellChanged.connect(self.on_cell_changed)
         # 滾動條常駐，不要自動隱藏。
         # macOS 原生 overlay 滾動條即使設定 AlwaysOn 仍會淡出隱藏，
         # 因此額外套用 QScrollBar 樣式，強制改用常駐的自繪滾動條。
         self.table.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOn)
         self.table.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOn)
+        # 儲存格之間以細黑線呈現格線（深色主題下預設格線看不見）
+        self.table.setShowGrid(True)
         self.table.setStyleSheet('''
+            QTableWidget { gridline-color: #000000; }
+            QTableWidget::item:selected {
+                background-color: #1565C0;
+                color: #FFFFFF;
+                border: 2px solid #00E5FF;
+            }
             QScrollBar:vertical { width: 14px; background: #2b2b2b; margin: 0; }
             QScrollBar::handle:vertical { background: #6e6e6e; min-height: 28px; border-radius: 5px; }
             QScrollBar::handle:vertical:hover { background: #8a8a8a; }
@@ -3324,7 +3456,17 @@ class QuickBrowsePanel(QWidget):
         self.clear()
 
     def eventFilter(self, obj, event):
-        if obj is self.table.viewport() and event.type() == QEvent.Type.Resize:
+        # 注意：pin_search_in 的事件過濾器在 self.table 建立前即已安裝，
+        # 故先比對 pin_search_in，並以 getattr 保護 self.table 尚未存在的情況。
+        if obj is self.pin_search_in:
+            if event.type() == QEvent.Type.KeyPress and \
+                    event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
+                # Enter：下一筆；Shift+Enter：上一筆
+                forward = not bool(event.modifiers() & Qt.KeyboardModifier.ShiftModifier)
+                self._run_pin_search(forward=forward)
+                return True
+        elif hasattr(self, 'table') and obj is self.table.viewport() \
+                and event.type() == QEvent.Type.Resize:
             self._position_header_line()
         return super().eventFilter(obj, event)
 
@@ -3365,6 +3507,104 @@ class QuickBrowsePanel(QWidget):
         else:
             nxt = 0 if forward else len(ids) - 1
         return self.pinned[nxt]
+
+    # --- 釘選表格內容搜尋 ---
+    def _pin_search_scope(self):
+        """搜尋範圍：有釘選表格則搜尋全部釘選；未釘選則僅搜尋目前開啟的表格。"""
+        if self.pinned:
+            return list(self.pinned)
+        if self.current_node_data:
+            return [self.current_node_data]
+        return []
+
+    def _run_pin_search(self, forward=True):
+        """搜尋（釘選 / 目前）表格內容並切換 Focus。
+
+        - 關鍵字 / 搜尋範圍變動時重建結果，forward 決定先跳第一筆或最後一筆。
+        - 否則依方向（Enter 下一筆 / Shift+Enter 上一筆 / 左右箭頭）循環切換。
+        """
+        query = self.pin_search_in.text().strip()
+        if not query:
+            self._update_pin_result_label()
+            return
+        scope = self._pin_search_scope()
+        pins_sig = tuple(n['id'] for n in scope)
+        if query != self._pin_search_query or pins_sig != self._pin_search_pins:
+            self._pin_search_query = query
+            self._pin_search_pins = pins_sig
+            self._pin_search_matches = self._build_pin_search_matches(query, scope)
+            self._pin_search_idx = -1
+
+        if not self._pin_search_matches:
+            self._pin_search_idx = -1
+            if not scope:
+                self.lbl_status.setText("目前沒有可搜尋的表格。")
+            else:
+                self.lbl_status.setText(f"表格中找不到「{query}」。")
+            self._update_pin_result_label()
+            return
+
+        n = len(self._pin_search_matches)
+        if self._pin_search_idx < 0:
+            self._pin_search_idx = 0 if forward else n - 1
+        else:
+            self._pin_search_idx = (self._pin_search_idx + (1 if forward else -1)) % n
+        self._jump_to_pin_match(self._pin_search_idx)
+        self._update_pin_result_label()
+
+    def _update_pin_result_label(self):
+        """更新搜尋框下方的「目前 / 總筆數」顯示。"""
+        n = len(self._pin_search_matches)
+        if n and self._pin_search_idx >= 0:
+            self.pin_result_label.setText(f"{self._pin_search_idx + 1}/{n}")
+        else:
+            self.pin_result_label.setText("")
+
+    def _build_pin_search_matches(self, query, scope):
+        """依順序掃描 scope 內各表格的表頭與儲存格，回傳符合的 (node_data, row, col)。"""
+        q = query.lower()
+        matches = []
+        seen = set()  # (node id, row, col) 去重，避免表頭命中與首列儲存格落在同格
+
+        def add(nd, r, c):
+            key = (nd['id'], r, c)
+            if key not in seen:
+                seen.add(key)
+                matches.append((nd, r, c))
+
+        for nd in scope:
+            try:
+                headers, data, _hc, _dc = \
+                    self.excel_handler.get_all_sheet_data_with_colors(nd['filename'], nd['sheet'])
+            except Exception:
+                continue
+            for c, hdr in enumerate(headers):
+                if q in str(hdr).lower():
+                    add(nd, 0, c)  # 表頭命中：定位該欄第一列
+            for r, row in enumerate(data):
+                for c, val in enumerate(row):
+                    if q in str(val).lower():
+                        add(nd, r, c)
+        return matches
+
+    def _jump_to_pin_match(self, idx):
+        """切換到命中所在的釘選表格並選取 / 捲動到該儲存格。"""
+        nd, r, c = self._pin_search_matches[idx]
+        if not (self.current_node_data and self.current_node_data.get('id') == nd['id']):
+            # 透過卡片選取切換預覽，保持主視窗 / 關聯圖同步
+            self.chip_selected.emit(nd)
+            if not (self.current_node_data and self.current_node_data.get('id') == nd['id']):
+                return  # 切換被取消（例如有未儲存編輯）
+        if r < self.table.rowCount() and c < self.table.columnCount():
+            self.table.setCurrentCell(r, c)
+            item = self.table.item(r, c)
+            if item:
+                self.table.scrollToItem(item, QAbstractItemView.ScrollHint.PositionAtCenter)
+        self.lbl_status.setText(
+            f"搜尋「{self._pin_search_query}」：第 {idx + 1}/{len(self._pin_search_matches)} 筆"
+            f"（{nd['sheet']}）")
+        # 把焦點留在搜尋框，讓使用者可連續按 Enter 跳下一筆
+        self.pin_search_in.setFocus()
 
     def rebuild_chips(self):
         # 清空現有方塊
@@ -3440,6 +3680,12 @@ class QuickBrowsePanel(QWidget):
             QMessageBox.warning(self, "Read Error", str(e))
             return
 
+        # 含公式的儲存格鎖定為唯讀（避免覆寫公式）
+        try:
+            formula_cells = self.excel_handler.get_formula_cells(self.filename, self.sheet)
+        except Exception:
+            formula_cells = set()
+
         self.table.clear()
         self.table.setColumnCount(len(headers))
         self.table.setRowCount(len(data))
@@ -3463,6 +3709,10 @@ class QuickBrowsePanel(QWidget):
                     if hex_color:
                         item.setBackground(QColor(hex_color))
                         item.setForeground(QColor(self._contrast_text_color(hex_color)))
+                    if (r, c) in formula_cells:
+                        # 公式儲存格：移除可編輯旗標並提示
+                        item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+                        item.setToolTip("此儲存格為公式，無法編輯")
                     self.table.setItem(r, c, item)
 
         self._apply_zoom_to_table()
@@ -3621,8 +3871,9 @@ class MainWindow(QMainWindow):
         # 載入數據並初始化 UI
         self.load_and_init()
 
-        # 每次開啟 APP 自動刷新一次資料（等同 Rescan Data，但不跳出成功 / 失敗對話框）
-        self.reload_data(silent=True)
+        # 視窗顯示後才自動刷新一次資料（等同 Rescan Data），以進度條示意；
+        # 用 singleShot(0) 讓事件迴圈先把主視窗畫出來，避免開 APP 卡白畫面。
+        QTimer.singleShot(0, lambda: self.reload_data(silent=True))
 
     def check_and_select_working_directory(self):
         """檢查並選擇工作目錄
@@ -3699,76 +3950,69 @@ class MainWindow(QMainWindow):
 
         silent=True 時（如開啟 APP 自動刷新）不跳出成功 / 失敗對話框，僅輸出至 console。
         """
-        # 在 Frozen 環境下 (PyInstaller)，我們不能輕易使用 subprocess 呼叫 python 腳本
-        # 因為環境變數和路徑可能不同。
-        # 最好的方式是直接導入模組並執行函數。
-        
-        # 顯示進度條或等待游標
-        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+        # 為避免 PyInstaller frozen 環境下 subprocess 路徑 / console window 問題，
+        # 直接動態導入分析模組並呼叫其函數，並以進度條示意整個 Rescan 流程。
+
+        progress = QProgressDialog("正在掃描 Excel 結構…", "", 0, 100, self)
+        progress.setWindowTitle("Rescan Data")
+        progress.setWindowModality(Qt.WindowModality.WindowModal)
+        progress.setCancelButton(None)   # 不提供取消，流程需完整跑完
+        progress.setAutoClose(False)
+        progress.setAutoReset(False)
+        progress.setMinimumDuration(0)
+        progress.setValue(0)
+        QApplication.processEvents()
         try:
             working_dir = self.config_manager.get_working_directory()
-            output_dir = self.app_directory
             print(f"Reloading data from: {working_dir}")
-            print(f"Outputting analysis to: {output_dir}")
-            
-            # 1. 執行 Excel 結構分析
-            # 我們假設 analyze_excel_structure.py 有一個 main 或 process 函數
-            # 如果沒有，我們需要模擬它的行為。
-            # 查看 analyze_excel_structure.py 和 relationship_analyzer.py 的內容會更保險
-            # 但為了修復 "Rescan" 彈出新視窗的問題，我們必須避免 subprocess.run([sys.executable, ...])
-            
-            # 動態導入並執行 (為了避免循環導入，我們在這裡導入)
+            print(f"Outputting analysis to: {self.app_directory}")
+
+            # 動態導入並執行（避免循環導入）；reload 以確保使用最新程式碼
             import analyze_excel_structure
             import relationship_analyzer
-            
-            # 重新加載模組以確保代碼更新 (雖然在打包環境下通常不會變)
             import importlib
             importlib.reload(analyze_excel_structure)
             importlib.reload(relationship_analyzer)
-            
-            # 執行分析
-            # analyze_excel_structure 通常需要命令行參數，我們需要查看它是如何編寫的。
-            # 假設它有一個 process_directory(path) 函數。
-            # 如果它只有 if __name__ == "__main__": 塊，我們可能需要重構它，
-            # 或者在這裡使用 runpy (但 runpy 類似於 subprocess，可能會有同樣問題)。
-            # 最穩健的方法是調用它們的邏輯函數。
-            
-            # 暫時使用 subprocess 但指向內部 executable (如果是 frozen)
-            # 但這正是導致 "彈出新視窗" 的原因 (在新进程中啟動了 GUI 默認行為?)。
-            # 不，Rescan Data 調用的是 analyze scripts，它們應該只是打印輸出。
-            # 如果它們沒有 GUI 代碼，subprocess 應該是安全的，除非 console window 彈出。
-            # 為了避免 console window，我們需要在 subprocess 中設置 flags。
-            
-            # 但更高效的是直接調用函數。
-            # 讓我們假設改用直接調用。
-            
+
+            def on_file(done, total, name):
+                # 檔案掃描階段對應 0~70%
+                pct = int(done / total * 70) if total else 70
+                if name:
+                    progress.setLabelText(f"正在掃描 ({done + 1}/{total})：{name}")
+                progress.setValue(pct)
+                QApplication.processEvents()
+
             print("Running Analysis...")
-            analyze_excel_structure.analyze_directory(str(working_dir), str(self.app_directory))
+            analyze_excel_structure.analyze_directory(
+                str(working_dir), str(self.app_directory), progress_callback=on_file)
+
+            progress.setLabelText("正在分析表格關聯…")
+            progress.setValue(80)
+            QApplication.processEvents()
             relationship_analyzer.analyze_relationships(str(self.app_directory))
-            
-            # 2. Reload data from JSON
+
+            progress.setLabelText("正在載入資料…")
+            progress.setValue(90)
+            QApplication.processEvents()
+
+            # Reload data from JSON
             self.graph_data = self.load_graph_data()
             nodes = [n for n in self.graph_data['nodes'] if not n['sheet'].startswith('#')]
-            
-            # Update all_nodes_map for Reference (Relation View etc)
-            # Note: This map only has Active nodes.
             self.all_nodes_map = {n['id']: n for n in nodes}
-            
-            # 3. Re-init graph logic (Smart Diff)
+
             self.details.clear()
             self.relation_view.show_empty_state()
-
-            # 以分組卡片重建主視窗瀏覽器
             self.main_view.load_nodes(nodes)
-            
-            QApplication.restoreOverrideCursor()
+
+            progress.setValue(100)
+            progress.close()
             if not silent:
                 QMessageBox.information(self, "Success", "Data rescanned and reloaded successfully.")
             else:
                 print("Startup auto-refresh completed.")
 
         except Exception as e:
-            QApplication.restoreOverrideCursor()
+            progress.close()
             import traceback
             traceback.print_exc()
             if not silent:
@@ -3828,6 +4072,18 @@ class MainWindow(QMainWindow):
         
         self.h_splitter = QSplitter(Qt.Orientation.Horizontal)
         self.v_splitter = QSplitter(Qt.Orientation.Vertical)
+
+        # 把可拖曳的分隔線畫出來（左右 / 上下窗口之間的中線），方便辨識與拖曳
+        splitter_qss = '''
+            QSplitter::handle { background-color: #6e6e6e; }
+            QSplitter::handle:hover { background-color: #FFD700; }
+            QSplitter::handle:horizontal { width: 4px; }
+            QSplitter::handle:vertical { height: 4px; }
+        '''
+        self.h_splitter.setHandleWidth(4)
+        self.v_splitter.setHandleWidth(4)
+        self.h_splitter.setStyleSheet(splitter_qss)
+        self.v_splitter.setStyleSheet(splitter_qss)
         
         self.main_view = TableBrowserView(self, self.config_manager, self.excel_handler)
         self.main_view.node_selected.connect(self.on_main_node_selected)
@@ -3838,6 +4094,7 @@ class MainWindow(QMainWindow):
         
         self.relation_view = RelationGraphView(self, self.config_manager, self.excel_handler)
         self.relation_view.details_requested.connect(self.on_relation_details_requested)
+        self.relation_view.node_pin_requested.connect(self.on_relation_pin_requested)
         
         # Relation container always visible now
         self.relation_view_container = QWidget()
@@ -4040,8 +4297,17 @@ class MainWindow(QMainWindow):
         """點擊右欄上方子表格方塊：切換預覽（透過卡片選取保持各視圖同步）。"""
         self.main_view.select_card_by_id(node_data['id'])
 
+    def on_relation_pin_requested(self, node_data):
+        """Relation View 中鍵節點：切換釘選 / 取消釘選（不切換預覽、不導航）。"""
+        if self.details.is_pinned(node_data['id']):
+            self.details.unpin_node(node_data['id'])
+        else:
+            self.details.pin_node(node_data)
+
     def _refresh_pin_markers(self):
-        self.main_view.set_pinned_ids(self.details.pinned_ids())
+        pinned = self.details.pinned_ids()
+        self.main_view.set_pinned_ids(pinned)
+        self.relation_view.set_pinned_ids(pinned)
 
     def on_search_enter(self):
         """搜尋狀態按 Enter：優先選中與搜尋字串完全相符的方塊，否則選第一個可見方塊。"""

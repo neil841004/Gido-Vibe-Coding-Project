@@ -387,10 +387,10 @@
   "layout_settings": {
     "h_splitter": [
       780,
-      1456
+      1457
     ],
     "v_splitter": [
-      630,
+      631,
       425
     ]
   },
@@ -401,7 +401,7 @@
   },
   "global_settings": {
     "font_size": 18,
-    "preview_zoom": 109
+    "preview_zoom": 106
   },
   "view_settings": {
     "main_view_transform": [

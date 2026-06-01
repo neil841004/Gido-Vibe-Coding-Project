@@ -231,6 +231,36 @@ class ExcelHandler:
             headers, data = self.get_all_sheet_data(filename, sheet_name)
             return headers, data, [], []
 
+    def get_formula_cells(self, filename, sheet_name):
+        """回傳含公式的資料儲存格座標集合 {(data_row, col), ...}。
+
+        座標與 get_all_sheet_data_with_colors 回傳的 data 對齊：
+        第一列為標題（不納入），data_row 0 即工作表第 2 列。
+        以 data_only=False 讀取，公式儲存格的 data_type 為 'f'。
+        """
+        file_path = self.base_dir / filename
+        if not file_path.exists():
+            return set()
+        try:
+            wb = openpyxl.load_workbook(file_path, data_only=False, read_only=True)
+            if sheet_name not in wb.sheetnames:
+                wb.close()
+                return set()
+            ws = wb[sheet_name]
+            formulas = set()
+            for ri, row in enumerate(ws.iter_rows()):
+                if ri == 0:
+                    continue  # 標題列
+                for ci, cell in enumerate(row):
+                    val = cell.value
+                    if cell.data_type == 'f' or (isinstance(val, str) and val.startswith('=')):
+                        formulas.add((ri - 1, ci))
+            wb.close()
+            return formulas
+        except Exception as e:
+            print(f"Formula scan error: {e}")
+            return set()
+
     # ===== 顏色解析輔助 (主題色 + tint) =====
     _THEME_NS = "{http://schemas.openxmlformats.org/drawingml/2006/main}"
     # 主題色索引 -> clrScheme 文件順序索引 (bg1/tx1、bg2/tx2 需互換)

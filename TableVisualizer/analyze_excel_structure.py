@@ -19,14 +19,24 @@ class ExcelAnalyzer:
         self.tables = {}
         self.relationships = []
         
-    def analyze_all(self):
-        """分析目錄中所有的 Excel 檔案"""
+    def analyze_all(self, progress_callback=None):
+        """分析目錄中所有的 Excel 檔案
+
+        progress_callback(done, total, filename) 會在每個檔案分析前被呼叫，
+        供 GUI 顯示進度條。
+        """
         print(f"開始分析 Excel 檔案 (目錄: {self.directory})...")
-        
-        for excel_file in self.directory.glob("*.xlsm"):
+
+        files = sorted(self.directory.glob("*.xlsm"))
+        total = len(files)
+        for i, excel_file in enumerate(files):
+            if progress_callback:
+                progress_callback(i, total, excel_file.name)
             print(f"\n正在分析: {excel_file.name}")
             self.analyze_file(excel_file)
-        
+        if progress_callback:
+            progress_callback(total, total, "")
+
         print("\n\n=== 分析完成 ===")
         self.detect_relationships()
         self.print_summary()
@@ -157,23 +167,23 @@ class ExcelAnalyzer:
         
         print(f"\n\n分析結果已儲存至: {output_file}")
 
-def analyze_directory(input_path, output_path=None):
+def analyze_directory(input_path, output_path=None, progress_callback=None):
     """Wrapper for external calls"""
     input_dir = Path(input_path)
-    
+
     # Use output_path if provided, else define relative to input
     if output_path:
         out_dir = Path(output_path)
     else:
         out_dir = input_dir
-        
+
     output_file = out_dir / 'excel_structure.json'
-    
+
     print(f"Analyzing directory: {input_dir}")
     print(f"Output Structure File: {output_file}")
-    
+
     analyzer = ExcelAnalyzer(input_dir, out_dir)
-    analyzer.analyze_all()
+    analyzer.analyze_all(progress_callback=progress_callback)
 
 def main():
     import sys
