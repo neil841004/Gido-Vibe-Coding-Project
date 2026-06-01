@@ -27,9 +27,9 @@ from PyQt6.QtWidgets import (
     QScrollArea, QFrame, QTableWidget, QTableWidgetItem,
     QHeaderView, QSpinBox, QDockWidget, QDialog, QSlider,
     QMenu, QListWidget, QListWidgetItem, QComboBox, QFileDialog,
-    QCompleter, QAbstractItemView
+    QCompleter, QAbstractItemView, QLayout, QSizePolicy
 )
-from PyQt6.QtCore import Qt, QRectF, QPointF, QLineF, pyqtSignal, QTimer, QSize, QEvent
+from PyQt6.QtCore import Qt, QRect, QRectF, QPoint, QPointF, QLineF, pyqtSignal, QTimer, QSize, QEvent
 from PyQt6.QtGui import (
     QPainter, QPen, QBrush, QColor, QPainterPath, QFont,
     QTransform, QPolygonF, QIcon, QAction
@@ -45,6 +45,7 @@ NODE_HEIGHT_BASE = 40
 NODE_RADIUS = 5
 FONT_FAMILY = "Segoe UI"
 GRID_SIZE = 20
+GROUP_LABEL_WIDTH = 120  # 分組左側標題欄寬度 (v4.0)
 
 COLOR_DEFAULT = "#9E9E9E"
 COLOR_SELECTED = "#FFD700"  # Gold
@@ -2696,6 +2697,411 @@ class EditConnectionDialog(QDialog):
         self.refresh_list()
 
 
+# ============================================================
+#  捲動式表格瀏覽器 (v4.0)
+#  以分組卡片取代圖形主視窗：字首字典排序、各組顏色、
+#  A–Z 側邊快速定位，僅供查找與選取，不顯示關聯與箭頭。
+# ============================================================
+
+def _contrast_text_color(color_hex):
+    """依背景亮度回傳黑或白文字色，確保可讀性。"""
+    c = QColor(color_hex)
+    luminance = 0.299 * c.red() + 0.587 * c.green() + 0.114 * c.blue()
+    return '#000000' if luminance > 150 else '#ffffff'
+
+
+class FlowLayout(QLayout):
+    """自動換行的流式佈局，用於排列同組卡片。"""
+
+    def __init__(self, parent=None, spacing=8):
+        super().__init__(parent)
+        self.setContentsMargins(0, 0, 0, 0)
+        self.setSpacing(spacing)
+        self._items = []
+
+    def addItem(self, item):
+        self._items.append(item)
+
+    def count(self):
+        return len(self._items)
+
+    def itemAt(self, index):
+        return self._items[index] if 0 <= index < len(self._items) else None
+
+    def takeAt(self, index):
+        return self._items.pop(index) if 0 <= index < len(self._items) else None
+
+    def expandingDirections(self):
+        return Qt.Orientation(0)
+
+    def hasHeightForWidth(self):
+        return True
+
+    def heightForWidth(self, width):
+        return self._do_layout(QRect(0, 0, width, 0), True)
+
+    def setGeometry(self, rect):
+        super().setGeometry(rect)
+        self._do_layout(rect, False)
+
+    def sizeHint(self):
+        return self.minimumSize()
+
+    def minimumSize(self):
+        size = QSize()
+        for item in self._items:
+            size = size.expandedTo(item.minimumSize())
+        m = self.contentsMargins()
+        size += QSize(m.left() + m.right(), m.top() + m.bottom())
+        return size
+
+    def _do_layout(self, rect, test_only):
+        x, y = rect.x(), rect.y()
+        line_height = 0
+        spacing = self.spacing()
+        for item in self._items:
+            w = item.sizeHint().width()
+            h = item.sizeHint().height()
+            next_x = x + w + spacing
+            if next_x - spacing > rect.right() and line_height > 0:
+                x = rect.x()
+                y = y + line_height + spacing
+                next_x = x + w + spacing
+                line_height = 0
+            if not test_only:
+                item.setGeometry(QRect(QPoint(x, y), QSize(w, h)))
+            x = next_x
+            line_height = max(line_height, h)
+        return y + line_height - rect.y()
+
+
+class TableCard(QFrame):
+    """單一工作表卡片，可點選 / 雙擊。"""
+
+    clicked = pyqtSignal(dict)
+    double_clicked = pyqtSignal(dict)
+
+    def __init__(self, node_data, color_hex, font_size, parent=None):
+        super().__init__(parent)
+        self.node_data = node_data
+        self.full_name = f"{node_data['table']}.{node_data['sheet']}"
+        self.color_hex = color_hex
+        self.font_size = font_size
+        self.selected = False
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(14, 9, 14, 9)
+        self._label = QLabel(node_data['sheet'])
+        self._label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(self._label)
+        self._apply_style()
+
+    def set_color(self, color_hex):
+        self.color_hex = color_hex
+        self._apply_style()
+
+    def set_font_size(self, size):
+        self.font_size = size
+        self._apply_style()
+
+    def set_selected(self, selected):
+        if self.selected != selected:
+            self.selected = selected
+            self._apply_style()
+
+    def _apply_style(self):
+        border_color = '#FFD700' if self.selected else 'rgba(255,255,255,0.30)'
+        border_w = 3 if self.selected else 1
+        text_color = _contrast_text_color(self.color_hex)
+        self.setStyleSheet(f'''
+            TableCard {{
+                background-color: {self.color_hex};
+                border: {border_w}px solid {border_color};
+                border-radius: 6px;
+            }}
+            QLabel {{
+                color: {text_color};
+                background: transparent;
+                font-family: "{FONT_FAMILY}";
+                font-size: {self.font_size}pt;
+            }}
+        ''')
+
+    def mousePressEvent(self, event):
+        event.accept()
+
+    def mouseReleaseEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton and self.rect().contains(event.pos()):
+            self.clicked.emit(self.node_data)
+        super().mouseReleaseEvent(event)
+
+    def mouseDoubleClickEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.double_clicked.emit(self.node_data)
+        super().mouseDoubleClickEvent(event)
+
+
+class SideIndexBar(QWidget):
+    """右側 A–Z 字首索引：點擊或拖曳即可快速定位到對應分組。"""
+
+    letter_picked = pyqtSignal(str)
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.letters = []
+        self._active = None
+        self.setFixedWidth(28)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+
+    def set_letters(self, letters):
+        self.letters = letters
+        if self._active not in letters:
+            self._active = None
+        self.update()
+
+    def set_active(self, letter):
+        if self._active != letter:
+            self._active = letter
+            self.update()
+
+    def _letter_at(self, y):
+        if not self.letters:
+            return None
+        slot = self.height() / len(self.letters)
+        idx = int(y // slot) if slot else 0
+        idx = max(0, min(len(self.letters) - 1, idx))
+        return self.letters[idx]
+
+    def mousePressEvent(self, event):
+        self._pick(event.position().y())
+
+    def mouseMoveEvent(self, event):
+        self._pick(event.position().y())
+
+    def _pick(self, y):
+        letter = self._letter_at(y)
+        if letter:
+            self._active = letter
+            self.letter_picked.emit(letter)
+            self.update()
+
+    def paintEvent(self, event):
+        if not self.letters:
+            return
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        slot = self.height() / len(self.letters)
+        painter.setFont(QFont(FONT_FAMILY, max(7, min(10, int(slot * 0.5)))))
+        for i, letter in enumerate(self.letters):
+            rect = QRectF(0, i * slot, self.width(), slot)
+            painter.setPen(QColor('#FFD700') if letter == self._active else QColor('#9E9E9E'))
+            painter.drawText(rect, Qt.AlignmentFlag.AlignCenter, letter)
+
+
+class TableBrowserView(QWidget):
+    """主視窗：分組捲動瀏覽器，取代原本的圖形視圖。"""
+
+    node_selected = pyqtSignal(dict)
+    node_deselected = pyqtSignal()
+    node_double_clicked = pyqtSignal(dict)
+
+    def __init__(self, parent, config_manager, excel_handler):
+        super().__init__(parent)
+        self.config_manager = config_manager
+        self.excel_handler = excel_handler
+        self.font_size = config_manager.get_global_font_size()
+        self.cards = []
+        self.group_widgets = {}   # table -> 分組容器 widget
+        self.selected_card = None
+        self._build_ui()
+
+    def _build_ui(self):
+        outer = QHBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.setSpacing(0)
+
+        self.scroll = QScrollArea()
+        self.scroll.setWidgetResizable(True)
+        self.scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+
+        self.content = QWidget()
+        self.vbox = QVBoxLayout(self.content)
+        self.vbox.setContentsMargins(14, 14, 14, 14)
+        self.vbox.setSpacing(18)
+        self.vbox.addStretch()
+        self.scroll.setWidget(self.content)
+
+        self.scroll.verticalScrollBar().valueChanged.connect(self._sync_index_to_scroll)
+
+        outer.addWidget(self.scroll, 1)
+
+        self.index_bar = SideIndexBar()
+        self.index_bar.letter_picked.connect(self.scroll_to_letter)
+        outer.addWidget(self.index_bar, 0)
+
+    @staticmethod
+    def _initial(table):
+        return table[0].upper() if table else '#'
+
+    def _clear(self):
+        self.cards = []
+        self.group_widgets = {}
+        self.selected_card = None
+        while self.vbox.count():
+            item = self.vbox.takeAt(0)
+            w = item.widget()
+            if w:
+                w.deleteLater()
+
+    def load_nodes(self, nodes):
+        """以分組卡片重建瀏覽器內容。"""
+        self._clear()
+        groups = {}
+        for n in nodes:
+            groups.setdefault(n['table'], []).append(n)
+
+        for table in sorted(groups.keys(), key=lambda s: s.lower()):
+            sheets = sorted(groups[table], key=lambda n: n['sheet'].lower())
+            color = self.config_manager.get_table_color(table)
+            section = self._make_group(table, sheets, color)
+            self.vbox.addWidget(section)
+            self.group_widgets[table] = section
+
+        self.vbox.addStretch()
+        self._refresh_index()
+
+    def _make_group(self, table, sheets, color):
+        box = QWidget()
+        h = QHBoxLayout(box)
+        h.setContentsMargins(0, 0, 0, 0)
+        h.setSpacing(10)
+
+        header = QLabel()
+        header.setFixedWidth(GROUP_LABEL_WIDTH)
+        header.setWordWrap(True)
+        header.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignHCenter)
+        self._style_header(header, table, len(sheets), color)
+        h.addWidget(header, 0)
+
+        holder = QWidget()
+        sp = holder.sizePolicy()
+        sp.setHeightForWidth(True)
+        holder.setSizePolicy(sp)
+        flow = FlowLayout(holder, spacing=8)
+
+        group_cards = []
+        for n in sheets:
+            card = TableCard(n, color, self.font_size)
+            card.clicked.connect(lambda nd, c=card: self._select_card(c))
+            card.double_clicked.connect(self.node_double_clicked.emit)
+            flow.addWidget(card)
+            self.cards.append(card)
+            group_cards.append(card)
+
+        h.addWidget(holder, 1)
+
+        box._table = table
+        box._header = header
+        box._cards = group_cards
+        box._hidden = False
+        return box
+
+    def _style_header(self, header, table, count, color):
+        text_color = _contrast_text_color(color)
+        header.setText(f"{table}\n· {count}")
+        header.setStyleSheet(f'''
+            QLabel {{
+                background-color: {color};
+                color: {text_color};
+                font-family: "{FONT_FAMILY}";
+                font-size: {self.font_size + 1}pt;
+                font-weight: bold;
+                padding: 6px 8px;
+                border-radius: 5px;
+            }}
+        ''')
+
+    def _select_card(self, card):
+        if self.selected_card is not None and self.selected_card is not card:
+            self.selected_card.set_selected(False)
+        self.selected_card = card
+        card.set_selected(True)
+        self.node_selected.emit(card.node_data)
+
+    # --- 側邊索引 ---
+    def _refresh_index(self):
+        letters = []
+        for table in sorted(self.group_widgets.keys(), key=lambda s: s.lower()):
+            if not self.group_widgets[table]._hidden:
+                ini = self._initial(table)
+                if ini not in letters:
+                    letters.append(ini)
+        self.index_bar.set_letters(letters)
+
+    def scroll_to_letter(self, letter):
+        for table in sorted(self.group_widgets.keys(), key=lambda s: s.lower()):
+            box = self.group_widgets[table]
+            if not box._hidden and self._initial(table) == letter:
+                y = box.mapTo(self.content, QPoint(0, 0)).y()
+                self.scroll.verticalScrollBar().setValue(y)
+                return
+
+    def _sync_index_to_scroll(self):
+        """捲動時同步反白側邊索引目前所在的字首。"""
+        viewport_top = self.scroll.verticalScrollBar().value()
+        current = None
+        for table in sorted(self.group_widgets.keys(), key=lambda s: s.lower()):
+            box = self.group_widgets[table]
+            if box._hidden:
+                continue
+            if current is None:
+                current = self._initial(table)  # 預設取第一個可見分組
+            y = box.mapTo(self.content, QPoint(0, 0)).y()
+            if y <= viewport_top + 16:
+                current = self._initial(table)
+        if current is not None:
+            self.index_bar.set_active(current)
+
+    # --- 搜尋（過濾顯示）---
+    def search_highlight(self, keyword):
+        kw = keyword.lower()
+        for table, box in self.group_widgets.items():
+            any_visible = False
+            for card in box._cards:
+                match = kw in card.node_data['sheet'].lower() or kw in table.lower()
+                card.setVisible(match)
+                any_visible = any_visible or match
+            box._hidden = not any_visible
+            box.setVisible(any_visible)
+        self._refresh_index()
+
+    def clear_search(self):
+        for box in self.group_widgets.values():
+            box._hidden = False
+            box.setVisible(True)
+            for card in box._cards:
+                card.setVisible(True)
+        self._refresh_index()
+
+    # --- 顏色與字體刷新 ---
+    def refresh_colors(self):
+        for table, box in self.group_widgets.items():
+            color = self.config_manager.get_table_color(table)
+            self._style_header(box._header, table, len(box._cards), color)
+            for card in box._cards:
+                card.set_color(color)
+
+    def set_font_size_live(self, size):
+        self.font_size = size
+        for table, box in self.group_widgets.items():
+            color = self.config_manager.get_table_color(table)
+            self._style_header(box._header, table, len(box._cards), color)
+            for card in box._cards:
+                card.set_font_size(size)
+
+
 class MainWindow(QMainWindow):
     # ... init ...
     
@@ -2707,7 +3113,7 @@ class MainWindow(QMainWindow):
         self.load_and_init()
         
     def open_quick_edit_dialog(self, node_data):
-        dlg = QuickEditDialog(self, self.excel_handler, node_data)
+        dlg = QuickEditDialog(self, node_data['filename'], node_data['sheet'], self.excel_handler)
         dlg.exec()
         # Refresh details if currently showing same node
         if self.details.current_node_data and self.details.current_node_data['id'] == node_data['id']:
@@ -2875,12 +3281,9 @@ class MainWindow(QMainWindow):
             # 3. Re-init graph logic (Smart Diff)
             self.details.clear()
             self.relation_view.show_empty_state()
-            
-            # Use Diff Update
-            self.main_view.update_scene_items_diff(nodes, self.graph_data['edges'], self.font_size)
-            
-            # Refresh colors
-            self.refresh_colors()
+
+            # 以分組卡片重建主視窗瀏覽器
+            self.main_view.load_nodes(nodes)
             
             QApplication.restoreOverrideCursor()
             QMessageBox.information(self, "Success", "Data rescanned and reloaded successfully.")
@@ -2931,34 +3334,21 @@ class MainWindow(QMainWindow):
         self.rescan_btn = QPushButton("Rescan Data")
         self.rescan_btn.clicked.connect(self.reload_data)
         top.addWidget(self.rescan_btn)
-        
-        self.reset_layout_btn = QPushButton("Reset Arrangement")
-        self.reset_layout_btn.clicked.connect(self.on_reset_layout)
-        top.addWidget(self.reset_layout_btn)
-        
+
         self.change_dir_btn = QPushButton("變更工作目錄")
         self.change_dir_btn.clicked.connect(self.on_change_directory)
         top.addWidget(self.change_dir_btn)
-        
-        # 箭頭顯示切換按鈕 (v3.12, v3.16 Persistence)
-        # 每次開啟 APP 一律隱藏箭頭 (效果同按下「隱藏箭頭」)
-        show_arrows = False
-        btn_text = "隱藏箭頭" if show_arrows else "顯示箭頭"
-        self.toggle_arrows_btn = QPushButton(btn_text)
-        self.toggle_arrows_btn.setCheckable(True)
-        self.toggle_arrows_btn.setChecked(not show_arrows)
-        self.toggle_arrows_btn.clicked.connect(self.on_toggle_arrows)
-        top.addWidget(self.toggle_arrows_btn)
-        
+
         top.addStretch()
         main_layout.addLayout(top)
         
         self.h_splitter = QSplitter(Qt.Orientation.Horizontal)
         self.v_splitter = QSplitter(Qt.Orientation.Vertical)
         
-        self.main_view = MainGraphView(self, self.config_manager, self.excel_handler)
+        self.main_view = TableBrowserView(self, self.config_manager, self.excel_handler)
         self.main_view.node_selected.connect(self.on_main_node_selected)
         self.main_view.node_deselected.connect(self.on_main_node_deselected)
+        self.main_view.node_double_clicked.connect(self.open_quick_edit_dialog)
         
         self.relation_view = RelationGraphView(self, self.config_manager, self.excel_handler)
         self.relation_view.details_requested.connect(self.on_relation_details_requested)
@@ -3015,30 +3405,12 @@ class MainWindow(QMainWindow):
     def closeEvent(self, event):
         self.config_manager.save_window_state(self.width(), self.height(), self.isMaximized())
         self.config_manager.set_layout_settings(self.h_splitter.sizes(), self.v_splitter.sizes())
-        t = self.main_view.transform()
-        matrix = (t.m11(), t.m12(), t.m13(), t.m21(), t.m22(), t.m23(), t.m31(), t.m32(), t.m33())
-        cp = self.main_view.mapToScene(self.main_view.viewport().rect().center())
-        self.config_manager.set_main_view_transform(matrix, [cp.x(), cp.y()])
         self.config_manager.save_config()
         super().closeEvent(event)
 
     # (init_graph, open_settings, on_font_changed, on_reset_layout unchanged)
     def init_graph(self, nodes):
-        self.main_view.set_scene_items(nodes, self.graph_data['edges'], self.font_size)
-        has_pos = bool(self.config_manager.config.get('node_positions'))
-        if not has_pos:
-            new_pos = self.main_view.arrange_clustered_layout(nodes)
-            for k, v in new_pos.items(): self.config_manager.set_node_position(k, v[0], v[1])
-            self.config_manager.save_config()
-            for item in self.main_view.node_items.values():
-                p = new_pos.get(item.full_name)
-                if p: item.setPos(p[0], p[1])
-        v_sets = self.config_manager.get_main_view_transform()
-        if 'main_view_transform' in v_sets: self.main_view.setTransform(QTransform(*v_sets['main_view_transform']))
-        if 'center_on' in v_sets: self.main_view.centerOn(*v_sets['center_on'])
-        
-        # 每次開啟 APP 一律隱藏箭頭 (效果同按下「隱藏箭頭」)
-        self.main_view.toggle_arrows_visibility(False)
+        self.main_view.load_nodes(nodes)
 
     def open_settings(self):
         dlg = SettingsDialog(self, self.font_size)
@@ -3048,21 +3420,8 @@ class MainWindow(QMainWindow):
     def on_font_changed(self, size):
         self.font_size = size
         self.config_manager.set_global_font_size(size)
-        
-    def on_reset_layout(self):
-        # v3.16 Fix: Use current scene items to ensure we include new nodes from Rescan
-        nodes = [item.node_data for item in self.main_view.node_items.values()]
-        new_pos = self.main_view.arrange_clustered_layout(nodes)
-        
-        for item in self.main_view.node_items.values():
-            p = new_pos.get(item.full_name)
-            if p: 
-                item.setPos(p[0], p[1])
-                self.config_manager.set_node_position(item.full_name, p[0], p[1])
-            
-        self.config_manager.save_config()
-        self.main_view.scene.update()
-    
+        self.main_view.set_font_size_live(size)
+
     def on_change_directory(self):
         """變更 Excel 目錄並重新載入數據 (v3.11)"""
         # 顯示目錄選擇對話框，預設為當前 Excel 目錄
@@ -3092,16 +3451,7 @@ class MainWindow(QMainWindow):
             self.load_and_init()
             
             QMessageBox.information(self, "成功", f"Excel 目錄已變更為：\n{new_dir}\n\n數據已重新載入。")
-    
-    def on_toggle_arrows(self):
-        """切換箭頭顯示 (v3.12, v3.16 Persistence)"""
-        is_checked = self.toggle_arrows_btn.isChecked()
-        self.main_view.toggle_arrows_visibility(not is_checked)
-        self.toggle_arrows_btn.setText("顯示箭頭" if is_checked else "隱藏箭頭")
-        
-        # Save to config
-        self.config_manager.set_arrow_visibility(not is_checked)
-    
+
     def on_toggle_relation_edit_mode(self):
         """切換 Relation View 編輯模式 (v3.13)"""
         is_edit_mode = self.relation_view.toggle_edit_mode()
@@ -3152,9 +3502,7 @@ class MainWindow(QMainWindow):
         else: self.main_view.search_highlight(txt)
             
     def refresh_colors(self):
-        for item in self.main_view.node_items.values():
-            item.bg_color = QColor(self.config_manager.get_table_color(item.node_data['table']))
-            item.update()
+        self.main_view.refresh_colors()
         for item in self.relation_view.scene.items():
             if isinstance(item, GraphNodeItem):
                 item.bg_color = QColor(self.config_manager.get_table_color(item.node_data['table']))
