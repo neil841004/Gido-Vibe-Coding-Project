@@ -27,12 +27,12 @@ from PyQt6.QtWidgets import (
     QScrollArea, QFrame, QTableWidget, QTableWidgetItem,
     QHeaderView, QSpinBox, QDockWidget, QDialog, QSlider,
     QMenu, QListWidget, QListWidgetItem, QComboBox, QFileDialog,
-    QCompleter
+    QCompleter, QAbstractItemView
 )
-from PyQt6.QtCore import Qt, QRectF, QPointF, QLineF, pyqtSignal, QTimer, QSize
+from PyQt6.QtCore import Qt, QRectF, QPointF, QLineF, pyqtSignal, QTimer, QSize, QEvent
 from PyQt6.QtGui import (
     QPainter, QPen, QBrush, QColor, QPainterPath, QFont,
-    QTransform, QPolygonF, QIcon, QAction, QShortcut, QKeySequence
+    QTransform, QPolygonF, QIcon, QAction
 )
 
 from config_manager import ConfigManager
@@ -3004,9 +3004,12 @@ class MainWindow(QMainWindow):
         main_layout.addWidget(self.h_splitter)
         self.setCentralWidget(central)
 
-        # 快捷鍵 "~"：直接進入搜尋狀態 (等同左鍵點擊搜尋框) (v3.17)
-        self.search_shortcut = QShortcut(QKeySequence("~"), self)
-        self.search_shortcut.activated.connect(self.focus_search)
+        # 不要在開啟 APP 時自動聚焦搜尋框 (改為 ClickFocus，僅點擊或快捷鍵才聚焦) (v3.17)
+        self.search_in.setFocusPolicy(Qt.FocusPolicy.ClickFocus)
+
+        # 快捷鍵 "~"：直接進入搜尋狀態 (等同左鍵點擊搜尋框)。
+        # 用 application event filter 讀取實體按鍵碼，無視輸入法 (含中文輸入法) (v3.17)
+        QApplication.instance().installEventFilter(self)
 
     # (closeEvent unchanged)
     def closeEvent(self, event):
@@ -3115,6 +3118,35 @@ class MainWindow(QMainWindow):
     def on_relation_details_requested(self, data):
         self.details.show_node(data)
         
+    def focus_search(self):
+        """進入搜尋狀態：聚焦搜尋框並清空當下字元 (v3.18)"""
+        self.search_in.setFocus(Qt.FocusReason.ShortcutFocusReason)
+        self.search_in.clear()
+
+    def exit_search(self):
+        """脫離搜尋狀態：清除搜尋框焦點 (v3.18)"""
+        self.search_in.clearFocus()
+
+    def eventFilter(self, obj, event):
+        """攔截 Enter/Esc 以進出搜尋狀態 (v3.18)。
+
+        - Enter：只要 app 任一視窗為作用中、且焦點不在文字輸入元件
+          (QLineEdit / QTextEdit / 下拉清單) 時，進入搜尋狀態並清空搜尋框。
+        - Esc：焦點在搜尋框時脫離搜尋狀態。
+        """
+        if event.type() == QEvent.Type.KeyPress:
+            key = event.key()
+            fw = QApplication.focusWidget()
+            if key in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
+                if QApplication.activeWindow() is not None and \
+                        not isinstance(fw, (QLineEdit, QTextEdit, QAbstractItemView)):
+                    self.focus_search()
+                    return True
+            elif key == Qt.Key.Key_Escape and fw is self.search_in:
+                self.exit_search()
+                return True
+        return super().eventFilter(obj, event)
+
     def on_search(self, txt):
         if not txt: self.main_view.clear_search()
         else: self.main_view.search_highlight(txt)
