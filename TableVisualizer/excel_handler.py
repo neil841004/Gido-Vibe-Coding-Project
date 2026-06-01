@@ -10,7 +10,9 @@ Excel 處理器 (Cross-Platform)
 
 import os
 import sys
+import colorsys
 import subprocess
+import xml.etree.ElementTree as ET
 from pathlib import Path
 import openpyxl
 
@@ -178,6 +180,137 @@ class ExcelHandler:
         except Exception as e:
             print(f"Read All Error: {e}")
             return [], []
+
+    def get_all_sheet_data_with_colors(self, filename, sheet_name):
+        """讀取整張工作表的值與儲存格背景色 (還原 Excel 設定的顏色)。
+
+        Returns: (headers, data_rows, header_colors, data_colors)
+          - header_colors: list[str|None]，對應每個標題欄的 #RRGGBB
+          - data_colors: list[list[str|None]]，對應每格資料的 #RRGGBB
+        顏色解析失敗時退回 (headers, data, [], [])，呼叫端應自行容錯。
+        """
+        file_path = self.base_dir / filename
+        if not file_path.exists():
+            return [], [], [], []
+
+        try:
+            # data_only 取得計算後的值；非 read_only 才能穩定讀取 fill / 主題色
+            wb = openpyxl.load_workbook(file_path, data_only=True)
+            if sheet_name not in wb.sheetnames:
+                wb.close()
+                return [], [], [], []
+            ws = wb[sheet_name]
+
+            theme_colors = self._parse_theme_colors(wb)
+
+            grid_values = []
+            grid_colors = []
+            for row in ws.iter_rows():
+                row_vals = []
+                row_cols = []
+                for cell in row:
+                    row_vals.append(str(cell.value) if cell.value is not None else "")
+                    row_cols.append(self._resolve_fill_color(cell.fill, theme_colors))
+                grid_values.append(row_vals)
+                grid_colors.append(row_cols)
+
+            wb.close()
+
+            if not grid_values:
+                return [], [], [], []
+
+            headers = grid_values[0]
+            data = grid_values[1:]
+            header_colors = grid_colors[0]
+            data_colors = grid_colors[1:]
+            return headers, data, header_colors, data_colors
+
+        except Exception as e:
+            print(f"Read Colors Error: {e}")
+            # 退回純資料，讓呼叫端仍可顯示
+            headers, data = self.get_all_sheet_data(filename, sheet_name)
+            return headers, data, [], []
+
+    # ===== 顏色解析輔助 (主題色 + tint) =====
+    _THEME_NS = "{http://schemas.openxmlformats.org/drawingml/2006/main}"
+    # 主題色索引 -> clrScheme 文件順序索引 (bg1/tx1、bg2/tx2 需互換)
+    _THEME_INDEX_MAP = [1, 0, 3, 2, 4, 5, 6, 7, 8, 9, 10, 11]
+
+    def _parse_theme_colors(self, wb):
+        """解析活頁簿主題，回傳 clrScheme 各色的 #RRGGBB (文件順序)。"""
+        try:
+            raw = getattr(wb, 'loaded_theme', None)
+            if not raw:
+                return []
+            if isinstance(raw, bytes):
+                raw = raw.decode('utf-8', errors='ignore')
+            root = ET.fromstring(raw)
+            scheme = root.find(f".//{self._THEME_NS}clrScheme")
+            if scheme is None:
+                return []
+            colors = []
+            for child in scheme:
+                srgb = child.find(f"{self._THEME_NS}srgbClr")
+                sys_clr = child.find(f"{self._THEME_NS}sysClr")
+                if srgb is not None and srgb.get('val'):
+                    colors.append(srgb.get('val'))
+                elif sys_clr is not None:
+                    colors.append(sys_clr.get('lastClr') or sys_clr.get('val') or '000000')
+                else:
+                    colors.append('000000')
+            return colors
+        except Exception:
+            return []
+
+    def _resolve_fill_color(self, fill, theme_colors):
+        """將儲存格 fill 解析為 #RRGGBB；非實心填色回傳 None。"""
+        try:
+            if fill is None or fill.patternType != 'solid':
+                return None
+            fg = fill.fgColor
+            base_hex = None
+            tint = float(getattr(fg, 'tint', 0.0) or 0.0)
+
+            if fg.type == 'rgb' and isinstance(fg.rgb, str):
+                base_hex = fg.rgb[-6:]
+            elif fg.type == 'theme':
+                idx = fg.theme
+                if isinstance(idx, int) and 0 <= idx < len(self._THEME_INDEX_MAP):
+                    doc_idx = self._THEME_INDEX_MAP[idx]
+                    if doc_idx < len(theme_colors):
+                        base_hex = theme_colors[doc_idx]
+            elif fg.type == 'indexed':
+                from openpyxl.styles.colors import COLOR_INDEX
+                if isinstance(fg.indexed, int) and 0 <= fg.indexed < len(COLOR_INDEX):
+                    base_hex = COLOR_INDEX[fg.indexed][-6:]
+
+            if not base_hex:
+                return None
+
+            return self._apply_tint(base_hex, tint)
+        except Exception:
+            return None
+
+    @staticmethod
+    def _apply_tint(hex6, tint):
+        """依 OOXML 規則將 tint 套用到 HSL 亮度，回傳 #RRGGBB。"""
+        try:
+            r = int(hex6[0:2], 16) / 255.0
+            g = int(hex6[2:4], 16) / 255.0
+            b = int(hex6[4:6], 16) / 255.0
+        except ValueError:
+            return None
+        if tint:
+            h, l, s = colorsys.rgb_to_hls(r, g, b)
+            if tint < 0:
+                l = l * (1.0 + tint)
+            else:
+                l = l * (1.0 - tint) + tint
+            l = max(0.0, min(1.0, l))
+            r, g, b = colorsys.hls_to_rgb(h, l, s)
+        return "#{:02X}{:02X}{:02X}".format(
+            int(round(r * 255)), int(round(g * 255)), int(round(b * 255))
+        )
 
     def update_cell_value(self, filename, sheet_name, col_idx, row_idx, value):
         """

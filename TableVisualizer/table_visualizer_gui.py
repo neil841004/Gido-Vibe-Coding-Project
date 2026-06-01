@@ -26,12 +26,13 @@ from PyQt6.QtWidgets import (
     QGraphicsTextItem, QTabWidget, QColorDialog, QFormLayout,
     QScrollArea, QFrame, QTableWidget, QTableWidgetItem,
     QHeaderView, QSpinBox, QDockWidget, QDialog, QSlider,
-    QMenu, QListWidget, QListWidgetItem, QComboBox, QFileDialog
+    QMenu, QListWidget, QListWidgetItem, QComboBox, QFileDialog,
+    QCompleter
 )
 from PyQt6.QtCore import Qt, QRectF, QPointF, QLineF, pyqtSignal, QTimer, QSize
 from PyQt6.QtGui import (
     QPainter, QPen, QBrush, QColor, QPainterPath, QFont,
-    QTransform, QPolygonF, QIcon, QAction
+    QTransform, QPolygonF, QIcon, QAction, QShortcut, QKeySequence
 )
 
 from config_manager import ConfigManager
@@ -2437,6 +2438,9 @@ class QuickEditDialog(QDialog):
         self.save_btn = QPushButton("Save Edited Cells")
         self.save_btn.clicked.connect(self.save)
         top.addWidget(self.save_btn)
+        self.open_excel_btn = QPushButton("Open in Excel")
+        self.open_excel_btn.clicked.connect(self.open_in_excel)
+        top.addWidget(self.open_excel_btn)
         layout.addLayout(top)
         
         self.table = QTableWidget()
@@ -2454,25 +2458,59 @@ class QuickEditDialog(QDialog):
         
     def load_data(self):
         self.table.blockSignals(True)
-        headers, data = self.excel_handler.get_all_sheet_data(self.filename, self.sheet)
-        
+        headers, data, header_colors, data_colors = \
+            self.excel_handler.get_all_sheet_data_with_colors(self.filename, self.sheet)
+
         self.table.setColumnCount(len(headers))
         self.table.setRowCount(len(data))
         self.table.setHorizontalHeaderLabels(headers)
-        
+
+        # 套用標題列顏色 (與 Excel 一致)
+        for c, hdr in enumerate(headers):
+            hex_color = header_colors[c] if c < len(header_colors) else None
+            if hex_color:
+                hitem = QTableWidgetItem(str(hdr))
+                hitem.setBackground(QColor(hex_color))
+                hitem.setForeground(QColor(self._contrast_text_color(hex_color)))
+                self.table.setHorizontalHeaderItem(c, hitem)
+
         for r, row_data in enumerate(data):
+            row_colors = data_colors[r] if r < len(data_colors) else []
             for c, val in enumerate(row_data):
                 if c < len(headers):
-                    self.table.setItem(r, c, QTableWidgetItem(str(val)))
-        
+                    item = QTableWidgetItem(str(val))
+                    hex_color = row_colors[c] if c < len(row_colors) else None
+                    if hex_color:
+                        item.setBackground(QColor(hex_color))
+                        item.setForeground(QColor(self._contrast_text_color(hex_color)))
+                    self.table.setItem(r, c, item)
+
         # Auto-resize columns to content, then cap at 300
         self.table.resizeColumnsToContents()
         for c in range(self.table.columnCount()):
             if self.table.columnWidth(c) > 300:
                 self.table.setColumnWidth(c, 300)
-                    
+
         self.table.blockSignals(False)
         self.dirty_cells.clear()
+
+    @staticmethod
+    def _contrast_text_color(hex_color):
+        """依背景亮度回傳黑或白文字色，確保可讀性。"""
+        try:
+            h = hex_color.lstrip('#')
+            r, g, b = int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
+            luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255.0
+            return "#000000" if luminance > 0.5 else "#FFFFFF"
+        except Exception:
+            return "#000000"
+
+    def open_in_excel(self):
+        """以 Excel 開啟目前的檔案與工作表 (v3.17)"""
+        try:
+            self.excel_handler.open_sheet(self.filename, self.sheet)
+        except Exception as e:
+            QMessageBox.warning(self, "Error", f"無法開啟 Excel：{e}")
 
     def on_cell_changed(self, row, col):
         item = self.table.item(row, col)
@@ -2876,6 +2914,14 @@ class MainWindow(QMainWindow):
         self.search_in.setPlaceholderText("Search...")
         self.search_in.setMaximumWidth(300)
         self.search_in.textChanged.connect(self.on_search)
+
+        # 搜尋自動完成：輸入時下拉列出符合的名稱，上下選擇、Enter 填入完整名 (v3.17)
+        suggestions = sorted({n['sheet'] for n in all_nodes} | {n['table'] for n in all_nodes})
+        completer = QCompleter(suggestions, self)
+        completer.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
+        completer.setFilterMode(Qt.MatchFlag.MatchContains)
+        completer.setCompletionMode(QCompleter.CompletionMode.PopupCompletion)
+        self.search_in.setCompleter(completer)
         top.addWidget(self.search_in)
         
         self.settings_btn = QPushButton("Settings")
@@ -2895,7 +2941,8 @@ class MainWindow(QMainWindow):
         top.addWidget(self.change_dir_btn)
         
         # 箭頭顯示切換按鈕 (v3.12, v3.16 Persistence)
-        show_arrows = self.config_manager.get_arrow_visibility()
+        # 每次開啟 APP 一律隱藏箭頭 (效果同按下「隱藏箭頭」)
+        show_arrows = False
         btn_text = "隱藏箭頭" if show_arrows else "顯示箭頭"
         self.toggle_arrows_btn = QPushButton(btn_text)
         self.toggle_arrows_btn.setCheckable(True)
@@ -2957,6 +3004,10 @@ class MainWindow(QMainWindow):
         main_layout.addWidget(self.h_splitter)
         self.setCentralWidget(central)
 
+        # 快捷鍵 "~"：直接進入搜尋狀態 (等同左鍵點擊搜尋框) (v3.17)
+        self.search_shortcut = QShortcut(QKeySequence("~"), self)
+        self.search_shortcut.activated.connect(self.focus_search)
+
     # (closeEvent unchanged)
     def closeEvent(self, event):
         self.config_manager.save_window_state(self.width(), self.height(), self.isMaximized())
@@ -2983,8 +3034,8 @@ class MainWindow(QMainWindow):
         if 'main_view_transform' in v_sets: self.main_view.setTransform(QTransform(*v_sets['main_view_transform']))
         if 'center_on' in v_sets: self.main_view.centerOn(*v_sets['center_on'])
         
-        # Apply arrow visibility (v3.16)
-        self.main_view.toggle_arrows_visibility(self.config_manager.get_arrow_visibility())
+        # 每次開啟 APP 一律隱藏箭頭 (效果同按下「隱藏箭頭」)
+        self.main_view.toggle_arrows_visibility(False)
 
     def open_settings(self):
         dlg = SettingsDialog(self, self.font_size)
