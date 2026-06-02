@@ -42,6 +42,24 @@ from PyQt6.QtGui import (
 from config_manager import ConfigManager
 from excel_handler import ExcelHandler
 
+
+def get_app_directory():
+    """回傳可永久寫入的應用程式目錄（存放 JSON 設定 / 關聯檔）。
+
+    - PyInstaller 凍結環境（含 --onefile）：使用執行檔所在目錄。
+      不可用 __file__，因為它會指向 onefile 解壓的暫存 _MEIPASS，結束即被刪除。
+    - macOS .app bundle：往上跳出 Contents/MacOS，回到 .app 旁的目錄。
+    - 一般執行：使用原始碼所在目錄。
+    與 ConfigManager 的路徑判斷保持一致。
+    """
+    if getattr(sys, 'frozen', False):
+        app_dir = Path(sys.executable).parent
+        if sys.platform == 'darwin' and 'Contents/MacOS' in str(app_dir):
+            app_dir = app_dir.parent.parent.parent
+        return app_dir
+    return Path(__file__).parent
+
+
 # --- Constants ---
 # Basic geometry will be dynamic based on global font size, but we keep base padding
 NODE_WIDTH_PADDING = 20
@@ -1716,8 +1734,8 @@ class MainGraphView(BaseGraphView):
 # User Relation Manager handles manual overrides
 class UserRelationManager:
     def __init__(self):
-        # JSON 檔案固定保存在應用程式目錄
-        self.file_path = Path(__file__).parent / 'user_relations.json'
+        # JSON 檔案固定保存在應用程式目錄（凍結環境下為執行檔目錄）
+        self.file_path = get_app_directory() / 'user_relations.json'
         self.relations = self.load_relations()
         
     def load_relations(self):
@@ -4149,7 +4167,7 @@ class MainWindow(QMainWindow):
         
         # 使用選定目錄初始化管理器
         self.working_directory = Path(excel_dir)  # Excel 檔案所在目錄
-        self.app_directory = Path(__file__).parent  # 應用程式目錄（JSON 檔案位置）
+        self.app_directory = get_app_directory()  # 應用程式目錄（JSON 檔案位置，凍結環境下為執行檔目錄）
         
         # ConfigManager: 配置檔在應用目錄，但記錄 Excel 目錄
         self.config_manager = ConfigManager(working_dir=self.working_directory)

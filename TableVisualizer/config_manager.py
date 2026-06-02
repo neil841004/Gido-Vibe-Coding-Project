@@ -11,15 +11,20 @@ import sys
 import shutil
 from pathlib import Path
 
+# 應用程式名稱：作為各平台使用者設定資料夾的名稱
+APP_NAME = 'TableVisualizer'
+
+
 class ConfigManager:
     def __init__(self, working_dir=None, config_file='gui_config.json'):
-        # Determine application directory (handle PyInstaller frozen state)
+        # Determine application directory (handle PyInstaller frozen state).
+        # app_dir 為「執行檔 / 原始碼」所在目錄，僅用於相容性遷移（舊版設定位置）。
         if getattr(sys, 'frozen', False):
             # If the application is run as a bundle, the PyInstaller bootloader
-            # extends the sys module by a flag frozen=True and sets the app 
+            # extends the sys module by a flag frozen=True and sets the app
             # path into variable _MEIPASS'.
             self.app_dir = Path(sys.executable).parent
-            
+
             # Handle macOS .app bundle
             if sys.platform == 'darwin' and 'Contents/MacOS' in str(self.app_dir):
                  # Go up to the directory containing .app
@@ -28,40 +33,22 @@ class ConfigManager:
 
         else:
             self.app_dir = Path(__file__).parent
-            
-        self.config_path = self.app_dir / config_file
-        
-        # If running as frozen application and config doesn't exist in writable location,
-        # try to copy the bundled default config (captured at build time).
-        if getattr(sys, 'frozen', False) and not self.config_path.exists():
-            try:
-                # Potential locations for bundled config
-                candidates = []
-                # 1. sys._MEIPASS (PyInstaller OneFile / Temp Dir / OneDir)
-                if hasattr(sys, '_MEIPASS'):
-                    candidates.append(Path(sys._MEIPASS) / config_file)
-                
-                # 2. Executable Directory (PyInstaller OneDir)
-                candidates.append(Path(sys.executable).parent / config_file)
 
-                # 3. Internal contents directory (Windows --contents-directory)
-                # If executable is in root, sys.executable is root/App.exe
-                # but bundled files might be in root/internal
-                # However, add-data usually puts them in _MEIPASS, so #1 should cover it.
-                
-                # 4. macOS Resources (PyInstaller .app bundle)
-                if sys.platform == 'darwin':
-                    # .../TableVisualizer.app/Contents/MacOS/TableVisualizer -> .../Contents/Resources
-                    candidates.append(Path(sys.executable).parent.parent / 'Resources' / config_file)
-                
-                for src in candidates:
-                    if src.exists():
-                        shutil.copy2(src, self.config_path)
-                        print(f"Initialized config from bundled file: {src}")
-                        break
-            except Exception as e:
-                print(f"Failed to copy bundled config: {e}")
-        
+        # gui_config.json 存放於各平台的使用者設定資料夾（可永久寫入，且不隨應用搬移而遺失）：
+        #   Windows: %APPDATA%\TableVisualizer\gui_config.json
+        #   macOS:   ~/Library/Application Support/TableVisualizer/gui_config.json
+        #   Linux:   ${XDG_CONFIG_HOME:-~/.config}/TableVisualizer/gui_config.json
+        self.config_dir = self._get_user_config_dir()
+        try:
+            self.config_dir.mkdir(parents=True, exist_ok=True)
+        except Exception as e:
+            print(f"Failed to create config directory {self.config_dir}: {e}")
+        self.config_path = self.config_dir / config_file
+
+        # 若使用者設定尚未建立，依序嘗試：1) 遷移舊版設定 2) 複製打包內建預設值。
+        if not self.config_path.exists():
+            self._initialize_config_file(config_file)
+
         # working_dir 用於儲存 Excel 檔案所在目錄（若提供）
         if working_dir is None:
             self.excel_dir = None  # 尚未設定
@@ -96,6 +83,43 @@ class ConfigManager:
             }
         }
         self.load_config()
+
+    def _get_user_config_dir(self):
+        """回傳各平台的使用者設定資料夾（TableVisualizer 專用）。"""
+        if sys.platform == 'win32':
+            base = os.environ.get('APPDATA') or str(Path.home() / 'AppData' / 'Roaming')
+        elif sys.platform == 'darwin':
+            base = str(Path.home() / 'Library' / 'Application Support')
+        else:
+            base = os.environ.get('XDG_CONFIG_HOME') or str(Path.home() / '.config')
+        return Path(base) / APP_NAME
+
+    def _initialize_config_file(self, config_file):
+        """首次啟動時建立使用者設定檔。
+
+        優先「遷移」舊版設定（過去 gui_config.json 與執行檔放在一起），
+        其次複製打包時內建的預設設定（PyInstaller _MEIPASS / 執行檔目錄 / macOS Resources）。
+        全部找不到時就維持不存在，load_config 會改用程式內建預設值。
+        """
+        candidates = []
+        # 1. 舊版位置（與執行檔 / 原始碼同目錄）—— 用於從舊版遷移既有設定
+        candidates.append(self.app_dir / config_file)
+        # 2. PyInstaller 打包內建預設值
+        if getattr(sys, 'frozen', False):
+            if hasattr(sys, '_MEIPASS'):
+                candidates.append(Path(sys._MEIPASS) / config_file)
+            candidates.append(Path(sys.executable).parent / config_file)
+            if sys.platform == 'darwin':
+                candidates.append(Path(sys.executable).parent.parent / 'Resources' / config_file)
+
+        for src in candidates:
+            try:
+                if src.exists() and src.resolve() != self.config_path.resolve():
+                    shutil.copy2(src, self.config_path)
+                    print(f"Initialized config from: {src}")
+                    return
+            except Exception as e:
+                print(f"Failed to copy config from {src}: {e}")
 
     def load_config(self):
         """載入設定"""

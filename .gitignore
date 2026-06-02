@@ -31,6 +31,10 @@ build/
 out/
 .cache/
 
+# 例外：TableVisualizer 打包後的單一檔應用需上傳 Git
+!TableVisualizer/dist/
+!TableVisualizer/dist/**
+
 # === 隱私與環境變數 ===
 .env
 .env.local

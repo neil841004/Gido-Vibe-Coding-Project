@@ -52,7 +52,9 @@ python3 -m venv venv && source venv/bin/activate && pip install -r requirements.
 - `gui_config.json` — 使用者 GUI 設定與狀態。
 - `user_relations.json` — 使用者手動新增的關聯。
 
-工作目錄（Excel 檔所在）由使用者在啟動時選擇，記錄於 `gui_config.json` 的 `working_directory`；JSON 設定檔則固定存放在程式目錄。
+工作目錄（Excel 檔所在）由使用者在啟動時選擇，記錄於 `gui_config.json` 的 `working_directory`。
+
+設定檔位置：`gui_config.json` 存放在各平台的使用者設定資料夾（Windows `%APPDATA%\TableVisualizer`、macOS `~/Library/Application Support/TableVisualizer`、Linux `${XDG_CONFIG_HOME:-~/.config}/TableVisualizer`），首次啟動會自動從舊版（執行檔同目錄）或打包內建預設值遷移；其餘 JSON（`excel_structure.json`、`relationship_graph.json`、`user_relations.json`）則存放在執行檔 / 程式目錄（凍結環境見 `table_visualizer_gui.py` 的 `get_app_directory()`）。
 
 ## 慣例
 
