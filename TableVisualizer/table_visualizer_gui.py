@@ -27,12 +27,16 @@ from PyQt6.QtWidgets import (
     QScrollArea, QFrame, QTableWidget, QTableWidgetItem,
     QHeaderView, QSpinBox, QDockWidget, QDialog, QSlider,
     QMenu, QListWidget, QListWidgetItem, QComboBox, QFileDialog,
-    QCompleter, QAbstractItemView, QLayout, QSizePolicy, QProgressDialog
+    QCompleter, QAbstractItemView, QLayout, QSizePolicy, QProgressDialog,
+    QGraphicsOpacityEffect
 )
-from PyQt6.QtCore import Qt, QRect, QRectF, QPoint, QPointF, QLineF, pyqtSignal, QTimer, QSize, QEvent
+from PyQt6.QtCore import (
+    Qt, QRect, QRectF, QPoint, QPointF, QLineF, pyqtSignal, QTimer, QSize,
+    QEvent, QMimeData, QModelIndex
+)
 from PyQt6.QtGui import (
     QPainter, QPen, QBrush, QColor, QPainterPath, QFont, QFontMetrics,
-    QTransform, QPolygonF, QIcon, QAction, QShortcut, QKeySequence
+    QTransform, QPolygonF, QIcon, QAction, QShortcut, QKeySequence, QDrag
 )
 
 from config_manager import ConfigManager
@@ -461,12 +465,8 @@ class GraphNodeItem(QGraphicsItem):
             self.view_context.on_node_moved(self)
             
     def mousePressEvent(self, event):
-        # Relation View：滾輪中鍵 → 釘選 / 取消釘選（不切換預覽）
-        if not self.is_main_view and event.button() == Qt.MouseButton.MiddleButton:
-            if hasattr(self.view_context, "on_node_pin_toggle"):
-                self.view_context.on_node_pin_toggle(self)
-            event.accept()
-            return
+        # Relation View 的中鍵釘選改由 RelationGraphView.mousePressEvent 處理，
+        # 因為 BaseGraphView 會先攔截中鍵啟動平移，節點本身收不到中鍵事件。
         super().mousePressEvent(event)
         if not self.is_main_view:
              # Use callback for reliable interaction in Relation View
@@ -1774,6 +1774,24 @@ class RelationGraphView(BaseGraphView):
         self.all_nodes_map = {}  # 保存所有節點映射
         self._pinned_ids = set()  # 目前釘選的 node id，供節點顯示圖釘
         self.show_empty_state()
+
+    def mousePressEvent(self, event):
+        # 中鍵：若游標下有節點則切換釘選（第一下即生效），否則交給 BaseGraphView 平移。
+        # 必須在 view 層攔截，否則 BaseGraphView 會先吃掉中鍵啟動平移，使節點收不到事件。
+        if event.button() == Qt.MouseButton.MiddleButton:
+            node = self._node_at(event.pos())
+            if node is not None and not getattr(node, 'is_missing', False):
+                self.on_node_pin_toggle(node)
+                event.accept()
+                return
+        super().mousePressEvent(event)
+
+    def _node_at(self, pos):
+        """回傳游標位置下的 GraphNodeItem（含子項時往上找父節點），無則回傳 None。"""
+        item = self.itemAt(pos)
+        while item is not None and not isinstance(item, GraphNodeItem):
+            item = item.parentItem()
+        return item
 
     def on_node_pin_toggle(self, item):
         """節點被中鍵點擊：通知主視窗切換釘選狀態。"""
@@ -3224,6 +3242,15 @@ class PanTableWidget(QTableWidget):
             return
         super().wheelEvent(event)
 
+    def _release_cell_focus(self):
+        """解除對儲存格的選取與鍵盤焦點：清除藍色反白、當前格，並讓表格失焦，
+        如此 Tab 或其他按鍵不再作用於原本的儲存格。"""
+        if self.state() == QAbstractItemView.State.EditingState:
+            return  # 編輯中不打斷，交由預設行為處理
+        self.clearSelection()
+        self.setCurrentIndex(QModelIndex())
+        self.clearFocus()
+
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.MiddleButton:
             self._panning = True
@@ -3231,7 +3258,21 @@ class PanTableWidget(QTableWidget):
             self.setCursor(Qt.CursorShape.ClosedHandCursor)
             event.accept()
             return
+        if event.button() == Qt.MouseButton.LeftButton and \
+                not self.indexAt(event.position().toPoint()).isValid():
+            # 點在沒有儲存格的空白處：解除藍色反白即脫離焦點
+            self._release_cell_focus()
+            event.accept()
+            return
         super().mousePressEvent(event)
+
+    def keyPressEvent(self, event):
+        if event.key() == Qt.Key.Key_Escape and \
+                self.state() != QAbstractItemView.State.EditingState:
+            self._release_cell_focus()
+            event.accept()
+            return
+        super().keyPressEvent(event)
 
     def mouseMoveEvent(self, event):
         if self._panning:
@@ -3256,12 +3297,22 @@ class PanTableWidget(QTableWidget):
 
 
 class SheetChip(QFrame):
-    """右欄上方的子表格方塊：顯示子表格名稱（含表格顏色），可點擊切換預覽；釘選時右上角顯示圖釘。"""
+    """右欄上方的子表格方塊：顯示子表格名稱（含表格顏色）。
 
-    clicked = pyqtSignal(dict)
+    互動：
+    - 左鍵點擊 → 切換預覽。
+    - 滾輪中鍵 → 釘選 / 取消釘選（未釘選的當前預覽方塊也可中鍵釘選）。
+    - 釘選方塊可按住左鍵拖曳排序；拖放與即時預覽由父層 ChipBar 處理。
+    """
+
     # node id 可能是 int（來自 relationship_graph.json）或 str，必須用 object，
     # 否則以 QueuedConnection 傳遞 int 給 str 型別的訊號時，跨執行緒序列化會直接閃退。
-    unpin_requested = pyqtSignal(object)  # 滾輪中鍵 → 取消釘選（傳 node id）
+    clicked = pyqtSignal(dict)
+    unpin_requested = pyqtSignal(object)         # 中鍵已釘選方塊 → 取消釘選（傳 node id）
+    pin_requested = pyqtSignal(dict)             # 中鍵未釘選方塊 → 釘選（傳 node_data）
+
+    # 拖放用的自訂 MIME 格式，避免與外部拖放混淆
+    MIME = "application/x-tablevisualizer-sheetchip"
 
     def __init__(self, node_data, color_hex, font_size, pinned=False, active=False, parent=None):
         super().__init__(parent)
@@ -3270,6 +3321,8 @@ class SheetChip(QFrame):
         self.font_size = font_size
         self.pinned = pinned
         self.active = active
+        self._press_pos = None      # 左鍵按下位置，用於判斷是否進入拖曳
+        self._drag_active = False   # 拖曳進行中：放開時不視為點擊
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
 
@@ -3304,6 +3357,15 @@ class SheetChip(QFrame):
             }}
         ''')
 
+    def set_dimmed(self, on):
+        """拖曳預覽時，把正在移動的方塊變暗，標示它的預計落點。"""
+        if on:
+            eff = QGraphicsOpacityEffect(self)
+            eff.setOpacity(0.4)
+            self.setGraphicsEffect(eff)
+        else:
+            self.setGraphicsEffect(None)
+
     def _reposition_pin(self):
         self._pin.adjustSize()
         self._pin.move(self.width() - self._pin.width() - 1, 0)
@@ -3313,13 +3375,162 @@ class SheetChip(QFrame):
         super().resizeEvent(event)
         self._reposition_pin()
 
+    def mousePressEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            self._press_pos = event.pos()
+        super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event):
+        # 釘選方塊按住左鍵並拖曳超過門檻 → 啟動排序拖放
+        if (self.pinned and self._press_pos is not None
+                and event.buttons() & Qt.MouseButton.LeftButton
+                and (event.pos() - self._press_pos).manhattanLength()
+                >= QApplication.startDragDistance()):
+            self._start_drag()
+            return
+        super().mouseMoveEvent(event)
+
+    def _start_drag(self):
+        self._drag_active = True
+        drag = QDrag(self)
+        mime = QMimeData()
+        mime.setData(self.MIME, str(self.node_data['id']).encode('utf-8'))
+        drag.setMimeData(mime)
+        pixmap = self.grab()
+        drag.setPixmap(pixmap)
+        drag.setHotSpot(self._press_pos)
+        drag.exec(Qt.DropAction.MoveAction)
+        self._drag_active = False
+        self._press_pos = None
+
     def mouseReleaseEvent(self, event):
+        # 拖曳結束的釋放不視為點擊
+        if self._drag_active:
+            self._drag_active = False
+            self._press_pos = None
+            return
         if event.button() == Qt.MouseButton.LeftButton and self.rect().contains(event.pos()):
             self.clicked.emit(self.node_data)
         elif event.button() == Qt.MouseButton.MiddleButton:
-            # 中鍵：取消釘選（未釘選的目前預覽方塊則由 unpin_node 自動忽略）
-            self.unpin_requested.emit(self.node_data['id'])
+            # 中鍵：已釘選 → 取消釘選；未釘選（當前預覽方塊）→ 釘選
+            if self.pinned:
+                self.unpin_requested.emit(self.node_data['id'])
+            else:
+                self.pin_requested.emit(self.node_data)
+        self._press_pos = None
         super().mouseReleaseEvent(event)
+
+
+class ChipBar(QWidget):
+    """釘選方塊容器：拖曳排序時即時重排方塊，讓使用者直接看到預計的最終順序。
+
+    - 僅釘選方塊（pinned）可被拖曳與重排；未釘選的「當前預覽」方塊固定置於最前。
+    - 拖曳過程中依游標位置即時把方塊插入到預計位置（被拖曳的方塊變暗）。
+    - 放開後發出 reorder_committed，帶出最終的釘選 node id 順序。
+    """
+
+    reorder_committed = pyqtSignal(list)  # 拖放完成 → 釘選方塊的 node id 字串順序
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.flow = FlowLayout(self, spacing=6)
+        self.setAcceptDrops(True)
+        # 高度貼齊內容，避免方塊列搶走下方表格的垂直空間
+        self.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Minimum)
+        self._drag_id = None       # 正在拖曳的方塊 id（字串）
+        self._dragging_chip = None
+
+    # --- 取得目前方塊 ---
+    def _chips(self):
+        chips = []
+        for i in range(self.flow.count()):
+            w = self.flow.itemAt(i).widget()
+            if isinstance(w, SheetChip):
+                chips.append(w)
+        return chips
+
+    def _relayout(self, ordered_chips):
+        """依指定順序重新排列方塊（widget 持續存在，只調整順序並立即重繪）。"""
+        while self.flow.count():
+            self.flow.takeAt(0)
+        for c in ordered_chips:
+            self.flow.addWidget(c)
+        self.flow.invalidate()
+        self.flow.setGeometry(self.contentsRect())
+
+    def _row_height(self, chips):
+        return max((c.height() for c in chips), default=24)
+
+    def _insertion_index(self, pos, movable):
+        """依閱讀順序計算游標落點在可移動方塊中的插入索引。"""
+        row_h = self._row_height(movable)
+        idx = 0
+        for c in movable:
+            center = c.geometry().center()
+            if center.y() < pos.y() - row_h / 2:
+                idx += 1                      # 游標所在列之上的方塊
+            elif center.y() <= pos.y() + row_h / 2 and center.x() < pos.x():
+                idx += 1                      # 同列且在游標左側
+        return idx
+
+    def _preview(self, pos):
+        """依游標位置重排方塊以預覽最終順序。"""
+        chips = self._chips()
+        fixed = [c for c in chips if not c.pinned]          # 當前預覽方塊固定在最前
+        movable = [c for c in chips if c.pinned and str(c.node_data['id']) != self._drag_id]
+        dragged = self._dragging_chip
+        idx = self._insertion_index(pos, movable)
+        new_movable = movable[:idx] + ([dragged] if dragged else []) + movable[idx:]
+        self._relayout(fixed + new_movable)
+
+    def _is_ours(self, event):
+        return event.mimeData().hasFormat(SheetChip.MIME)
+
+    def dragEnterEvent(self, event):
+        if not self._is_ours(event):
+            event.ignore()
+            return
+        self._drag_id = bytes(event.mimeData().data(SheetChip.MIME)).decode('utf-8')
+        self._dragging_chip = next(
+            (c for c in self._chips() if str(c.node_data['id']) == self._drag_id), None)
+        if self._dragging_chip:
+            self._dragging_chip.set_dimmed(True)
+        event.acceptProposedAction()
+        self._preview(event.position().toPoint())
+
+    def dragMoveEvent(self, event):
+        if not self._is_ours(event):
+            event.ignore()
+            return
+        event.acceptProposedAction()
+        self._preview(event.position().toPoint())
+
+    def dragLeaveEvent(self, event):
+        # 離開容器：取消預覽並還原（由 panel 重建），清除變暗
+        if self._dragging_chip:
+            self._dragging_chip.set_dimmed(False)
+        self._end_drag(commit=False)
+        super().dragLeaveEvent(event)
+
+    def dropEvent(self, event):
+        if not self._is_ours(event):
+            event.ignore()
+            return
+        self._preview(event.position().toPoint())
+        if self._dragging_chip:
+            self._dragging_chip.set_dimmed(False)
+        event.acceptProposedAction()
+        self._end_drag(commit=True)
+
+    def _end_drag(self, commit):
+        if commit:
+            order = [str(c.node_data['id']) for c in self._chips() if c.pinned]
+            self.reorder_committed.emit(order)
+        else:
+            # 還原：請 panel 依現有 pinned 順序重建
+            self.reorder_committed.emit([])
+        self._drag_id = None
+        self._dragging_chip = None
 
 
 class QuickBrowsePanel(QWidget):
@@ -3327,6 +3538,7 @@ class QuickBrowsePanel(QWidget):
 
     chip_selected = pyqtSignal(dict)  # 點擊上方子表格方塊 → 切換預覽
     pins_changed = pyqtSignal()       # 釘選清單變動 → 通知主視窗更新卡片標記
+    fullscreen_toggle_requested = pyqtSignal()  # 按下全螢幕按鈕 → 切換右欄全介面
 
     def __init__(self, excel_handler, config_manager):
         super().__init__()
@@ -3337,6 +3549,7 @@ class QuickBrowsePanel(QWidget):
         self.sheet = None
         self.dirty_cells = {}  # (row, col) -> new_value
         self.pinned = []       # 釘選的 node_data（依序，僅存於記憶體，關閉 app 即解除）
+        self.all_nodes = []    # 所有表格節點，供「所有表格」搜尋範圍使用（由主視窗注入）
         self.preview_zoom = config_manager.get_preview_zoom()  # 右欄預覽縮放百分比
         # 釘選表格內容搜尋狀態
         self._pin_search_query = None
@@ -3348,52 +3561,64 @@ class QuickBrowsePanel(QWidget):
     def init_ui(self):
         layout = QVBoxLayout(self)
 
-        # 上方：釘選表格內容搜尋框 + 子表格方塊（含釘選）+ 操作按鈕
-        top = QHBoxLayout()
+        # 第一列：搜尋相關控制項全部置於同一水平
+        #（搜尋框 + 範圍切換 + 上一筆 / 計數 / 下一筆 + 操作按鈕）
+        search_row = QHBoxLayout()
+        search_row.setSpacing(6)
 
-        search_box = QVBoxLayout()
-        search_box.setSpacing(2)
         self.pin_search_in = QLineEdit()
-        self.pin_search_in.setPlaceholderText("搜尋釘選表格內容…")
-        self.pin_search_in.setMaximumWidth(180)
-        self.pin_search_in.setToolTip("Enter：依釘選順序定位下一筆；Shift+Enter：上一筆")
+        self.pin_search_in.setPlaceholderText("搜尋表格內容…")
+        self.pin_search_in.setMaximumWidth(200)
+        self.pin_search_in.setToolTip("Enter：定位下一筆；Shift+Enter：上一筆")
         self.pin_search_in.installEventFilter(self)  # 攔截 Enter / Shift+Enter
-        search_box.addWidget(self.pin_search_in)
+        search_row.addWidget(self.pin_search_in, 0)
 
-        # 搜尋框下方：結果計數 + 上一筆 / 下一筆箭頭
-        nav = QHBoxLayout()
-        nav.setSpacing(2)
+        # 搜尋範圍切換：當前瀏覽表格 / 釘選的表格 / 所有表格
+        self.search_scope_combo = QComboBox()
+        self.search_scope_combo.addItem("當前瀏覽表格", "current")
+        self.search_scope_combo.addItem("釘選的表格", "pinned")
+        self.search_scope_combo.addItem("所有表格", "all")
+        self.search_scope_combo.setToolTip("選擇搜尋範圍")
+        self.search_scope_combo.currentIndexChanged.connect(self._on_scope_changed)
+        search_row.addWidget(self.search_scope_combo, 0)
+
+        # 上一筆 / 下一筆只在有搜尋結果時顯示，一般狀態隱藏
         self.pin_prev_btn = QPushButton("◀")
         self.pin_prev_btn.setFixedWidth(28)
         self.pin_prev_btn.setToolTip("上一筆結果 (Shift+Enter)")
         self.pin_prev_btn.clicked.connect(lambda: self._run_pin_search(forward=False))
-        nav.addWidget(self.pin_prev_btn, 0)
+        self.pin_prev_btn.setVisible(False)
+        search_row.addWidget(self.pin_prev_btn, 0)
 
         self.pin_result_label = QLabel("")
         self.pin_result_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        nav.addWidget(self.pin_result_label, 1)
+        self.pin_result_label.setMinimumWidth(48)
+        search_row.addWidget(self.pin_result_label, 0)
 
         self.pin_next_btn = QPushButton("▶")
         self.pin_next_btn.setFixedWidth(28)
         self.pin_next_btn.setToolTip("下一筆結果 (Enter)")
         self.pin_next_btn.clicked.connect(lambda: self._run_pin_search(forward=True))
-        nav.addWidget(self.pin_next_btn, 0)
-        search_box.addLayout(nav)
+        self.pin_next_btn.setVisible(False)
+        search_row.addWidget(self.pin_next_btn, 0)
 
-        top.addLayout(search_box, 0)
-
-        self.chip_bar = QWidget()
-        self.chip_layout = FlowLayout(self.chip_bar, spacing=6)
-        top.addWidget(self.chip_bar, 1)
+        search_row.addStretch(1)
 
         self.save_btn = QPushButton("Save to Excel")
         self.save_btn.clicked.connect(self.save)
-        top.addWidget(self.save_btn, 0, Qt.AlignmentFlag.AlignTop)
+        search_row.addWidget(self.save_btn, 0)
 
         self.open_excel_btn = QPushButton("Open in Excel")
         self.open_excel_btn.clicked.connect(self.open_in_excel)
-        top.addWidget(self.open_excel_btn, 0, Qt.AlignmentFlag.AlignTop)
-        layout.addLayout(top)
+        search_row.addWidget(self.open_excel_btn, 0)
+        layout.addLayout(search_row)
+
+        # 第二列：子表格方塊（含釘選），靠左排列於搜尋列下方
+        self.chip_bar = ChipBar()
+        self.chip_layout = self.chip_bar.flow
+        self.chip_bar.reorder_committed.connect(
+            self._commit_pin_order, Qt.ConnectionType.QueuedConnection)
+        layout.addWidget(self.chip_bar)
 
         self.table = PanTableWidget()
         self.table.cellChanged.connect(self.on_cell_changed)
@@ -3451,6 +3676,14 @@ class QuickBrowsePanel(QWidget):
         self.zoom_label.setMinimumWidth(44)
         self.zoom_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         bottom.addWidget(self.zoom_label, 0)
+
+        # 全螢幕按鈕：將右欄放大至全介面（隱藏左側兩個窗口），再按一次恢復
+        self.fullscreen_btn = QPushButton("⛶")
+        self.fullscreen_btn.setCheckable(True)
+        self.fullscreen_btn.setFixedWidth(32)
+        self.fullscreen_btn.setToolTip("放大右欄至全介面 (Tab)")
+        self.fullscreen_btn.clicked.connect(self.fullscreen_toggle_requested.emit)
+        bottom.addWidget(self.fullscreen_btn, 0)
         layout.addLayout(bottom)
 
         self.clear()
@@ -3508,14 +3741,28 @@ class QuickBrowsePanel(QWidget):
             nxt = 0 if forward else len(ids) - 1
         return self.pinned[nxt]
 
-    # --- 釘選表格內容搜尋 ---
+    # --- 表格內容搜尋 ---
     def _pin_search_scope(self):
-        """搜尋範圍：有釘選表格則搜尋全部釘選；未釘選則僅搜尋目前開啟的表格。"""
-        if self.pinned:
+        """依右上角下拉選單決定搜尋範圍：當前瀏覽表格 / 釘選的表格 / 所有表格。"""
+        mode = self.search_scope_combo.currentData()
+        if mode == 'all':
+            return list(self.all_nodes)
+        if mode == 'pinned':
             return list(self.pinned)
+        # 'current'：僅搜尋目前開啟的表格
         if self.current_node_data:
             return [self.current_node_data]
         return []
+
+    def _on_scope_changed(self, _index=0):
+        """搜尋範圍變動：清除前次結果快取，若已輸入關鍵字則立即以新範圍重搜。"""
+        self._pin_search_query = None
+        self._pin_search_pins = ()
+        self._pin_search_matches = []
+        self._pin_search_idx = -1
+        self._update_pin_result_label()
+        if self.pin_search_in.text().strip():
+            self._run_pin_search(forward=True)
 
     def _run_pin_search(self, forward=True):
         """搜尋（釘選 / 目前）表格內容並切換 Focus。
@@ -3553,12 +3800,15 @@ class QuickBrowsePanel(QWidget):
         self._update_pin_result_label()
 
     def _update_pin_result_label(self):
-        """更新搜尋框下方的「目前 / 總筆數」顯示。"""
+        """更新「目前 / 總筆數」顯示，並依是否有結果切換左右按鈕的顯示。"""
         n = len(self._pin_search_matches)
         if n and self._pin_search_idx >= 0:
             self.pin_result_label.setText(f"{self._pin_search_idx + 1}/{n}")
         else:
             self.pin_result_label.setText("")
+        # 左右切換按鈕只在有搜尋結果時顯示
+        self.pin_prev_btn.setVisible(n > 0)
+        self.pin_next_btn.setVisible(n > 0)
 
     def _build_pin_search_matches(self, query, scope):
         """依順序掃描 scope 內各表格的表頭與儲存格，回傳符合的 (node_data, row, col)。"""
@@ -3634,10 +3884,30 @@ class QuickBrowsePanel(QWidget):
                              pinned=self.is_pinned(nd['id']),
                              active=(nd['id'] == cur_id))
             chip.clicked.connect(self.chip_selected.emit)
-            # 用 Queued 連線：取消釘選會在 rebuild_chips 中刪除此 chip，
+            # 用 Queued 連線：釘選 / 取消釘選 / 排序都會在 rebuild_chips 中刪除此 chip，
             # 必須等目前的滑鼠事件完全結束後再執行，否則會 use-after-free 閃退。
             chip.unpin_requested.connect(self.unpin_node, Qt.ConnectionType.QueuedConnection)
+            chip.pin_requested.connect(self.pin_node, Qt.ConnectionType.QueuedConnection)
             self.chip_layout.addWidget(chip)
+
+    def _commit_pin_order(self, ordered_ids):
+        """拖放完成：依預覽得到的 node id 順序重排釘選清單並重建方塊。
+
+        ordered_ids 為空（拖曳取消 / 離開容器）時，僅依現有順序重建以還原預覽。
+        """
+        if ordered_ids:
+            id_to_node = {str(n['id']): n for n in self.pinned}
+            new_order = [id_to_node[i] for i in ordered_ids if i in id_to_node]
+            for n in self.pinned:  # 保險：補回任何遺漏的釘選
+                if n not in new_order:
+                    new_order.append(n)
+            changed = new_order != self.pinned
+            self.pinned = new_order
+        else:
+            changed = False
+        self.rebuild_chips()
+        if changed:
+            self.pins_changed.emit()
 
     def clear(self):
         # 釘選保留（僅關閉 app 才解除），只清空目前預覽內容
@@ -3790,6 +4060,11 @@ class QuickBrowsePanel(QWidget):
             self.excel_handler.open_sheet(self.filename, self.sheet)
         except Exception as e:
             QMessageBox.warning(self, "Error", f"無法開啟 Excel：{e}")
+
+    def discard_edits(self):
+        """捨棄未儲存的編輯（不寫回 Excel）。切換表格時會重載內容，故僅需清空暫存。"""
+        self.dirty_cells.clear()
+        self.lbl_status.setText("Tips: 雙擊儲存格可編輯，按 Save to Excel 寫回。")
 
     def save(self):
         if not self.current_node_data:
@@ -4000,6 +4275,7 @@ class MainWindow(QMainWindow):
             nodes = [n for n in self.graph_data['nodes'] if not n['sheet'].startswith('#')]
             self.all_nodes_map = {n['id']: n for n in nodes}
 
+            self.details.all_nodes = nodes  # 重新掃描後更新「所有表格」搜尋範圍
             self.details.clear()
             self.relation_view.show_empty_state()
             self.main_view.load_nodes(nodes)
@@ -4033,9 +4309,16 @@ class MainWindow(QMainWindow):
         central = QWidget()
         main_layout = QVBoxLayout(central)
         
-        # Top Bar
-        top = QHBoxLayout()
-        top.setContentsMargins(5, 5, 5, 5)
+        # Top Bar：包進帶下邊線的 QFrame，與下方三個窗口做出視覺區隔。
+        # 高度需貼齊內容（Fixed），否則 QFrame 會與下方分割視窗均分剩餘空間而被撐高。
+        top_bar = QFrame()
+        top_bar.setObjectName("topBar")
+        top_bar.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
+        top_bar.setStyleSheet(
+            '#topBar { border-bottom: 2px solid #6e6e6e; }'
+        )
+        top = QHBoxLayout(top_bar)
+        top.setContentsMargins(5, 5, 5, 8)
         top.addWidget(QLabel("Search:"))
         self.search_in = QLineEdit()
         self.search_in.setPlaceholderText("Search...")
@@ -4068,20 +4351,21 @@ class MainWindow(QMainWindow):
         top.addWidget(self.change_dir_btn)
 
         top.addStretch()
-        main_layout.addLayout(top)
-        
+        main_layout.addWidget(top_bar)
+
         self.h_splitter = QSplitter(Qt.Orientation.Horizontal)
         self.v_splitter = QSplitter(Qt.Orientation.Vertical)
 
-        # 把可拖曳的分隔線畫出來（左右 / 上下窗口之間的中線），方便辨識與拖曳
+        # 把可拖曳的分隔線畫出來（左右 / 上下窗口之間的中線），方便辨識與拖曳。
+        # 加粗握把（10px）並擴大可拖曳範圍，讓使用者更容易抓取調整窗口大小。
         splitter_qss = '''
             QSplitter::handle { background-color: #6e6e6e; }
             QSplitter::handle:hover { background-color: #FFD700; }
-            QSplitter::handle:horizontal { width: 4px; }
-            QSplitter::handle:vertical { height: 4px; }
+            QSplitter::handle:horizontal { width: 10px; }
+            QSplitter::handle:vertical { height: 10px; }
         '''
-        self.h_splitter.setHandleWidth(4)
-        self.v_splitter.setHandleWidth(4)
+        self.h_splitter.setHandleWidth(10)
+        self.v_splitter.setHandleWidth(10)
         self.h_splitter.setStyleSheet(splitter_qss)
         self.v_splitter.setStyleSheet(splitter_qss)
         
@@ -4114,8 +4398,12 @@ class MainWindow(QMainWindow):
         self.h_splitter.addWidget(self.v_splitter)
         
         self.details = QuickBrowsePanel(self.excel_handler, self.config_manager)
+        self.details.all_nodes = all_nodes  # 供右欄「所有表格」搜尋範圍使用
         self.details.chip_selected.connect(self.on_chip_selected)
         self.details.pins_changed.connect(self._refresh_pin_markers)
+        self.details.fullscreen_toggle_requested.connect(self.toggle_details_fullscreen)
+        self._details_fullscreen = False
+        self._h_sizes_before_fullscreen = None
 
         self.h_splitter.addWidget(self.details)
         
@@ -4131,7 +4419,7 @@ class MainWindow(QMainWindow):
             self.v_splitter.setStretchFactor(0, 3)
             self.v_splitter.setStretchFactor(1, 1)
         
-        main_layout.addWidget(self.h_splitter)
+        main_layout.addWidget(self.h_splitter, 1)  # 剩餘垂直空間全部給分割視窗
         self.setCentralWidget(central)
 
         # 不要在開啟 APP 時自動聚焦搜尋框 (改為 ClickFocus，僅點擊或快捷鍵才聚焦) (v3.17)
@@ -4167,6 +4455,20 @@ class MainWindow(QMainWindow):
         node = self.details.next_pinned(forward=forward)
         if node:
             self.main_view.select_card_by_id(node['id'])
+
+    def toggle_details_fullscreen(self):
+        """切換右欄全介面：放大時隱藏左側兩個窗口，再次切換則恢復原本比例。"""
+        if not self._details_fullscreen:
+            # 記住目前左右比例，再把左側窗口縮到 0
+            self._h_sizes_before_fullscreen = self.h_splitter.sizes()
+            self.h_splitter.setSizes([0, max(1, sum(self._h_sizes_before_fullscreen))])
+            self._details_fullscreen = True
+        else:
+            if self._h_sizes_before_fullscreen:
+                self.h_splitter.setSizes(self._h_sizes_before_fullscreen)
+            self._details_fullscreen = False
+        # 同步按鈕勾選狀態（也涵蓋以 Tab 快捷鍵觸發的情況）
+        self.details.fullscreen_btn.setChecked(self._details_fullscreen)
 
     # (closeEvent unchanged)
     def closeEvent(self, event):
@@ -4238,9 +4540,9 @@ class MainWindow(QMainWindow):
             self.refresh_colors()
 
     def _confirm_switch(self, new_data):
-        """切換預覽前確認：若右欄有未儲存編輯且要切到不同表格，跳出『保存 / 取消』。
+        """切換預覽前確認：若右欄有未儲存編輯且要切到不同表格，跳出『保存 / 不保存 / 取消』。
 
-        回傳 True 表示可切換（已視需要儲存）；False 表示使用者取消切換。
+        回傳 True 表示可切換（已視需要儲存或捨棄）；False 表示使用者取消切換。
         """
         cur = self.details.current_node_data
         if cur and cur.get('id') != new_data.get('id') and self.details.dirty_cells:
@@ -4249,10 +4551,15 @@ class MainWindow(QMainWindow):
             box.setWindowTitle("未儲存的變更")
             box.setText(f"右欄『{cur['sheet']}』有未儲存的編輯。\n要先儲存再切換嗎？")
             save_btn = box.addButton("保存", QMessageBox.ButtonRole.AcceptRole)
+            discard_btn = box.addButton("不保存", QMessageBox.ButtonRole.DestructiveRole)
             box.addButton("取消", QMessageBox.ButtonRole.RejectRole)
             box.exec()
-            if box.clickedButton() is save_btn:
+            clicked = box.clickedButton()
+            if clicked is save_btn:
                 self.details.save()
+                return True
+            if clicked is discard_btn:
+                self.details.discard_edits()
                 return True
             return False
         return True
@@ -4355,6 +4662,13 @@ class MainWindow(QMainWindow):
             elif key == Qt.Key.Key_Escape and fw is self.search_in:
                 self.exit_search()
                 return True
+            elif key == Qt.Key.Key_Tab and not event.modifiers():
+                # 無修飾鍵的 Tab：切換右欄全介面。
+                # 焦點在文字輸入 / 表格時不攔截，保留原本的 Tab 行為（換欄 / 編輯移動）。
+                if QApplication.activeWindow() is not None and \
+                        not isinstance(fw, (QLineEdit, QTextEdit, QAbstractItemView)):
+                    self.toggle_details_fullscreen()
+                    return True
         return super().eventFilter(obj, event)
 
     def on_search(self, txt):

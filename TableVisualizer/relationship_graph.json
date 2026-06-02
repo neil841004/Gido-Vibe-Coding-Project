@@ -77,7 +77,7 @@
         "掉落表Id",
         "掉落表Id_Duo限定取得"
       ],
-      "row_count": 37
+      "row_count": 38
     },
     {
       "id": 3243883238,
@@ -118,6 +118,28 @@
       "row_count": 3
     },
     {
+      "id": 2326068401,
+      "table": "Building",
+      "sheet": "Building_UltraCocoon",
+      "full_name": "Building.Building_UltraCocoon",
+      "type": "building",
+      "filename": "Building.xlsm",
+      "headers": [
+        "#流水號",
+        "說明",
+        "超合融合圈範圍(千分之一)",
+        "異變最大值",
+        "異變值偵測變化頻率(毫秒)",
+        "1人進圈 異變值增加量",
+        "2人進圈 異變值增加量",
+        "3人進圈 異變值增加量",
+        "4人進圈 異變值增加量",
+        "無人進圈 異變值倒扣量",
+        "自身被動效果"
+      ],
+      "row_count": 3
+    },
+    {
       "id": 2235120777,
       "table": "Building",
       "sheet": "Building_Fountain",
@@ -148,7 +170,7 @@
         "Col_3",
         "Col_4"
       ],
-      "row_count": 87
+      "row_count": 99
     },
     {
       "id": 986290926,
@@ -171,7 +193,7 @@
         "AttackType對照表",
         "Col_11"
       ],
-      "row_count": 68
+      "row_count": 69
     },
     {
       "id": 4147932027,
@@ -186,7 +208,9 @@
         "Parameter",
         "Parameter",
         "Value",
-        "存在時間(秒)"
+        "存在時間(秒)",
+        "掉落表Id_Solo吃掉取得",
+        "掉落表Id_融合獸吃掉取得"
       ],
       "row_count": 30
     },
@@ -207,7 +231,7 @@
         "Value",
         "說明"
       ],
-      "row_count": 203
+      "row_count": 213
     },
     {
       "id": 4195824706,
@@ -331,6 +355,11 @@
         "起步加速度",
         "慣性減速度",
         "產生速度加成之輸入夾角度\n(所有成員朝相同方向角度內移動，產生速度加成)",
+        "失衡條滿值",
+        "失衡值延遲衰退時間(毫秒)",
+        "失衡衰退頻率(毫秒)",
+        "失衡衰退量",
+        "失衡持續時間(毫秒)",
         "脈衝最大值",
         "共鳴值偵測變化頻率(毫秒)",
         "1人集氣 脈衝值增加量",
@@ -338,8 +367,10 @@
         "3人集氣 脈衝值增加量",
         "4人集氣 脈衝值增加量",
         "無人集氣 脈衝值倒扣量",
+        "進食範圍(千分之一公尺)",
+        "掉落表Id",
         "自身被動效果",
-        "Col_18"
+        "Col_25"
       ],
       "row_count": 4
     },
@@ -376,7 +407,7 @@
         "日文",
         "韓文"
       ],
-      "row_count": 183
+      "row_count": 188
     },
     {
       "id": 2343521243,
@@ -398,7 +429,7 @@
         "Col_9",
         "Col_10"
       ],
-      "row_count": 89
+      "row_count": 128
     },
     {
       "id": 3516493207,
@@ -451,6 +482,7 @@
         "融合獸頭 ID",
         "融合獸 ID",
         "Combo第幾下",
+        "可瞄準角度",
         "後座力速度(千分之一)",
         "後座力時間(毫秒)",
         "Frame",
@@ -479,7 +511,8 @@
         "說明",
         "類型",
         "血量",
-        "掉落表Id"
+        "掉落表Id_Solo吃掉取得",
+        "掉落表Id_融合獸吃掉取得"
       ],
       "row_count": 11
     },
@@ -554,9 +587,12 @@
         "稀有度",
         "Parameter",
         "Parameter",
-        "Value"
+        "Value",
+        "Mode",
+        "Col_7",
+        "Col_8"
       ],
-      "row_count": 38
+      "row_count": 37
     },
     {
       "id": 1868040658,
@@ -1004,6 +1040,7 @@
         "傷害頻率(毫秒)",
         "光束最遠距離(千分之一)",
         "自身效果_ID",
+        "組合技CD(毫秒)",
         "前搖時間(毫秒)",
         "技能作用時間(毫秒)",
         "收尾時間(毫秒)",
@@ -1263,6 +1300,8 @@
         "#流水號",
         "說明",
         "範圍內的Solo-Gido治療量",
+        "範圍內的Duo治療量",
+        "範圍內的Ultra治療量",
         "範圍內的Turret, 主堡治療量",
         "治療範圍(半徑，千分之一公尺)",
         "延遲治療時間(毫秒)"
@@ -1336,6 +1375,7 @@
         "EntityType",
         "說明",
         "生產單位",
+        "Loot生產ID",
         "生產上限"
       ],
       "row_count": 24
@@ -1352,7 +1392,7 @@
         "Json File Name",
         "Airdrop_Pattern_id"
       ],
-      "row_count": 5
+      "row_count": 6
     },
     {
       "id": 2171228891,
@@ -1367,6 +1407,118 @@
         "數值"
       ],
       "row_count": 4
+    },
+    {
+      "id": 4031881784,
+      "table": "UltraMutation",
+      "sheet": "UltraMutation",
+      "full_name": "UltraMutation.UltraMutation",
+      "type": "other",
+      "filename": "UltraMutation.xlsm",
+      "headers": [
+        "#流水號",
+        "說明",
+        "說明",
+        "說明",
+        "說明"
+      ],
+      "row_count": 8
+    },
+    {
+      "id": 2426724451,
+      "table": "UltraMutation",
+      "sheet": "UltraMutation_VenomTrail",
+      "full_name": "UltraMutation.UltraMutation_VenomTrail",
+      "type": "other",
+      "filename": "UltraMutation.xlsm",
+      "headers": [
+        "#流水號",
+        "說明",
+        "地面毒水ID"
+      ],
+      "row_count": 3
+    },
+    {
+      "id": 1470761805,
+      "table": "UltraMutation",
+      "sheet": "UltraMutation_LeafShield",
+      "full_name": "UltraMutation.UltraMutation_LeafShield",
+      "type": "other",
+      "filename": "UltraMutation.xlsm",
+      "headers": [
+        "#流水號",
+        "說明",
+        "環繞盾牌數量",
+        "盾牌旋轉速度(角度/每秒)",
+        "盾牌距離(半徑，千分之一)"
+      ],
+      "row_count": 4
+    },
+    {
+      "id": 1892589416,
+      "table": "UltraMutation",
+      "sheet": "UltraMutation_ZoomZap",
+      "full_name": "UltraMutation.UltraMutation_ZoomZap",
+      "type": "other",
+      "filename": "UltraMutation.xlsm",
+      "headers": [
+        "#流水號",
+        "說明",
+        "Damage_ID",
+        "電擊間隔時間(毫秒)",
+        "電擊對象數量上限",
+        "產生電圈速度門檻\n(千分之一)",
+        "電擊影響範圍(半徑，千分之一)",
+        "HIT效果集合",
+        "硬直時間ID",
+        "毫秒",
+        "擊退力ID",
+        "擊退力",
+        "被動效果"
+      ],
+      "row_count": 3
+    },
+    {
+      "id": 1971082973,
+      "table": "UltraMutation",
+      "sheet": "UltraMutation_RapidCast",
+      "full_name": "UltraMutation.UltraMutation_RapidCast",
+      "type": "other",
+      "filename": "UltraMutation.xlsm",
+      "headers": [
+        "#流水號",
+        "說明",
+        "Self_Effect_ID"
+      ],
+      "row_count": 3
+    },
+    {
+      "id": 1769332526,
+      "table": "UltraMutation",
+      "sheet": "UltraMutation_ToughSkin",
+      "full_name": "UltraMutation.UltraMutation_ToughSkin",
+      "type": "other",
+      "filename": "UltraMutation.xlsm",
+      "headers": [
+        "#流水號",
+        "說明",
+        "Self_Effect_ID"
+      ],
+      "row_count": 3
+    },
+    {
+      "id": 431196094,
+      "table": "UltraMutation",
+      "sheet": "UltraMutation_AllInStrike",
+      "full_name": "UltraMutation.UltraMutation_AllInStrike",
+      "type": "other",
+      "filename": "UltraMutation.xlsm",
+      "headers": [
+        "#流水號",
+        "說明",
+        "Self_Effect_ID"
+      ],
+      "row_count": 3
     }
   ],
   "edges": [
@@ -1385,6 +1537,12 @@
     {
       "from": 2884855552,
       "to": 162995944,
+      "type": "naming_hierarchy",
+      "label": "inherits"
+    },
+    {
+      "from": 2884855552,
+      "to": 2326068401,
       "type": "naming_hierarchy",
       "label": "inherits"
     },
@@ -1463,6 +1621,42 @@
     {
       "from": 3513595676,
       "to": 2171228891,
+      "type": "naming_hierarchy",
+      "label": "inherits"
+    },
+    {
+      "from": 4031881784,
+      "to": 2426724451,
+      "type": "naming_hierarchy",
+      "label": "inherits"
+    },
+    {
+      "from": 4031881784,
+      "to": 1470761805,
+      "type": "naming_hierarchy",
+      "label": "inherits"
+    },
+    {
+      "from": 4031881784,
+      "to": 1892589416,
+      "type": "naming_hierarchy",
+      "label": "inherits"
+    },
+    {
+      "from": 4031881784,
+      "to": 1971082973,
+      "type": "naming_hierarchy",
+      "label": "inherits"
+    },
+    {
+      "from": 4031881784,
+      "to": 1769332526,
+      "type": "naming_hierarchy",
+      "label": "inherits"
+    },
+    {
+      "from": 4031881784,
+      "to": 431196094,
       "type": "naming_hierarchy",
       "label": "inherits"
     },
@@ -1705,11 +1899,46 @@
       "column": "EntityType"
     },
     {
+      "from": 1398131978,
+      "to": 2343521243,
+      "type": "string_reference",
+      "label": "Loot生產ID",
+      "column": "Loot生產ID"
+    },
+    {
       "from": 3513595676,
       "to": 3039205605,
       "type": "string_reference",
       "label": "Airdrop_Pattern_id",
       "column": "Airdrop_Pattern_id"
+    },
+    {
+      "from": 1892589416,
+      "to": 986290926,
+      "type": "string_reference",
+      "label": "Damage_ID",
+      "column": "Damage_ID"
+    },
+    {
+      "from": 1971082973,
+      "to": 3670186166,
+      "type": "string_reference",
+      "label": "Self_Effect_ID",
+      "column": "Self_Effect_ID"
+    },
+    {
+      "from": 1769332526,
+      "to": 3670186166,
+      "type": "string_reference",
+      "label": "Self_Effect_ID",
+      "column": "Self_Effect_ID"
+    },
+    {
+      "from": 431196094,
+      "to": 3670186166,
+      "type": "string_reference",
+      "label": "Self_Effect_ID",
+      "column": "Self_Effect_ID"
     },
     {
       "from": 2884855552,
@@ -1740,6 +1969,13 @@
       "column": "Skill_Turret_ID"
     },
     {
+      "from": 2326068401,
+      "to": 3670186166,
+      "type": "value_reference",
+      "label": "自身被動效果: Self_Effect_ID",
+      "column": "自身被動效果"
+    },
+    {
       "from": 2766699913,
       "to": 3670186166,
       "type": "value_reference",
@@ -1752,6 +1988,13 @@
       "type": "value_reference",
       "label": "傷害(對建築): DamageToBuilding",
       "column": "傷害(對建築)"
+    },
+    {
+      "from": 4147932027,
+      "to": 2343521243,
+      "type": "value_reference",
+      "label": "掉落表Id_Solo吃掉取得: Loot_Id_Solo",
+      "column": "掉落表Id_Solo吃掉取得"
     },
     {
       "from": 3670186166,
@@ -1797,6 +2040,13 @@
     },
     {
       "from": 2823911306,
+      "to": 2343521243,
+      "type": "value_reference",
+      "label": "掉落表Id: Loot_Id",
+      "column": "掉落表Id"
+    },
+    {
+      "from": 2823911306,
       "to": 3670186166,
       "type": "value_reference",
       "label": "自身被動效果: Self_Effect_ID",
@@ -1827,8 +2077,8 @@
       "from": 476719733,
       "to": 2343521243,
       "type": "value_reference",
-      "label": "掉落表Id: Loot_Id",
-      "column": "掉落表Id"
+      "label": "掉落表Id_Solo吃掉取得: Loot_Id_Solo",
+      "column": "掉落表Id_Solo吃掉取得"
     },
     {
       "from": 705805667,
@@ -2088,11 +2338,25 @@
       "type": "value_reference",
       "label": "Skill_ID: Skill_SlicerLeaf",
       "column": "Skill_ID"
+    },
+    {
+      "from": 2426724451,
+      "to": 2686299979,
+      "type": "value_reference",
+      "label": "地面毒水ID: SpawnedObject_VenomPuddle_ID",
+      "column": "地面毒水ID"
+    },
+    {
+      "from": 1892589416,
+      "to": 3670186166,
+      "type": "value_reference",
+      "label": "HIT效果集合: Hit_Effect_ID",
+      "column": "HIT效果集合"
     }
   ],
   "metadata": {
-    "total_tables": 20,
-    "total_sheets": 67,
-    "total_relationships": 105
+    "total_tables": 21,
+    "total_sheets": 75,
+    "total_relationships": 122
   }
 }

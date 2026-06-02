@@ -1,5 +1,5 @@
 {
-  "working_directory": "F:\\Unity\\Project_Gidora\\GidoraCommon\\Table\\ExcelFiles",
+  "working_directory": "/Users/halaa/Desktop/Unity Project/ProjectGidora/GidoraCommon/Table/ExcelFiles",
   "node_positions": {
     "Airdrop.Airdrop_Pattern": [
       715.5,
@@ -386,8 +386,8 @@
   },
   "layout_settings": {
     "h_splitter": [
-      780,
-      1457
+      776,
+      1449
     ],
     "v_splitter": [
       631,

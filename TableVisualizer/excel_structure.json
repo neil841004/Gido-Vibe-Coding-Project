@@ -225,7 +225,7 @@
             "掉落表Id",
             "掉落表Id_Duo限定取得"
           ],
-          "row_count": 37,
+          "row_count": 38,
           "columns": {
             "#流水號": {
               "samples": [
@@ -434,6 +434,101 @@
             }
           }
         },
+        "Building_UltraCocoon": {
+          "headers": [
+            "#流水號",
+            "說明",
+            "超合融合圈範圍(千分之一)",
+            "異變最大值",
+            "異變值偵測變化頻率(毫秒)",
+            "1人進圈 異變值增加量",
+            "2人進圈 異變值增加量",
+            "3人進圈 異變值增加量",
+            "4人進圈 異變值增加量",
+            "無人進圈 異變值倒扣量",
+            "自身被動效果"
+          ],
+          "row_count": 3,
+          "columns": {
+            "#流水號": {
+              "samples": [
+                "uint",
+                "id",
+                "5001"
+              ]
+            },
+            "說明": {
+              "samples": [
+                "#string",
+                "物件",
+                "超合獸繭"
+              ]
+            },
+            "超合融合圈範圍(千分之一)": {
+              "samples": [
+                "uint",
+                "UltraWaveRadius",
+                "19000"
+              ]
+            },
+            "異變最大值": {
+              "samples": [
+                "uint",
+                "MutationMax",
+                "1000"
+              ]
+            },
+            "異變值偵測變化頻率(毫秒)": {
+              "samples": [
+                "uint",
+                "MutationCheckTickInterval",
+                "100"
+              ]
+            },
+            "1人進圈 異變值增加量": {
+              "samples": [
+                "uint",
+                "MutationGain1P",
+                "5"
+              ]
+            },
+            "2人進圈 異變值增加量": {
+              "samples": [
+                "uint",
+                "MutationGain2P",
+                "12"
+              ]
+            },
+            "3人進圈 異變值增加量": {
+              "samples": [
+                "uint",
+                "MutationGain3P",
+                "28"
+              ]
+            },
+            "4人進圈 異變值增加量": {
+              "samples": [
+                "uint",
+                "MutationGain4P",
+                "60"
+              ]
+            },
+            "無人進圈 異變值倒扣量": {
+              "samples": [
+                "uint",
+                "MutationDecayNoInput",
+                "10"
+              ]
+            },
+            "自身被動效果": {
+              "samples": [
+                "string",
+                "Self_Effect_ID",
+                "4802"
+              ]
+            }
+          }
+        },
         "Building_Fountain": {
           "headers": [
             "#流水號",
@@ -502,7 +597,7 @@
             "Col_3",
             "Col_4"
           ],
-          "row_count": 87,
+          "row_count": 99,
           "columns": {
             "#流水號": {
               "samples": [
@@ -599,7 +694,7 @@
             "AttackType對照表",
             "Col_11"
           ],
-          "row_count": 68,
+          "row_count": 69,
           "columns": {
             "#流水號": {
               "samples": [
@@ -714,7 +809,9 @@
             "Parameter",
             "Parameter",
             "Value",
-            "存在時間(秒)"
+            "存在時間(秒)",
+            "掉落表Id_Solo吃掉取得",
+            "掉落表Id_融合獸吃掉取得"
           ],
           "row_count": 30,
           "columns": {
@@ -759,8 +856,26 @@
                 "uint",
                 "Lifetime",
                 "22",
-                "99999",
+                "3",
                 "22"
+              ]
+            },
+            "掉落表Id_Solo吃掉取得": {
+              "samples": [
+                "uint",
+                "Loot_Id_Solo",
+                "0",
+                "0",
+                "0"
+              ]
+            },
+            "掉落表Id_融合獸吃掉取得": {
+              "samples": [
+                "uint",
+                "Loot_Id_Fused",
+                "0",
+                "0",
+                "303"
               ]
             }
           }
@@ -821,7 +936,7 @@
             "Value",
             "說明"
           ],
-          "row_count": 203,
+          "row_count": 213,
           "columns": {
             "#流水號": {
               "samples": [
@@ -885,7 +1000,7 @@
             "Col_1",
             "Col_2"
           ],
-          "row_count": 47,
+          "row_count": 49,
           "columns": {
             "Col_0": {
               "samples": []
@@ -1649,18 +1764,18 @@
               "samples": [
                 "uint",
                 "DashSpeed",
-                "44000",
-                "44000",
-                "44000"
+                "41500",
+                "41500",
+                "41500"
               ]
             },
             "Dash時間(毫秒)": {
               "samples": [
                 "uint",
                 "DashDuration",
-                "235",
-                "235",
-                "235"
+                "200",
+                "200",
+                "200"
               ]
             },
             "Dash轉向速度(角度/每秒)": {
@@ -1814,6 +1929,11 @@
             "起步加速度",
             "慣性減速度",
             "產生速度加成之輸入夾角度\n(所有成員朝相同方向角度內移動，產生速度加成)",
+            "失衡條滿值",
+            "失衡值延遲衰退時間(毫秒)",
+            "失衡衰退頻率(毫秒)",
+            "失衡衰退量",
+            "失衡持續時間(毫秒)",
             "脈衝最大值",
             "共鳴值偵測變化頻率(毫秒)",
             "1人集氣 脈衝值增加量",
@@ -1821,8 +1941,10 @@
             "3人集氣 脈衝值增加量",
             "4人集氣 脈衝值增加量",
             "無人集氣 脈衝值倒扣量",
+            "進食範圍(千分之一公尺)",
+            "掉落表Id",
             "自身被動效果",
-            "Col_18"
+            "Col_25"
           ],
           "row_count": 4,
           "columns": {
@@ -1838,8 +1960,8 @@
               "samples": [
                 "#string",
                 "職業",
-                "雙人獸",
-                "Gidora"
+                "Duo",
+                "Ultra 原始龍型態"
               ]
             },
             "怪獸能源": {
@@ -1854,16 +1976,16 @@
               "samples": [
                 "uint",
                 "KaijuPowerConsumptionRate",
-                "1000",
-                "1000"
+                "0",
+                "0"
               ]
             },
             "怪獸能源消耗量": {
               "samples": [
                 "uint",
                 "KaijuPowerConsumptionCost",
-                "10",
-                "10"
+                "0",
+                "0"
               ]
             },
             "移動速度(千分之一)": {
@@ -1904,6 +2026,46 @@
                 "BoostAngle",
                 "40",
                 "55"
+              ]
+            },
+            "失衡條滿值": {
+              "samples": [
+                "uint",
+                "StaggerMax",
+                "180",
+                "750"
+              ]
+            },
+            "失衡值延遲衰退時間(毫秒)": {
+              "samples": [
+                "uint",
+                "StaggerDecayDelay",
+                "2000",
+                "2000"
+              ]
+            },
+            "失衡衰退頻率(毫秒)": {
+              "samples": [
+                "uint",
+                "StaggerDecayInterval",
+                "100",
+                "100"
+              ]
+            },
+            "失衡衰退量": {
+              "samples": [
+                "uint",
+                "StaggerDecayAmount",
+                "4",
+                "9"
+              ]
+            },
+            "失衡持續時間(毫秒)": {
+              "samples": [
+                "uint",
+                "StaggerDuration",
+                "3000",
+                "6000"
               ]
             },
             "脈衝最大值": {
@@ -1962,6 +2124,22 @@
                 "12"
               ]
             },
+            "進食範圍(千分之一公尺)": {
+              "samples": [
+                "uint",
+                "EatingRadius",
+                "16000",
+                "24000"
+              ]
+            },
+            "掉落表Id": {
+              "samples": [
+                "uint",
+                "Loot_Id",
+                "0",
+                "0"
+              ]
+            },
             "自身被動效果": {
               "samples": [
                 "string",
@@ -1970,7 +2148,7 @@
                 "7102 | 4003 | 7203 | 4301 | 4401 | 4105 | 4106 | 4107 | 4903 | 5003 | 8201 | 8301"
               ]
             },
-            "Col_18": {
+            "Col_25": {
               "samples": []
             }
           }
@@ -2039,7 +2217,7 @@
             "日文",
             "韓文"
           ],
-          "row_count": 183,
+          "row_count": 188,
           "columns": {
             "#編號": {
               "samples": [
@@ -2197,14 +2375,14 @@
             "Col_9",
             "Col_10"
           ],
-          "row_count": 89,
+          "row_count": 128,
           "columns": {
             "#編號": {
               "samples": [
                 "uint",
                 "id",
                 "#隨機道具",
-                "#Lv1 - 6 item",
+                "#Lv1 - 7 item",
                 "1011"
               ]
             },
@@ -2257,8 +2435,8 @@
               "samples": [
                 "uint",
                 "rate",
-                "500",
-                "500",
+                "316",
+                "316",
                 "0"
               ]
             },
@@ -2557,6 +2735,7 @@
             "融合獸頭 ID",
             "融合獸 ID",
             "Combo第幾下",
+            "可瞄準角度",
             "後座力速度(千分之一)",
             "後座力時間(毫秒)",
             "Frame",
@@ -2627,6 +2806,15 @@
                 "1"
               ]
             },
+            "可瞄準角度": {
+              "samples": [
+                "uint",
+                "AimAngle",
+                "60",
+                "60",
+                "60"
+              ]
+            },
             "後座力速度(千分之一)": {
               "samples": [
                 "uint",
@@ -2648,9 +2836,9 @@
             "Frame": {
               "samples": [
                 "#uint",
+                "25",
+                "25",
                 "30",
-                "30",
-                "24",
                 "30"
               ]
             },
@@ -2660,25 +2848,25 @@
                 "StartupDuration",
                 "401",
                 "401",
-                "334"
+                "451"
               ]
             },
             "攻擊狀態持續時間(毫秒)": {
               "samples": [
                 "uint",
                 "ActiveDuration",
-                "301",
-                "301",
-                "267"
+                "134",
+                "134",
+                "200"
               ]
             },
             "後搖持續時間(毫秒)": {
               "samples": [
                 "uint",
                 "RecoveryDuration",
-                "501",
-                "501",
-                "401"
+                "418",
+                "418",
+                "501"
               ]
             },
             "硬直時間ID": {
@@ -2739,7 +2927,8 @@
             "說明",
             "類型",
             "血量",
-            "掉落表Id"
+            "掉落表Id_Solo吃掉取得",
+            "掉落表Id_融合獸吃掉取得"
           ],
           "row_count": 11,
           "columns": {
@@ -2779,13 +2968,22 @@
                 "1"
               ]
             },
-            "掉落表Id": {
+            "掉落表Id_Solo吃掉取得": {
               "samples": [
                 "uint",
-                "Loot_Id",
-                "0",
-                "0",
-                "0"
+                "Loot_Id_Solo",
+                "304",
+                "304",
+                "304"
+              ]
+            },
+            "掉落表Id_融合獸吃掉取得": {
+              "samples": [
+                "uint",
+                "Loot_Id_Fused",
+                "305",
+                "305",
+                "305"
               ]
             }
           }
@@ -3053,26 +3251,29 @@
             "稀有度",
             "Parameter",
             "Parameter",
-            "Value"
+            "Value",
+            "Mode",
+            "Col_7",
+            "Col_8"
           ],
-          "row_count": 38,
+          "row_count": 37,
           "columns": {
             "#編號": {
               "samples": [
                 "uint",
                 "id",
-                "#個人資源",
-                "#101",
-                "#102"
+                "#掉落物",
+                "1001",
+                "1002"
               ]
             },
             "資源名稱": {
               "samples": [
                 "#string",
                 "name",
-                "金幣",
-                "經驗值",
-                "鑽石"
+                "共鳴能量球",
+                "超共鳴能量球",
+                "補血"
               ]
             },
             "稀有度": {
@@ -3081,25 +3282,50 @@
                 "rare",
                 "0",
                 "0",
-                "0"
+                "1"
               ]
             },
             "Parameter": {
               "samples": [
                 "uint",
                 "resourceParameter",
-                "1",
-                "1",
-                "1"
+                "2",
+                "2",
+                "2"
               ]
             },
             "Value": {
               "samples": [
                 "uint",
                 "value",
+                "1001",
+                "1002",
+                "1101"
+              ]
+            },
+            "Mode": {
+              "samples": [
+                "string",
+                "mode",
                 "1",
                 "1",
-                "1"
+                "0"
+              ]
+            },
+            "Col_7": {
+              "samples": [
+                "#Mode代號",
+                "0",
+                "1",
+                "2"
+              ]
+            },
+            "Col_8": {
+              "samples": [
+                "#Mode對應",
+                "通用所有模式",
+                "限定Moba",
+                "限定Showdown"
               ]
             }
           }
@@ -3110,24 +3336,24 @@
             "資源名稱",
             "字串Id"
           ],
-          "row_count": 32,
+          "row_count": 28,
           "columns": {
             "#編號": {
               "samples": [
                 "uint",
                 "id",
-                "#個人資源",
-                "#101",
-                "#102"
+                "#掉落物",
+                "1001",
+                "1002"
               ]
             },
             "資源名稱": {
               "samples": [
                 "#string",
                 "name",
-                "金幣",
-                "經驗值",
-                "鑽石"
+                "共鳴能量球",
+                "超共鳴能量球",
+                "補血"
               ]
             },
             "字串Id": {
@@ -3150,7 +3376,7 @@
             "Col_2",
             "Col_3"
           ],
-          "row_count": 6,
+          "row_count": 10,
           "columns": {
             "#": {
               "samples": []
@@ -3159,7 +3385,9 @@
               "samples": [
                 "數值",
                 "掉落物",
-                "掉落表"
+                "掉落表",
+                "積分",
+                "飽足度"
               ]
             },
             "Col_2": {
@@ -3167,7 +3395,8 @@
                 "Resource_Used",
                 "Amount",
                 "DropObject_Id",
-                "Loot_Id"
+                "Loot_Id",
+                "AddUltraEnergy"
               ]
             },
             "Col_3": {
@@ -3175,7 +3404,8 @@
                 "Value",
                 "1",
                 "2",
-                "3"
+                "3",
+                "4"
               ]
             }
           }
@@ -5119,6 +5349,7 @@
             "傷害頻率(毫秒)",
             "光束最遠距離(千分之一)",
             "自身效果_ID",
+            "組合技CD(毫秒)",
             "前搖時間(毫秒)",
             "技能作用時間(毫秒)",
             "收尾時間(毫秒)",
@@ -5199,6 +5430,14 @@
                 "Self_Effect_ID",
                 "\"\"",
                 "\"\""
+              ]
+            },
+            "組合技CD(毫秒)": {
+              "samples": [
+                "uint",
+                "SkillCD",
+                "30000",
+                "30000"
               ]
             },
             "前搖時間(毫秒)": {
@@ -6154,6 +6393,8 @@
             "#流水號",
             "說明",
             "範圍內的Solo-Gido治療量",
+            "範圍內的Duo治療量",
+            "範圍內的Ultra治療量",
             "範圍內的Turret, 主堡治療量",
             "治療範圍(半徑，千分之一公尺)",
             "延遲治療時間(毫秒)"
@@ -6178,6 +6419,20 @@
               "samples": [
                 "uint",
                 "SoloHealAmount",
+                "80"
+              ]
+            },
+            "範圍內的Duo治療量": {
+              "samples": [
+                "uint",
+                "DuoHealAmount",
+                "80"
+              ]
+            },
+            "範圍內的Ultra治療量": {
+              "samples": [
+                "uint",
+                "UltraHealAmount",
                 "80"
               ]
             },
@@ -6300,7 +6555,7 @@
               "samples": [
                 "uint",
                 "ExplosionRadius",
-                "6000"
+                "5500"
               ]
             },
             "炸彈隱形所需時間(毫秒)": {
@@ -6335,7 +6590,7 @@
               "samples": [
                 "uint",
                 "RevealDuration",
-                "250"
+                "370"
               ]
             },
             "受擊時飛行距離(千分之一公尺)": {
@@ -6417,6 +6672,7 @@
             "EntityType",
             "說明",
             "生產單位",
+            "Loot生產ID",
             "生產上限"
           ],
           "row_count": 24,
@@ -6457,6 +6713,15 @@
                 "4001 | 4002"
               ]
             },
+            "Loot生產ID": {
+              "samples": [
+                "uint",
+                "Loot_Id",
+                "11001",
+                "11002",
+                "11003"
+              ]
+            },
             "生產上限": {
               "samples": [
                 "uint",
@@ -6479,7 +6744,7 @@
             "Json File Name",
             "Airdrop_Pattern_id"
           ],
-          "row_count": 5,
+          "row_count": 6,
           "columns": {
             "#UUID": {
               "samples": [
@@ -6539,6 +6804,320 @@
                 "Value_1",
                 "25",
                 "180"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "UltraMutation": {
+      "filename": "UltraMutation.xlsm",
+      "sheets": {
+        "UltraMutation": {
+          "headers": [
+            "#流水號",
+            "說明",
+            "說明",
+            "說明",
+            "說明"
+          ],
+          "row_count": 8,
+          "columns": {
+            "#流水號": {
+              "samples": [
+                "uint",
+                "id",
+                "1100",
+                "1200",
+                "1300"
+              ]
+            },
+            "說明": {
+              "samples": [
+                "#string",
+                "英文效果描述",
+                "Leaves venom behind while moving.",
+                "Creates leaves that orbit around you.",
+                "Resonance movement creates electric shocks."
+              ]
+            }
+          }
+        },
+        "UltraMutation_VenomTrail": {
+          "headers": [
+            "#流水號",
+            "說明",
+            "地面毒水ID"
+          ],
+          "row_count": 3,
+          "columns": {
+            "#流水號": {
+              "samples": [
+                "uint",
+                "id",
+                "1100"
+              ]
+            },
+            "說明": {
+              "samples": [
+                "#string",
+                "基因名",
+                "毒毒毒"
+              ]
+            },
+            "地面毒水ID": {
+              "samples": [
+                "uint",
+                "SpawnedObject_VenomPuddle_ID",
+                "3001"
+              ]
+            }
+          }
+        },
+        "UltraMutation_LeafShield": {
+          "headers": [
+            "#流水號",
+            "說明",
+            "環繞盾牌數量",
+            "盾牌旋轉速度(角度/每秒)",
+            "盾牌距離(半徑，千分之一)"
+          ],
+          "row_count": 4,
+          "columns": {
+            "#流水號": {
+              "samples": [
+                "uint",
+                "id",
+                "1200",
+                "1201"
+              ]
+            },
+            "說明": {
+              "samples": [
+                "#string",
+                "基因名",
+                "葉子護盾",
+                "葉子護盾 組合技期間"
+              ]
+            },
+            "環繞盾牌數量": {
+              "samples": [
+                "uint",
+                "ShieldCount",
+                "1",
+                "8"
+              ]
+            },
+            "盾牌旋轉速度(角度/每秒)": {
+              "samples": [
+                "uint",
+                "ShieldRotationSpeed",
+                "60",
+                "90"
+              ]
+            },
+            "盾牌距離(半徑，千分之一)": {
+              "samples": [
+                "uint",
+                "ShieldRadius",
+                "1400",
+                "1100"
+              ]
+            }
+          }
+        },
+        "UltraMutation_ZoomZap": {
+          "headers": [
+            "#流水號",
+            "說明",
+            "Damage_ID",
+            "電擊間隔時間(毫秒)",
+            "電擊對象數量上限",
+            "產生電圈速度門檻\n(千分之一)",
+            "電擊影響範圍(半徑，千分之一)",
+            "HIT效果集合",
+            "硬直時間ID",
+            "毫秒",
+            "擊退力ID",
+            "擊退力",
+            "被動效果"
+          ],
+          "row_count": 3,
+          "columns": {
+            "#流水號": {
+              "samples": [
+                "uint",
+                "id",
+                "1300"
+              ]
+            },
+            "說明": {
+              "samples": [
+                "#string",
+                "基因名",
+                "同心協力放電"
+              ]
+            },
+            "Damage_ID": {
+              "samples": [
+                "uint",
+                "Damage_ID",
+                "60105"
+              ]
+            },
+            "電擊間隔時間(毫秒)": {
+              "samples": [
+                "uint",
+                "DamageInterval",
+                "850"
+              ]
+            },
+            "電擊對象數量上限": {
+              "samples": [
+                "uint",
+                "TargetCountMax",
+                "3"
+              ]
+            },
+            "產生電圈速度門檻\n(千分之一)": {
+              "samples": [
+                "uint",
+                "DamageSpeedThreshold",
+                "9000"
+              ]
+            },
+            "電擊影響範圍(半徑，千分之一)": {
+              "samples": [
+                "uint",
+                "ZapRadius",
+                "32000"
+              ]
+            },
+            "HIT效果集合": {
+              "samples": [
+                "string",
+                "Hit_Effect_ID",
+                "1201"
+              ]
+            },
+            "硬直時間ID": {
+              "samples": [
+                "#uint"
+              ]
+            },
+            "毫秒": {
+              "samples": [
+                "#uint"
+              ]
+            },
+            "擊退力ID": {
+              "samples": [
+                "#uint",
+                "1201"
+              ]
+            },
+            "擊退力": {
+              "samples": [
+                "#uint",
+                "?"
+              ]
+            },
+            "被動效果": {
+              "samples": [
+                "#string"
+              ]
+            }
+          }
+        },
+        "UltraMutation_RapidCast": {
+          "headers": [
+            "#流水號",
+            "說明",
+            "Self_Effect_ID"
+          ],
+          "row_count": 3,
+          "columns": {
+            "#流水號": {
+              "samples": [
+                "uint",
+                "id",
+                "1400"
+              ]
+            },
+            "說明": {
+              "samples": [
+                "#string",
+                "基因名",
+                "快速施放"
+              ]
+            },
+            "Self_Effect_ID": {
+              "samples": [
+                "string",
+                "Self_Effect_ID",
+                "5401"
+              ]
+            }
+          }
+        },
+        "UltraMutation_ToughSkin": {
+          "headers": [
+            "#流水號",
+            "說明",
+            "Self_Effect_ID"
+          ],
+          "row_count": 3,
+          "columns": {
+            "#流水號": {
+              "samples": [
+                "uint",
+                "id",
+                "1500"
+              ]
+            },
+            "說明": {
+              "samples": [
+                "#string",
+                "基因名",
+                "防禦+"
+              ]
+            },
+            "Self_Effect_ID": {
+              "samples": [
+                "string",
+                "Self_Effect_ID",
+                "4206"
+              ]
+            }
+          }
+        },
+        "UltraMutation_AllInStrike": {
+          "headers": [
+            "#流水號",
+            "說明",
+            "Self_Effect_ID"
+          ],
+          "row_count": 3,
+          "columns": {
+            "#流水號": {
+              "samples": [
+                "uint",
+                "id",
+                "1600"
+              ]
+            },
+            "說明": {
+              "samples": [
+                "#string",
+                "基因名",
+                "終極一發"
+              ]
+            },
+            "Self_Effect_ID": {
+              "samples": [
+                "string",
+                "Self_Effect_ID",
+                "5501"
               ]
             }
           }
