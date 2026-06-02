@@ -3604,6 +3604,12 @@ class QuickBrowsePanel(QWidget):
 
         search_row.addStretch(1)
 
+        # 一鍵解除所有釘選（置於 Save to Excel 左側）
+        self.unpin_all_btn = QPushButton("📌 解除全部釘選")
+        self.unpin_all_btn.setToolTip("解除目前所有釘選的表格")
+        self.unpin_all_btn.clicked.connect(self.unpin_all)
+        search_row.addWidget(self.unpin_all_btn, 0)
+
         self.save_btn = QPushButton("Save to Excel")
         self.save_btn.clicked.connect(self.save)
         search_row.addWidget(self.save_btn, 0)
@@ -3727,6 +3733,14 @@ class QuickBrowsePanel(QWidget):
             self.pinned = [n for n in self.pinned if n['id'] != node_id]
             self.rebuild_chips()
             self.pins_changed.emit()
+
+    def unpin_all(self):
+        """一鍵解除所有釘選（保留目前預覽內容）。"""
+        if not self.pinned:
+            return
+        self.pinned = []
+        self.rebuild_chips()
+        self.pins_changed.emit()
 
     def next_pinned(self, forward=True):
         """回傳釘選清單中相對目前預覽的下一個 / 上一個 node_data；無釘選則回傳 None。"""
@@ -3857,6 +3871,9 @@ class QuickBrowsePanel(QWidget):
         self.pin_search_in.setFocus()
 
     def rebuild_chips(self):
+        # 釘選數量變動時同步「解除全部釘選」按鈕的可用狀態
+        if hasattr(self, 'unpin_all_btn'):
+            self.unpin_all_btn.setEnabled(bool(self.pinned))
         # 清空現有方塊
         while self.chip_layout.count():
             it = self.chip_layout.takeAt(0)
