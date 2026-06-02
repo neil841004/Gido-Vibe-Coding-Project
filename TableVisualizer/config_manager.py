@@ -11,8 +11,29 @@ import sys
 import shutil
 from pathlib import Path
 
-# 應用程式名稱：作為各平台使用者設定資料夾的名稱
+# 應用程式名稱：作為各平台使用者資料夾的名稱
 APP_NAME = 'TableVisualizer'
+
+
+def get_user_data_dir():
+    """回傳各平台的使用者資料夾（TableVisualizer 專用）並確保其存在。
+
+    所有「可寫入」的 JSON（gui_config.json、excel_structure.json、
+    relationship_graph.json、user_relations.json）皆存放於此，避免應用被放在
+    唯讀位置（如 Program Files）或 onefile 暫存目錄而無法寫入 / 遺失：
+        Windows: %APPDATA%\\TableVisualizer
+        macOS:   ~/Library/Application Support/TableVisualizer
+        Linux:   ${XDG_CONFIG_HOME:-~/.config}/TableVisualizer
+    """
+    if sys.platform == 'win32':
+        base = os.environ.get('APPDATA') or str(Path.home() / 'AppData' / 'Roaming')
+    elif sys.platform == 'darwin':
+        base = str(Path.home() / 'Library' / 'Application Support')
+    else:
+        base = os.environ.get('XDG_CONFIG_HOME') or str(Path.home() / '.config')
+    data_dir = Path(base) / APP_NAME
+    data_dir.mkdir(parents=True, exist_ok=True)
+    return data_dir
 
 
 class ConfigManager:
@@ -34,15 +55,8 @@ class ConfigManager:
         else:
             self.app_dir = Path(__file__).parent
 
-        # gui_config.json 存放於各平台的使用者設定資料夾（可永久寫入，且不隨應用搬移而遺失）：
-        #   Windows: %APPDATA%\TableVisualizer\gui_config.json
-        #   macOS:   ~/Library/Application Support/TableVisualizer/gui_config.json
-        #   Linux:   ${XDG_CONFIG_HOME:-~/.config}/TableVisualizer/gui_config.json
-        self.config_dir = self._get_user_config_dir()
-        try:
-            self.config_dir.mkdir(parents=True, exist_ok=True)
-        except Exception as e:
-            print(f"Failed to create config directory {self.config_dir}: {e}")
+        # gui_config.json 存放於各平台的使用者資料夾（見 get_user_data_dir）
+        self.config_dir = get_user_data_dir()
         self.config_path = self.config_dir / config_file
 
         # 若使用者設定尚未建立，依序嘗試：1) 遷移舊版設定 2) 複製打包內建預設值。
@@ -83,16 +97,6 @@ class ConfigManager:
             }
         }
         self.load_config()
-
-    def _get_user_config_dir(self):
-        """回傳各平台的使用者設定資料夾（TableVisualizer 專用）。"""
-        if sys.platform == 'win32':
-            base = os.environ.get('APPDATA') or str(Path.home() / 'AppData' / 'Roaming')
-        elif sys.platform == 'darwin':
-            base = str(Path.home() / 'Library' / 'Application Support')
-        else:
-            base = os.environ.get('XDG_CONFIG_HOME') or str(Path.home() / '.config')
-        return Path(base) / APP_NAME
 
     def _initialize_config_file(self, config_file):
         """首次啟動時建立使用者設定檔。

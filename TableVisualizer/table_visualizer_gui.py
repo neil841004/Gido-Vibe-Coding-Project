@@ -15,6 +15,7 @@ import sys
 import json
 import math
 import random
+import shutil
 from pathlib import Path
 
 # PyQt6 imports
@@ -39,18 +40,17 @@ from PyQt6.QtGui import (
     QTransform, QPolygonF, QIcon, QAction, QShortcut, QKeySequence, QDrag
 )
 
-from config_manager import ConfigManager
+from config_manager import ConfigManager, get_user_data_dir
 from excel_handler import ExcelHandler
 
 
-def get_app_directory():
-    """回傳可永久寫入的應用程式目錄（存放 JSON 設定 / 關聯檔）。
+def get_legacy_app_directory():
+    """舊版 JSON 存放位置（執行檔 / 原始碼所在目錄），僅用於一次性遷移。
 
     - PyInstaller 凍結環境（含 --onefile）：使用執行檔所在目錄。
       不可用 __file__，因為它會指向 onefile 解壓的暫存 _MEIPASS，結束即被刪除。
     - macOS .app bundle：往上跳出 Contents/MacOS，回到 .app 旁的目錄。
     - 一般執行：使用原始碼所在目錄。
-    與 ConfigManager 的路徑判斷保持一致。
     """
     if getattr(sys, 'frozen', False):
         app_dir = Path(sys.executable).parent
@@ -58,6 +58,15 @@ def get_app_directory():
             app_dir = app_dir.parent.parent.parent
         return app_dir
     return Path(__file__).parent
+
+
+def get_app_directory():
+    """所有可寫入 JSON 的統一存放位置（使用者資料夾，與 gui_config.json 同處）。
+
+    含執行期重新產生的 relationship_graph.json / excel_structure.json，以及
+    使用者手動關聯 user_relations.json。詳見 config_manager.get_user_data_dir()。
+    """
+    return get_user_data_dir()
 
 
 # --- Constants ---
@@ -1734,8 +1743,15 @@ class MainGraphView(BaseGraphView):
 # User Relation Manager handles manual overrides
 class UserRelationManager:
     def __init__(self):
-        # JSON 檔案固定保存在應用程式目錄（凍結環境下為執行檔目錄）
+        # user_relations.json 存放於使用者資料夾；首次啟動從舊版位置遷移既有關聯
         self.file_path = get_app_directory() / 'user_relations.json'
+        if not self.file_path.exists():
+            legacy = get_legacy_app_directory() / 'user_relations.json'
+            try:
+                if legacy.exists() and legacy.resolve() != self.file_path.resolve():
+                    shutil.copy2(legacy, self.file_path)
+            except Exception as e:
+                print(f"Failed to migrate user_relations.json: {e}")
         self.relations = self.load_relations()
         
     def load_relations(self):
